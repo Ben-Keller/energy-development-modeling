@@ -1,0 +1,5 @@
+mario_region,mario_sector,gva_per_musd_output,household_income_per_musd_output,reference_year,source,notes
+East_Africa,Construction,0.42,0.22,2019,placeholder,replace with calibrated estimate
+West_Africa,Gas_supply_chain,0.38,0.14,2019,placeholder,replace with calibrated estimate
+Southern_Africa,Electrical_equipment,0.47,0.20,2019,placeholder,replace with calibrated estimate
+North_Africa,Transmission_and_distribution,0.44,0.18,2019,placeholder,replace with calibrated estimate

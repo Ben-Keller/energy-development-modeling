@@ -1,0 +1,15 @@
+file_name,column_name,required,dtype,description
+energy_service_balance.csv,run_id,yes,string,Unique run identifier
+energy_service_balance.csv,scenario,yes,string,Scenario key
+energy_service_balance.csv,region,yes,string,Mapped MARIO region
+energy_service_balance.csv,year,yes,int,Model year
+energy_service_balance.csv,carrier,yes,string,Energy carrier
+energy_service_balance.csv,generation,yes,float,Total generation in model units
+energy_service_balance.csv,demand,yes,float,Total demand in model units
+energy_service_balance.csv,net_imports,no,float,Net imports in model units
+investment_shocks.csv,technology,yes,string,Calliope technology key
+investment_shocks.csv,mario_sector,yes,string,Target MARIO sector
+investment_shocks.csv,shock_value,yes,float,Shock magnitude in monetary units
+operating_shocks.csv,technology,yes,string,Calliope technology key
+operating_shocks.csv,mario_sector,yes,string,Target MARIO sector
+operating_shocks.csv,shock_value,yes,float,Shock magnitude in monetary units

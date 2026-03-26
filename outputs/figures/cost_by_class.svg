@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="244" viewBox="0 0 1100 244">
+<rect width="100%" height="100%" fill="#0b1220"/>
+<text x="300" y="40" fill="#e6edf8" font-size="24" font-family="Arial" font-weight="700">System Cost by Cost Class</text>
+<text x="300" y="66" fill="#9fb0c9" font-size="14" font-family="Arial">run_id=ab19aad5, scenario=new_links, solved_at=unknown, solution_time=n/as (note: co2 is model cost-class proxy, not physical emissions)</text>
+<text x="288" y="116" fill="#d6e0f0" font-size="14" font-family="Arial" text-anchor="end">co2</text>
+<rect x="300" y="100" width="640.00" height="22" rx="4" fill="#ff9770" />
+<text x="950" y="116" fill="#d6e0f0" font-size="14" font-family="Arial">9.55B</text>
+<text x="288" y="158" fill="#d6e0f0" font-size="14" font-family="Arial" text-anchor="end">monetary</text>
+<rect x="300" y="142" width="172.27" height="22" rx="4" fill="#ff9770" />
+<text x="950" y="158" fill="#d6e0f0" font-size="14" font-family="Arial">2.57B</text>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="370" viewBox="0 0 1100 370">
+<rect width="100%" height="100%" fill="#0b1220"/>
+<text x="300" y="40" fill="#e6edf8" font-size="24" font-family="Arial" font-weight="700">Generation by Power Pool</text>
+<text x="300" y="66" fill="#9fb0c9" font-size="14" font-family="Arial">run_id=ab19aad5, scenario=new_links, solved_at=unknown, solution_time=n/as</text>
+<text x="288" y="116" fill="#d6e0f0" font-size="14" font-family="Arial" text-anchor="end">EAPP</text>
+<rect x="300" y="100" width="640.00" height="22" rx="4" fill="#41b98b" />
+<text x="950" y="116" fill="#d6e0f0" font-size="14" font-family="Arial">45.57B</text>
+<text x="288" y="158" fill="#d6e0f0" font-size="14" font-family="Arial" text-anchor="end">SAPP</text>
+<rect x="300" y="142" width="467.03" height="22" rx="4" fill="#41b98b" />
+<text x="950" y="158" fill="#d6e0f0" font-size="14" font-family="Arial">33.25B</text>
+<text x="288" y="200" fill="#d6e0f0" font-size="14" font-family="Arial" text-anchor="end">CAPP</text>
+<rect x="300" y="184" width="174.02" height="22" rx="4" fill="#41b98b" />
+<text x="950" y="200" fill="#d6e0f0" font-size="14" font-family="Arial">12.39B</text>
+<text x="288" y="242" fill="#d6e0f0" font-size="14" font-family="Arial" text-anchor="end">NAPP</text>
+<rect x="300" y="226" width="118.46" height="22" rx="4" fill="#41b98b" />
+<text x="950" y="242" fill="#d6e0f0" font-size="14" font-family="Arial">8.44B</text>
+<text x="288" y="284" fill="#d6e0f0" font-size="14" font-family="Arial" text-anchor="end">WAPP</text>
+<rect x="300" y="268" width="92.39" height="22" rx="4" fill="#41b98b" />
+<text x="950" y="284" fill="#d6e0f0" font-size="14" font-family="Arial">6.58B</text>
+</svg>

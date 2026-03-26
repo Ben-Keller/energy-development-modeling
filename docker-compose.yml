@@ -1,0 +1,28 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    volumes:
+      - ./outputs/runs:/app/outputs/runs
+      - ./outputs/figures:/app/outputs/figures
+      - ./Calliope-Africa-main:/app/calliope-africa:ro
+      - ./inputs:/app/inputs:ro
+      - ./frontend:/app/frontend:ro
+    environment:
+      - EDIM_CALLIOPE_ROOT=/app/calliope-africa
+      - EDIM_FRONTEND_DIR=/app/frontend
+      - EDIM_RUNS_DIR=/app/outputs/runs
+      - EDIM_CONFIG_DIR=/app/inputs
+      - EDIM_SOLVER=highs
+      - EDIM_ALLOW_FULL_YEAR=true
+      - EDIM_DEV_SUBSET_START=2019-01-01
+      - EDIM_DEV_SUBSET_END=2019-01-14
+      - EDIM_ANALYSIS_SUBSET_START=2019-01-01
+      - EDIM_ANALYSIS_SUBSET_END=2019-03-31
+      - EDIM_DEVELOPMENT_ENGINE=mario
+      - EDIM_MARIO_TIMEOUT_SECONDS=120
+      - EDIM_MARIO_FAIL_ON_ERROR=false
+      - EDIM_SUMMARY_DIAGNOSTICS_MAX_ROWS=120
+      - EDIM_CORS_ALLOW_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
+    ports:
+      - "8000:8000"

@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EDIM – Integrated Energy-Development Workbench</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(1200px 600px at 10% -20%, #1a2f56 0%, rgba(26, 47, 86, 0) 60%),
+          radial-gradient(900px 520px at 100% -25%, #1d3b66 0%, rgba(29, 59, 102, 0) 62%),
+          #070d17;
+        color: #e6edf7;
+        min-height: 100vh;
+      }
+
+      a {
+        color: #86b9ff;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .container {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 24px 18px 40px;
+      }
+
+      .card {
+        background: linear-gradient(180deg, #0e1628 0%, #0b1322 100%);
+        border: 1px solid #22324f;
+        border-radius: 14px;
+        padding: 12px 14px;
+        box-shadow: 0 8px 22px rgba(4, 9, 18, 0.32);
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .muted {
+        color: #a9bad0;
+      }
+
+      .warn {
+        border: 1px solid #6f4d2c;
+        background: #2b2015;
+        color: #ffd7b0;
+        border-radius: 12px;
+        padding: 10px 12px;
+        margin-top: 14px;
+      }
+
+      .ok {
+        border: 1px solid #2f5d49;
+        background: #10251d;
+        color: #bdf3d9;
+        border-radius: 12px;
+        padding: 10px 12px;
+        margin-top: 14px;
+      }
+
+      label {
+        font-size: 12px;
+        color: #a9bad0;
+        display: block;
+      }
+
+      input[type="number"],
+      input[type="text"],
+      select {
+        background: #0a1220;
+        color: #e6edf7;
+        border: 1px solid #2a3a58;
+        border-radius: 8px;
+        padding: 7px 8px;
+      }
+
+      input[type="range"] {
+        accent-color: #6da8ff;
+      }
+
+      button {
+        background: #2d6bcd;
+        color: #f2f7ff;
+        border: 0;
+        border-radius: 9px;
+        padding: 9px 12px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      button:hover:enabled {
+        filter: brightness(1.08);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      code {
+        background: #0a1220;
+        border: 1px solid #243551;
+        border-radius: 6px;
+        padding: 1px 6px;
+        font-size: 12px;
+        color: #d8e7fd;
+      }
+
+      .metric-card {
+        min-width: 140px;
+        padding: 8px 10px;
+        border: 1px solid #26375a;
+        border-radius: 10px;
+      }
+
+      .panel-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      .panel-table th {
+        text-align: left;
+        border-bottom: 1px solid #21304f;
+        padding: 8px 6px;
+        color: #c5d4e6;
+        font-weight: 600;
+      }
+
+      .panel-table td {
+        border-bottom: 1px solid #1a253c;
+        padding: 8px 6px;
+      }
+
+      .panel-table tbody tr:hover {
+        background: rgba(79, 135, 255, 0.08);
+      }
+
+      .row-selected {
+        background: #14213a;
+      }
+
+      .hbar-wrap {
+        display: grid;
+        gap: 8px;
+      }
+
+      .hbar-row {
+        display: grid;
+        grid-template-columns: 150px 1fr 80px;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+      }
+
+      .hbar-track {
+        height: 12px;
+        background: #111c31;
+        border: 1px solid #22324f;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .hbar-fill {
+        height: 100%;
+        background: #4f87ff;
+      }
+
+      .hbar-fill.negative {
+        background: #62c393;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid transparent;
+      }
+
+      .badge-neutral {
+        color: #c6d5ec;
+        background: #111d32;
+        border-color: #2a3b5e;
+      }
+
+      .badge-queued {
+        color: #cde0ff;
+        background: #172949;
+        border-color: #35588e;
+      }
+
+      .badge-running {
+        color: #ffe9c1;
+        background: #3a2a11;
+        border-color: #7b5b25;
+      }
+
+      .badge-succeeded {
+        color: #bdf3d9;
+        background: #122b22;
+        border-color: #2f5d49;
+      }
+
+      .badge-warning {
+        color: #ffd7b0;
+        background: #2b2015;
+        border-color: #6f4d2c;
+      }
+
+      .badge-failed,
+      .badge-cancelled {
+        color: #ffc8c8;
+        background: #31191d;
+        border-color: #7a363f;
+      }
+
+      .segmented-control {
+        display: inline-flex;
+        gap: 6px;
+        background: #101a2c;
+        border: 1px solid #2a3a58;
+        border-radius: 10px;
+        padding: 4px;
+      }
+
+      .seg-button {
+        background: transparent;
+        color: #b2c5df;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 7px 10px;
+        font-weight: 600;
+      }
+
+      .seg-button.active {
+        color: #e8f2ff;
+        background: #2f5fb8;
+        border-color: #4d82df;
+      }
+
+      @media (max-width: 980px) {
+        .container {
+          padding: 16px 12px 30px;
+        }
+
+        .grid {
+          grid-template-columns: 1fr !important;
+        }
+
+        .hbar-row {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel" data-presets="env,react" src="./app.jsx"></script>
+  </body>
+</html>

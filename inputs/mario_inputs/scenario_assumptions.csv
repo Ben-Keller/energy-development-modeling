@@ -1,0 +1,6 @@
+assumption_key,scenario_key,value,unit,effective_year,source,notes
+usd_local_fx,baseline,1.00,index,2019,placeholder,replace with country/region FX paths
+gdp_deflator,baseline,1.00,index,2019,placeholder,replace with calibrated deflator series
+fuel_price_shock,high_fuel,1.25,multiplier,2040,placeholder,stress-test assumption
+carbon_price,net_zero_push,75,usd_per_tco2,2040,placeholder,policy package assumption
+demand_growth_adjustment,high_growth,1.10,multiplier,2040,placeholder,macro-demand stress case
