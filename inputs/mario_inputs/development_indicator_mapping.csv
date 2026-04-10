@@ -1,6 +1,8 @@
 indicator_id,indicator_name,driver_metric,aggregation_rule,unit,lag_years,notes
-jobs_total,Total employment impact,jobs_per_musd_total,sum,jobs,0,from MARIO + intensity tables
-gva_total,Gross value added impact,gva_per_musd_output,sum,musd_2019,0,from MARIO output
-energy_affordability_proxy,Household energy burden proxy,household_income_per_musd_output,ratio,index,1,requires household demand side series
-import_dependence,Energy import dependence,net_import_value,ratio,percent,0,requires trade account extraction
-co2_cost_burden,Carbon cost burden,co2_cost_proxy,sum,musd_2019,0,proxy until physical emissions channel is added
+jobs_total,Total employment impact,jobs_total,sum,jobs,0,Seeded mapping using MARIO employment totals.
+gva_total,Gross value added impact,gva_total_musd,sum,musd_2019,0,Seeded mapping using MARIO value-added totals.
+household_income_supported,Household income supported,household_income_proxy_musd,sum,musd_2019,0,Income proxy based on the modeled household share of value added.
+import_leakage,Import leakage from supply chain,import_leakage_musd,sum,musd_2019,0,Supply-chain leakage proxy from import-oriented supplier sectors.
+reliability_gap,Unserved energy share,unserved_energy_share,average,share,0,Service reliability proxy from modeled unserved energy share.
+system_cost,System cost,monetary_cost,sum,usd_2019,0,Run-wide monetary system cost.
+co2_cost_burden,Carbon cost burden,co2_cost_proxy,sum,musd_2019,0,Physical emissions multiplied by the seeded carbon-price assumption.

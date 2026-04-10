@@ -9,7 +9,8 @@ This module intentionally keeps summary logic deterministic and data-first:
 
 Key modeling assumptions to keep explicit for maintainers:
 1. Pool mapping comes from Calliope location constraint YAML files.
-2. Physical emissions are derived as generation * technology CO2 factor when available.
+2. Physical emissions prefer direct `cost[costs=co2]` accounting when available and fall back to
+   generation * technology CO2 factor otherwise.
 3. Technology grouping is heuristic string-based classification for visualization only.
 4. Missing model variables do not hard-fail a run; warnings are emitted in summary payloads.
 """
@@ -101,6 +102,27 @@ def _maybe_get_input(model, varname: str):
         return None
 
 
+def _manual_records(
+    df: pd.DataFrame,
+    columns: List[str],
+    max_rows: int | None = None,
+) -> List[Dict[str, Any]]:
+    if df.empty:
+        return []
+    keep = [c for c in columns if c in df.columns]
+    if not keep:
+        return []
+    out = df[keep].copy()
+    if max_rows is not None and len(out) > max_rows:
+        out = out.head(max_rows)
+    for col in keep:
+        if pd.api.types.is_numeric_dtype(out[col]):
+            out[col] = pd.to_numeric(out[col], errors="coerce").fillna(0.0).astype(float).round(6)
+        else:
+            out[col] = out[col].astype(str)
+    return out.to_dict(orient="records")
+
+
 def _summarize_generation(
     da,
     max_generation_techs: int,
@@ -157,6 +179,65 @@ def _summarize_category(
     if len(df) > max_rows:
         df = df.head(max_rows)
     return _to_records(df, group_dims)
+
+
+def _cost_class_df(model, cost_class: str) -> pd.DataFrame:
+    cost = _maybe_get(model, "cost")
+    if cost is None:
+        return pd.DataFrame(columns=["value"])
+    df = _expand_composite_indices(_clean_values(_to_dataframe(cost)))
+    if df.empty or "costs" not in df.columns:
+        return pd.DataFrame(columns=["value"])
+    target = str(cost_class or "").strip().lower()
+    mask = df["costs"].astype(str).str.strip().str.lower() == target
+    return df.loc[mask].copy()
+
+
+def _factor_emissions_summary(
+    model,
+    tech_library: dict | None,
+    pool_map: Dict[str, str],
+    emit_warnings: bool,
+    warnings: List[str],
+) -> Dict[str, Any] | None:
+    carrier_prod = model.results["carrier_prod"] if "carrier_prod" in model.results else None
+    if carrier_prod is None:
+        if emit_warnings:
+            warnings.append("Summary diagnostics physical_emissions: 'carrier_prod' not found.")
+        return None
+
+    gen = _expand_composite_indices(_clean_values(_to_dataframe(carrier_prod)))
+    if not {"techs", "locs"}.issubset(gen.columns):
+        if emit_warnings:
+            warnings.append("Summary diagnostics physical_emissions: carrier_prod missing tech/loc dimensions.")
+        return None
+
+    factors = _extract_emission_factors(tech_library)
+    if not factors:
+        if emit_warnings:
+            warnings.append("Summary diagnostics physical_emissions: no technology emission factors found in tech library.")
+        return None
+
+    work = gen.copy()
+    work["factor"] = work["techs"].map(factors).fillna(0.0)
+    work["emissions"] = work["value"] * work["factor"]
+    total_generation = float(work["value"].sum())
+    covered_generation = float(work.loc[work["factor"] > 0, "value"].sum())
+    by_tech = work.groupby("techs", as_index=False)["emissions"].sum().rename(columns={"emissions": "value"})
+    by_pool = (
+        work.assign(pool=work["locs"].map(pool_map).fillna("UNKNOWN"))
+        .groupby("pool", as_index=False)["emissions"]
+        .sum()
+        .rename(columns={"emissions": "value"})
+    )
+    by_tech = by_tech.sort_values("value", ascending=False, key=lambda s: s.abs())
+    by_pool = by_pool.sort_values("value", ascending=False, key=lambda s: s.abs())
+    return {
+        "coverage_share": (covered_generation / total_generation) if total_generation > 0 else 0.0,
+        "total_emissions": float(by_tech["value"].sum()) if not by_tech.empty else 0.0,
+        "by_tech": by_tech,
+        "by_pool": by_pool,
+    }
 
 
 def build_summary_core(
@@ -477,7 +558,7 @@ def _summarize_trade_matrix(model, pool_map: Dict[str, str], max_rows: int, warn
     net = exports.merge(imports, on="pool", how="outer").fillna(0.0)
     net["value"] = net["exports"] - net["imports"]
     net = net.sort_values("value", ascending=False, key=lambda s: s.abs())
-    out["net_by_pool"]["records"] = _to_records(net, ["pool"], max_rows=max_rows)
+    out["net_by_pool"]["records"] = _manual_records(net, ["pool", "exports", "imports", "value"], max_rows=max_rows)
     return out
 
 
@@ -506,45 +587,218 @@ def _summarize_physical_emissions(
     """Compute physical emissions from generation and mapped technology factors."""
     out: Dict[str, Any] = {
         "method": "",
+        "source_variable": "",
         "factor_coverage_share": 0.0,
         "total_emissions": 0.0,
+        "cost_class_total_emissions": 0.0,
+        "factor_method_total_emissions": 0.0,
+        "factor_method_gap": 0.0,
+        "factor_method_gap_share": 0.0,
         "by_tech": {"records": []},
         "by_pool": {"records": []},
     }
+    factor_summary = _factor_emissions_summary(
+        model=model,
+        tech_library=tech_library,
+        pool_map=pool_map,
+        emit_warnings=False,
+        warnings=warnings,
+    )
+    if factor_summary:
+        out["factor_coverage_share"] = float(factor_summary.get("coverage_share") or 0.0)
+        out["factor_method_total_emissions"] = float(factor_summary.get("total_emissions") or 0.0)
+
+    direct = _cost_class_df(model, "co2")
+    if not direct.empty:
+        out["method"] = "cost_class_co2_direct"
+        out["source_variable"] = "cost[costs=co2]"
+        out["cost_class_total_emissions"] = float(direct["value"].sum())
+        out["total_emissions"] = out["cost_class_total_emissions"]
+        if "techs" in direct.columns:
+            by_tech = direct.groupby("techs", as_index=False)["value"].sum().sort_values("value", ascending=False, key=lambda s: s.abs())
+            out["by_tech"]["records"] = _to_records(by_tech, ["techs"], max_rows=max_rows)
+        if "locs" in direct.columns:
+            by_pool = (
+                direct.assign(pool=direct["locs"].map(pool_map).fillna("UNKNOWN"))
+                .groupby("pool", as_index=False)["value"]
+                .sum()
+                .sort_values("value", ascending=False, key=lambda s: s.abs())
+            )
+            out["by_pool"]["records"] = _to_records(by_pool, ["pool"], max_rows=max_rows)
+        if factor_summary:
+            out["factor_method_gap"] = out["cost_class_total_emissions"] - out["factor_method_total_emissions"]
+            denom = max(abs(out["cost_class_total_emissions"]), 1e-12)
+            out["factor_method_gap_share"] = abs(out["factor_method_gap"]) / denom
+        return out
+
+    factor_summary = _factor_emissions_summary(
+        model=model,
+        tech_library=tech_library,
+        pool_map=pool_map,
+        emit_warnings=True,
+        warnings=warnings,
+    )
+    if not factor_summary:
+        return out
+
+    out["method"] = "generation_x_tech_co2_factor"
+    out["source_variable"] = "carrier_prod x tech_library.costs.co2.om_prod"
+    out["total_emissions"] = float(factor_summary.get("total_emissions") or 0.0)
+    out["factor_method_total_emissions"] = float(factor_summary.get("total_emissions") or 0.0)
+    out["by_tech"]["records"] = _to_records(factor_summary.get("by_tech") or pd.DataFrame(), ["techs"], max_rows=max_rows)
+    out["by_pool"]["records"] = _to_records(factor_summary.get("by_pool") or pd.DataFrame(), ["pool"], max_rows=max_rows)
+    return out
+
+
+def _summarize_system_structure(model, max_rows: int, warnings: List[str]) -> Dict[str, Any]:
+    out: Dict[str, Any] = {
+        "generation_total": 0.0,
+        "capacity_total": 0.0,
+        "renewable_generation_share": 0.0,
+        "zero_carbon_generation_share": 0.0,
+        "fossil_generation_share": 0.0,
+        "renewable_capacity_share": 0.0,
+        "zero_carbon_capacity_share": 0.0,
+        "fossil_capacity_share": 0.0,
+        "generation_by_group": {"records": []},
+        "capacity_by_group": {"records": []},
+    }
+    renewable_groups = {"VRE", "Hydro", "Geothermal", "Bioenergy"}
+    zero_carbon_groups = renewable_groups | {"Nuclear"}
+
     carrier_prod = model.results["carrier_prod"] if "carrier_prod" in model.results else None
     if carrier_prod is None:
-        warnings.append("Summary diagnostics physical_emissions: 'carrier_prod' not found.")
+        warnings.append("Summary diagnostics system_structure: 'carrier_prod' not found.")
+    else:
+        gen = _expand_composite_indices(_clean_values(_to_dataframe(carrier_prod)))
+        if "techs" not in gen.columns:
+            warnings.append("Summary diagnostics system_structure: carrier_prod missing tech dimension.")
+        else:
+            gen = gen[~gen["techs"].map(lambda tech: _classify_tech_group(tech) in {"Demand", "Transmission"})].copy()
+            gen["tech_group"] = gen["techs"].map(_classify_tech_group)
+            gen_by_group = gen.groupby("tech_group", as_index=False)["value"].sum()
+            gen_by_group = gen_by_group.sort_values("value", ascending=False, key=lambda s: s.abs())
+            out["generation_total"] = float(gen_by_group["value"].sum()) if not gen_by_group.empty else 0.0
+            out["generation_by_group"]["records"] = _to_records(gen_by_group, ["tech_group"], max_rows=max_rows)
+            if out["generation_total"] > 0:
+                by_group = {str(row["tech_group"]): float(row["value"]) for row in out["generation_by_group"]["records"]}
+                renewable_total = sum(by_group.get(group, 0.0) for group in renewable_groups)
+                zero_carbon_total = sum(by_group.get(group, 0.0) for group in zero_carbon_groups)
+                fossil_total = float(by_group.get("Fossil", 0.0))
+                out["renewable_generation_share"] = renewable_total / out["generation_total"]
+                out["zero_carbon_generation_share"] = zero_carbon_total / out["generation_total"]
+                out["fossil_generation_share"] = fossil_total / out["generation_total"]
+
+    energy_cap = model.results["energy_cap"] if "energy_cap" in model.results else None
+    if energy_cap is None:
+        warnings.append("Summary diagnostics system_structure: 'energy_cap' not found.")
+    else:
+        cap = _expand_composite_indices(_clean_values(_to_dataframe(energy_cap)))
+        if "techs" not in cap.columns:
+            warnings.append("Summary diagnostics system_structure: energy_cap missing tech dimension.")
+        else:
+            cap = cap[~cap["techs"].map(lambda tech: _classify_tech_group(tech) in {"Demand", "Transmission"})].copy()
+            cap["tech_group"] = cap["techs"].map(_classify_tech_group)
+            cap_by_group = cap.groupby("tech_group", as_index=False)["value"].sum()
+            cap_by_group = cap_by_group.sort_values("value", ascending=False, key=lambda s: s.abs())
+            out["capacity_total"] = float(cap_by_group["value"].sum()) if not cap_by_group.empty else 0.0
+            out["capacity_by_group"]["records"] = _to_records(cap_by_group, ["tech_group"], max_rows=max_rows)
+            if out["capacity_total"] > 0:
+                by_group = {str(row["tech_group"]): float(row["value"]) for row in out["capacity_by_group"]["records"]}
+                renewable_total = sum(by_group.get(group, 0.0) for group in renewable_groups)
+                zero_carbon_total = sum(by_group.get(group, 0.0) for group in zero_carbon_groups)
+                fossil_total = float(by_group.get("Fossil", 0.0))
+                out["renewable_capacity_share"] = renewable_total / out["capacity_total"]
+                out["zero_carbon_capacity_share"] = zero_carbon_total / out["capacity_total"]
+                out["fossil_capacity_share"] = fossil_total / out["capacity_total"]
+
+    return out
+
+
+def _summarize_energy_balance(
+    model,
+    pool_map: Dict[str, str],
+    reliability: Dict[str, Any],
+    trade_matrix: Dict[str, Any],
+    max_rows: int,
+    warnings: List[str],
+) -> Dict[str, Any]:
+    out: Dict[str, Any] = {
+        "max_abs_balance_gap": 0.0,
+        "max_abs_balance_gap_share": 0.0,
+        "records": [],
+    }
+    carrier_prod = model.results["carrier_prod"] if "carrier_prod" in model.results else None
+    if carrier_prod is None:
+        warnings.append("Summary diagnostics energy_balance: 'carrier_prod' not found.")
         return out
 
     gen = _expand_composite_indices(_clean_values(_to_dataframe(carrier_prod)))
-    if not {"techs", "locs"}.issubset(gen.columns):
-        warnings.append("Summary diagnostics physical_emissions: carrier_prod missing tech/loc dimensions.")
+    if not {"locs", "techs"}.issubset(gen.columns):
+        warnings.append("Summary diagnostics energy_balance: carrier_prod missing loc/tech dimensions.")
         return out
 
-    factors = _extract_emission_factors(tech_library)
-    if not factors:
-        warnings.append("Summary diagnostics physical_emissions: no technology emission factors found in tech library.")
-        return out
-
-    gen["factor"] = gen["techs"].map(factors).fillna(0.0)
-    gen["emissions"] = gen["value"] * gen["factor"]
-    covered_generation = float(gen.loc[gen["factor"] > 0, "value"].sum())
-    total_generation = float(gen["value"].sum())
-    out["factor_coverage_share"] = (covered_generation / total_generation) if total_generation > 0 else 0.0
-
-    by_tech = gen.groupby("techs", as_index=False)["emissions"].sum().rename(columns={"emissions": "value"})
-    by_pool = (
+    gen = gen[~gen["techs"].map(lambda tech: _classify_tech_group(tech) in {"Demand", "Transmission"})].copy()
+    generation_by_pool = (
         gen.assign(pool=gen["locs"].map(pool_map).fillna("UNKNOWN"))
-        .groupby("pool", as_index=False)["emissions"]
+        .groupby("pool", as_index=False)["value"]
         .sum()
-        .rename(columns={"emissions": "value"})
+        .rename(columns={"value": "generation"})
     )
-    by_tech = by_tech.sort_values("value", ascending=False, key=lambda s: s.abs())
-    by_pool = by_pool.sort_values("value", ascending=False, key=lambda s: s.abs())
-    out["method"] = "generation_x_tech_co2_factor"
-    out["total_emissions"] = float(by_tech["value"].sum()) if not by_tech.empty else 0.0
-    out["by_tech"]["records"] = _to_records(by_tech, ["techs"], max_rows=max_rows)
-    out["by_pool"]["records"] = _to_records(by_pool, ["pool"], max_rows=max_rows)
+
+    demand_rows = ((reliability.get("demand_by_pool") or {}).get("records") or [])
+    unmet_rows = ((reliability.get("unserved_by_pool") or {}).get("records") or [])
+    trade_rows = ((trade_matrix.get("net_by_pool") or {}).get("records") or [])
+
+    demand_df = pd.DataFrame(demand_rows) if demand_rows else pd.DataFrame(columns=["pool", "value"])
+    if not demand_df.empty:
+        demand_df = demand_df.rename(columns={"value": "demand"})
+    unmet_df = pd.DataFrame(unmet_rows) if unmet_rows else pd.DataFrame(columns=["pool", "value"])
+    if not unmet_df.empty:
+        unmet_df = unmet_df.rename(columns={"value": "unserved"})
+    trade_df = pd.DataFrame(trade_rows) if trade_rows else pd.DataFrame(columns=["pool", "exports", "imports", "value"])
+    if not trade_df.empty:
+        if "exports" not in trade_df.columns:
+            trade_df["exports"] = trade_df["value"].clip(lower=0)
+        if "imports" not in trade_df.columns:
+            trade_df["imports"] = (-trade_df["value"]).clip(lower=0)
+        trade_df["net_exports"] = pd.to_numeric(trade_df.get("value"), errors="coerce").fillna(0.0)
+        trade_df["net_imports"] = pd.to_numeric(trade_df.get("imports"), errors="coerce").fillna(0.0) - pd.to_numeric(
+            trade_df.get("exports"), errors="coerce"
+        ).fillna(0.0)
+
+    merged = generation_by_pool
+    for extra in (demand_df, unmet_df, trade_df):
+        if extra.empty:
+            continue
+        cols = [c for c in extra.columns if c == "pool" or c in {"demand", "unserved", "exports", "imports", "net_exports", "net_imports"}]
+        merged = merged.merge(extra[cols], on="pool", how="outer")
+
+    if merged.empty:
+        return out
+
+    merged = merged.fillna(0.0)
+    for col in ("generation", "demand", "unserved", "exports", "imports", "net_exports", "net_imports"):
+        if col not in merged.columns:
+            merged[col] = 0.0
+        merged[col] = pd.to_numeric(merged[col], errors="coerce").fillna(0.0)
+    merged["balance_gap"] = merged["generation"] + merged["net_imports"] + merged["unserved"] - merged["demand"]
+    merged["balance_gap_share"] = merged.apply(
+        lambda row: abs(float(row["balance_gap"])) / max(abs(float(row["demand"])), abs(float(row["generation"])), 1e-12),
+        axis=1,
+    )
+    merged = merged.sort_values("balance_gap_share", ascending=False)
+    out["max_abs_balance_gap"] = float(merged["balance_gap"].abs().max()) if not merged.empty else 0.0
+    out["max_abs_balance_gap_share"] = float(merged["balance_gap_share"].max()) if not merged.empty else 0.0
+    out["records"] = _manual_records(
+        merged,
+        ["pool", "generation", "demand", "unserved", "exports", "imports", "net_exports", "net_imports", "balance_gap", "balance_gap_share"],
+        max_rows=max_rows,
+    )
+    if out["max_abs_balance_gap_share"] > 0.02:
+        warnings.append(
+            "Summary diagnostics energy_balance: pool energy balance residual exceeds 2% for at least one pool."
+        )
     return out
 
 
@@ -619,15 +873,26 @@ def build_summary_diagnostics(
 ) -> Dict[str, Any]:
     """Build diagnostics payload used by API + UI detailed panels."""
     pool_map = _load_pool_mapping(calliope_root)
+    reliability = _summarize_reliability(model, pool_map=pool_map, max_rows=max_rows, warnings=warnings)
+    trade_matrix = _summarize_trade_matrix(model, pool_map=pool_map, max_rows=max_rows, warnings=warnings)
     return {
-        "version": "1.0",
+        "version": "1.1",
         "run_metadata": _extract_run_metadata(model, run_id=run_id, scenario=scenario),
-        "reliability": _summarize_reliability(model, pool_map=pool_map, max_rows=max_rows, warnings=warnings),
-        "trade_matrix": _summarize_trade_matrix(model, pool_map=pool_map, max_rows=max_rows, warnings=warnings),
+        "reliability": reliability,
+        "trade_matrix": trade_matrix,
         "physical_emissions": _summarize_physical_emissions(
             model,
             tech_library=tech_library,
             pool_map=pool_map,
+            max_rows=max_rows,
+            warnings=warnings,
+        ),
+        "system_structure": _summarize_system_structure(model, max_rows=max_rows, warnings=warnings),
+        "energy_balance": _summarize_energy_balance(
+            model,
+            pool_map=pool_map,
+            reliability=reliability,
+            trade_matrix=trade_matrix,
             max_rows=max_rows,
             warnings=warnings,
         ),

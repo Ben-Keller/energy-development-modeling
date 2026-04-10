@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EDIM Architecture Component</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      --bg: #02040a;
+      --ink: #ffffff;
+      --muted: rgba(255,255,255,0.7);
+      --grid: rgba(255,255,255,0.045);
+      --layer: rgba(255,255,255,0.045);
+      --stroke: rgba(255,255,255,0.16);
+      --dataInput: #f59e0b;
+      --model: #38bdf8;
+      --output: #34d399;
+      --quality: #38bdf8;
+      --scenario: #f59e0b;
+      --energy: #38bdf8;
+      --bridge: #38bdf8;
+      --mrio: #38bdf8;
+      --impact: #38bdf8;
+      --frontend: #34d399;
+      --data: #f59e0b;
+    }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      font-family: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      overflow: hidden;
+    }
+    #diagram {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      background:
+        radial-gradient(circle at 16% 12%, rgba(56,189,248,0.16), rgba(56,189,248,0) 34%),
+        radial-gradient(circle at 82% 0%, rgba(52,211,153,0.12), rgba(52,211,153,0) 30%),
+        radial-gradient(circle at 50% 100%, rgba(245,158,11,0.08), rgba(245,158,11,0) 28%),
+        repeating-linear-gradient(0deg, transparent 0, transparent 31px, var(--grid) 32px),
+        repeating-linear-gradient(90deg, transparent 0, transparent 31px, var(--grid) 32px),
+        var(--bg);
+    }
+    svg { width: 100%; height: 100%; display: block; cursor: grab; }
+    svg:active { cursor: grabbing; }
+    .layer-band { fill: var(--layer); stroke: var(--stroke); stroke-width: 1.2; backdrop-filter: blur(6px); }
+    .layer-title { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; fill: rgba(255,255,255,0.72); }
+    .node, .node * { cursor: grab; }
+    .node:active, .node:active * { cursor: grabbing; }
+    .node rect.card { stroke-width: 1.35; filter: url(#shadow); }
+    .node .title { font-size: 17px; font-weight: 700; fill: #fff; }
+    .node .subtitle { font-size: 10.5px; font-weight: 700; fill: rgba(255,255,255,0.82); text-transform: uppercase; letter-spacing: 0.08em; }
+    .node .body { font-size: 12.2px; fill: rgba(255,255,255,0.92); dominant-baseline: hanging; }
+    .node .chip { fill: rgba(0,0,0,0.20); stroke: rgba(255,255,255,0.24); stroke-width: 1; }
+    .node .chip-label { font-size: 9.5px; font-weight: 800; fill: rgba(255,255,255,0.9); letter-spacing: 0.04em; text-transform: uppercase; }
+    .node.light .title, .node.light .body, .node.light .subtitle, .node.light .chip-label { fill: #fff; }
+    .node.light .subtitle { fill: rgba(255,255,255,0.78); }
+    .node.light .chip { fill: rgba(0,0,0,0.18); stroke: rgba(255,255,255,0.22); }
+    .edge { fill: none; stroke-width: 2.8; opacity: 0.62; }
+    .edge-wrap, .edge-wrap * { cursor: help; }
+    .edge-label { font-size: 10.5px; font-weight: 800; fill: rgba(255,255,255,0.86); letter-spacing: 0.01em; }
+    .annotation { font-size: 12px; fill: rgba(255,255,255,0.7); }
+    .legend-card { fill: rgba(2,4,10,0.78); stroke: var(--stroke); stroke-width: 1.1; }
+    .legend-title { font-size: 10.5px; font-weight: 800; fill: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.08em; }
+    .legend-label { font-size: 11px; font-weight: 800; fill: #fff; }
+    .legend-item { cursor: help; }
+    .port-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; fill: rgba(255,255,255,0.82); }
+    .node.active rect.card, .node:hover rect.card { stroke-width: 2.2; transform: translateY(-1px); }
+    .node.runtime-running rect.card { stroke: #f59e0b; stroke-width: 2.4; }
+    .node.runtime-complete rect.card { stroke: #22c55e; stroke-width: 2.1; }
+    .node.runtime-failed rect.card { stroke: #ef4444; stroke-width: 2.4; }
+    .runtime-badge text { font-size: 10px; font-weight: 900; fill: #fff; text-transform: uppercase; letter-spacing: 0.055em; }
+    .runtime-overlay { fill: rgba(2,4,10,0.58); stroke: rgba(148,163,184,0.42); }
+    .runtime-overlay-label { fill: #e2e8f0; font-size: 18px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.14em; }
+    .runtime-glimmer { fill: rgba(255,255,255,0.08); opacity: 0.42; animation: runtimePulse 1.35s ease-in-out infinite; pointer-events: none; }
+    @keyframes runtimePulse {
+      0%, 100% { opacity: 0.12; }
+      50% { opacity: 0.42; }
+    }
+    .edge.active, .edge:hover { stroke-width: 4.6; opacity: 1; }
+    .tooltip {
+      position: fixed; pointer-events: none; max-width: 430px; padding: 12px 14px;
+      background: rgba(4, 8, 18, 0.97); color: #fff; border-radius: 12px;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.44); font-size: 12.5px; line-height: 1.45;
+      opacity: 0; transform: translateY(4px); transition: opacity 120ms ease, transform 120ms ease; z-index: 20;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .tooltip.visible { opacity: 1; transform: translateY(0); }
+    .tooltip .tt-title { font-size: 13px; font-weight: 800; margin-bottom: 4px; color: #fff; }
+    .tooltip .tt-sub { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,0.7); margin-bottom: 8px; }
+    .tooltip .tt-section { margin-top: 8px; font-size: 11px; font-weight: 800; color: rgba(255,255,255,0.74); text-transform: uppercase; letter-spacing: 0.06em; }
+    .tooltip ul { margin: 4px 0 0 18px; padding: 0; }
+    .tooltip li { margin: 2px 0; }
+    .status {
+      position: fixed; left: 16px; bottom: 14px; padding: 8px 10px; border-radius: 999px;
+      background: rgba(2,4,10,0.76); border: 1px solid var(--stroke); color: var(--muted);
+      font-size: 12px; font-weight: 700; backdrop-filter: blur(8px);
+    }
+  </style>
+</head>
+<body>
+  <div id="diagram" aria-label="EDIM unified architecture diagram"></div>
+  <div id="tooltip" class="tooltip" role="tooltip"></div>
+  <div id="status" class="status">Loading architecture spec...</div>
+  <script src="./architecture.js"></script>
+</body>
+</html>

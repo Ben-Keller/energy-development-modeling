@@ -18,12 +18,217 @@ REQUIRED_MARIO_INPUT_FILES = [
     "value_added_intensity.csv",
 ]
 
+OPTIONAL_MARIO_INPUT_FILES = [
+    "development_indicator_mapping.csv",
+    "scenario_assumptions.csv",
+]
+
+EXPERT_OWNED_DATASETS: Dict[str, Dict[str, Any]] = {
+    "employment_intensity.csv": {
+        "label": "Employment intensity table",
+        "strict_blocking": True,
+        "description": "Direct and total jobs factors by MARIO region and sector.",
+    },
+    "value_added_intensity.csv": {
+        "label": "Value-added intensity table",
+        "strict_blocking": True,
+        "description": "GVA and household-income multipliers by MARIO region and sector.",
+    },
+    "scenario_assumptions.csv": {
+        "label": "Scenario assumptions table",
+        "strict_blocking": True,
+        "description": "Exogenous macro and policy assumptions used by integrated indicators.",
+    },
+    "development_indicator_mapping.csv": {
+        "label": "Development indicator mapping",
+        "strict_blocking": False,
+        "description": "Maps modeled metrics into reported development indicators.",
+    },
+}
+
+PLACEHOLDER_SOURCE_VALUES = {"placeholder", "todo", "tbd", "sample", "example"}
+
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
     except Exception:
         return default
+
+
+def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
+    if not path.exists():
+        return []
+    try:
+        with path.open("r", encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(f)
+            out: List[Dict[str, str]] = []
+            for row in reader:
+                if not isinstance(row, dict):
+                    continue
+                out.append({str(k): "" if v is None else str(v).strip() for k, v in row.items()})
+            return out
+    except Exception:
+        return []
+
+
+def _placeholder_examples_for_rows(rows: List[Dict[str, str]], max_examples: int = 5) -> Tuple[int, List[Dict[str, Any]]]:
+    count = 0
+    examples: List[Dict[str, Any]] = []
+    for idx, row in enumerate(rows, start=2):
+        source = str(row.get("source", "")).strip().lower()
+        notes = str(row.get("notes", "")).strip().lower()
+        is_placeholder = source in PLACEHOLDER_SOURCE_VALUES or ("placeholder" in source)
+        if not is_placeholder and notes:
+            is_placeholder = ("placeholder" in notes) or ("replace with" in notes)
+        if not is_placeholder:
+            continue
+        count += 1
+        if len(examples) >= max_examples:
+            continue
+        label_parts = [
+            str(row.get("assumption_key", "")).strip(),
+            str(row.get("indicator_id", "")).strip(),
+            str(row.get("mario_region", "")).strip(),
+            str(row.get("mario_sector", "")).strip(),
+        ]
+        label = " / ".join([part for part in label_parts if part][:3])
+        examples.append(
+            {
+                "line": idx,
+                "label": label,
+                "source": str(row.get("source", "")).strip(),
+                "notes": str(row.get("notes", "")).strip(),
+            }
+        )
+    return count, examples
+
+
+def _normalize_year(value: Any) -> int | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        year = int(float(raw))
+    except Exception:
+        return None
+    return year if year > 0 else None
+
+
+def _assumption_scope_rank(row_scenario: str, target_scenario: str) -> int:
+    normalized = str(row_scenario or "").strip().lower()
+    target = str(target_scenario or "").strip().lower()
+    if target and normalized == target:
+        return 3
+    if normalized == "baseline":
+        return 2
+    if not normalized:
+        return 1
+    return 0
+
+
+def load_scenario_assumptions(
+    config_dir: Path,
+    scenario_key: str = "",
+    run_year: int | None = None,
+) -> Dict[str, Any]:
+    path = config_dir / "mario_inputs" / "scenario_assumptions.csv"
+    rows = _read_csv_rows(path)
+    placeholder_row_count, placeholder_examples = _placeholder_examples_for_rows(rows)
+    selected_candidates: Dict[str, List[Dict[str, Any]]] = {}
+    for row in rows:
+        assumption_key = str(row.get("assumption_key", "")).strip()
+        scenario_name = str(row.get("scenario_key", "")).strip()
+        if not assumption_key:
+            continue
+        scope_rank = _assumption_scope_rank(scenario_name, scenario_key)
+        if scope_rank <= 0:
+            continue
+        effective_year = _normalize_year(row.get("effective_year"))
+        candidate = {
+            **row,
+            "effective_year": effective_year,
+            "scope_rank": scope_rank,
+        }
+        selected_candidates.setdefault(assumption_key, []).append(candidate)
+
+    selected_records: List[Dict[str, Any]] = []
+    selected_values: Dict[str, Dict[str, Any]] = {}
+    selected_placeholder_row_count = 0
+    for assumption_key, candidates in selected_candidates.items():
+        candidates.sort(
+            key=lambda row: (
+                int(row.get("scope_rank") or 0),
+                int(row.get("effective_year") or -1),
+            ),
+            reverse=True,
+        )
+        chosen = candidates[0]
+        selected_records.append(
+            {
+                "assumption_key": assumption_key,
+                "scenario_key": str(chosen.get("scenario_key", "")).strip(),
+                "value": str(chosen.get("value", "")).strip(),
+                "value_numeric": _safe_float(chosen.get("value"), float("nan")),
+                "unit": str(chosen.get("unit", "")).strip(),
+                "effective_year": chosen.get("effective_year"),
+                "source": str(chosen.get("source", "")).strip(),
+                "notes": str(chosen.get("notes", "")).strip(),
+                "match_scope": (
+                    "scenario"
+                    if _assumption_scope_rank(chosen.get("scenario_key", ""), scenario_key) >= 3
+                    else "baseline"
+                    if str(chosen.get("scenario_key", "")).strip().lower() == "baseline"
+                    else "default"
+                ),
+            }
+        )
+        selected_values[assumption_key] = selected_records[-1]
+        source = str(chosen.get("source", "")).strip().lower()
+        notes = str(chosen.get("notes", "")).strip().lower()
+        if source in PLACEHOLDER_SOURCE_VALUES or "placeholder" in source or "placeholder" in notes or "replace with" in notes:
+            selected_placeholder_row_count += 1
+
+    selected_records.sort(key=lambda row: str(row.get("assumption_key", "")))
+    return {
+        "path": str(path),
+        "exists": path.exists(),
+        "requested_scenario": str(scenario_key or ""),
+        "run_year": int(run_year) if run_year else None,
+        "records": selected_records,
+        "selected_values": selected_values,
+        "selected_count": len(selected_records),
+        "selected_placeholder_row_count": int(selected_placeholder_row_count),
+        "file_placeholder_row_count": int(placeholder_row_count),
+        "file_placeholder_examples": placeholder_examples,
+    }
+
+
+def load_development_indicator_mapping(config_dir: Path) -> Dict[str, Any]:
+    path = config_dir / "mario_inputs" / "development_indicator_mapping.csv"
+    rows = _read_csv_rows(path)
+    normalized_rows = []
+    for row in rows:
+        indicator_id = str(row.get("indicator_id", "")).strip()
+        if not indicator_id:
+            continue
+        normalized_rows.append(
+            {
+                "indicator_id": indicator_id,
+                "indicator_name": str(row.get("indicator_name", "")).strip() or indicator_id,
+                "driver_metric": str(row.get("driver_metric", "")).strip(),
+                "aggregation_rule": str(row.get("aggregation_rule", "")).strip(),
+                "unit": str(row.get("unit", "")).strip(),
+                "lag_years": _normalize_year(row.get("lag_years")) or 0,
+                "notes": str(row.get("notes", "")).strip(),
+            }
+        )
+    return {
+        "path": str(path),
+        "exists": path.exists(),
+        "records": normalized_rows,
+        "record_count": len(normalized_rows),
+    }
 
 
 def mario_inputs_health(config_dir: Path) -> Dict[str, Any]:
@@ -33,10 +238,19 @@ def mario_inputs_health(config_dir: Path) -> Dict[str, Any]:
         "exists": mario_dir.exists(),
         "missing_required": [],
         "present_required": [],
+        "missing_optional": [],
+        "present_optional": [],
+        "expert_owned_files": sorted(EXPERT_OWNED_DATASETS.keys()),
+        "placeholder_files": [],
+        "placeholder_row_counts": {},
+        "placeholder_details": [],
+        "blocking_placeholder_files": [],
+        "expert_inputs_ready": False,
         "ok": False,
     }
     if not mario_dir.exists():
         out["missing_required"] = list(REQUIRED_MARIO_INPUT_FILES)
+        out["missing_optional"] = list(OPTIONAL_MARIO_INPUT_FILES)
         return out
 
     missing: List[str] = []
@@ -50,6 +264,44 @@ def mario_inputs_health(config_dir: Path) -> Dict[str, Any]:
 
     out["missing_required"] = missing
     out["present_required"] = present
+    missing_optional: List[str] = []
+    present_optional: List[str] = []
+    for name in OPTIONAL_MARIO_INPUT_FILES:
+        candidate = mario_dir / name
+        if candidate.exists() and candidate.is_file():
+            present_optional.append(name)
+        else:
+            missing_optional.append(name)
+    out["missing_optional"] = missing_optional
+    out["present_optional"] = present_optional
+
+    placeholder_details: List[Dict[str, Any]] = []
+    placeholder_row_counts: Dict[str, int] = {}
+    blocking_placeholder_files: List[str] = []
+    for file_name, meta in EXPERT_OWNED_DATASETS.items():
+        candidate = mario_dir / file_name
+        rows = _read_csv_rows(candidate)
+        placeholder_count, examples = _placeholder_examples_for_rows(rows)
+        if placeholder_count <= 0:
+            continue
+        placeholder_row_counts[file_name] = int(placeholder_count)
+        placeholder_details.append(
+            {
+                "file_name": file_name,
+                "label": str(meta.get("label", file_name)),
+                "strict_blocking": bool(meta.get("strict_blocking", False)),
+                "placeholder_row_count": int(placeholder_count),
+                "examples": examples,
+            }
+        )
+        if bool(meta.get("strict_blocking", False)):
+            blocking_placeholder_files.append(file_name)
+
+    out["placeholder_row_counts"] = placeholder_row_counts
+    out["placeholder_details"] = placeholder_details
+    out["placeholder_files"] = sorted(placeholder_row_counts.keys())
+    out["blocking_placeholder_files"] = sorted(blocking_placeholder_files)
+    out["expert_inputs_ready"] = len(blocking_placeholder_files) == 0
     out["ok"] = len(missing) == 0
     return out
 

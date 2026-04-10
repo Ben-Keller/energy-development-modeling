@@ -1,0 +1,6501 @@
+{
+  "version": "1.0",
+  "crs": "EPSG:4326",
+  "topo_object_default": "data",
+  "paths": {
+    "topo_dir": "countries_topojson",
+    "world_fit_geojson": "world_fit.geojson"
+  },
+  "world": {
+    "bbox": [
+      -180.0,
+      -89.9000015089999,
+      180.0,
+      83.6176528921196
+    ],
+    "fit_feature": "world_fit.geojson"
+  },
+  "country_index": [
+    "ABW",
+    "AFG",
+    "AGO",
+    "AIA",
+    "ALA",
+    "ALB",
+    "AND",
+    "ARE",
+    "ARG",
+    "ARM",
+    "ASM",
+    "ATA",
+    "ATF",
+    "ATG",
+    "AUS",
+    "AUT",
+    "AZE",
+    "BDI",
+    "BEL",
+    "BEN",
+    "BES",
+    "BFA",
+    "BGD",
+    "BGR",
+    "BHR",
+    "BHS",
+    "BIH",
+    "BLM",
+    "BLR",
+    "BLZ",
+    "BMU",
+    "BOL",
+    "BRA",
+    "BRB",
+    "BRN",
+    "BTN",
+    "BVT",
+    "BWA",
+    "CAF",
+    "CAN",
+    "CCK",
+    "CHE",
+    "CHL",
+    "CHN",
+    "CIV",
+    "CMR",
+    "COD",
+    "COG",
+    "COK",
+    "COL",
+    "COM",
+    "CPV",
+    "CRI",
+    "CUB",
+    "CUW",
+    "CXR",
+    "CYM",
+    "CYP",
+    "CZE",
+    "DEU",
+    "DJI",
+    "DMA",
+    "DNK",
+    "DOM",
+    "DZA",
+    "ECU",
+    "EGY",
+    "ERI",
+    "ESH",
+    "ESP",
+    "EST",
+    "ETH",
+    "FIN",
+    "FJI",
+    "FLK",
+    "FRA",
+    "FRO",
+    "FSM",
+    "GAB",
+    "GBR",
+    "GEO",
+    "GGY",
+    "GHA",
+    "GIB",
+    "GIN",
+    "GLP",
+    "GMB",
+    "GNB",
+    "GNQ",
+    "GRC",
+    "GRD",
+    "GRL",
+    "GTM",
+    "GUF",
+    "GUM",
+    "GUY",
+    "HKG",
+    "HMD",
+    "HND",
+    "HRV",
+    "HTI",
+    "HUN",
+    "IDN",
+    "IMN",
+    "IND",
+    "IRL",
+    "IRN",
+    "IRQ",
+    "ISL",
+    "ISR",
+    "ITA",
+    "JAM",
+    "JEY",
+    "JOR",
+    "JPN",
+    "KAZ",
+    "KEN",
+    "KGZ",
+    "KHM",
+    "KIR",
+    "KNA",
+    "KOR",
+    "KWT",
+    "LAO",
+    "LBN",
+    "LBR",
+    "LBY",
+    "LCA",
+    "LIE",
+    "LKA",
+    "LSO",
+    "LTU",
+    "LUX",
+    "LVA",
+    "MAC",
+    "MAF",
+    "MAR",
+    "MCO",
+    "MDA",
+    "MDG",
+    "MDV",
+    "MEX",
+    "MHL",
+    "MKD",
+    "MLI",
+    "MLT",
+    "MMR",
+    "MNE",
+    "MNG",
+    "MNP",
+    "MOZ",
+    "MRT",
+    "MSR",
+    "MTQ",
+    "MUS",
+    "MWI",
+    "MYS",
+    "MYT",
+    "NAM",
+    "NCL",
+    "NER",
+    "NFK",
+    "NGA",
+    "NIC",
+    "NIU",
+    "NLD",
+    "NOR",
+    "NPL",
+    "NRU",
+    "NZL",
+    "OMN",
+    "PAK",
+    "PAN",
+    "PCN",
+    "PER",
+    "PHL",
+    "PLW",
+    "PNG",
+    "POL",
+    "PRI",
+    "PRK",
+    "PRT",
+    "PRY",
+    "PSE",
+    "PYF",
+    "QAT",
+    "REU",
+    "ROU",
+    "RUS",
+    "RWA",
+    "SAU",
+    "SDN",
+    "SEN",
+    "SGP",
+    "SGS",
+    "SHN",
+    "SJM",
+    "SLB",
+    "SLE",
+    "SLV",
+    "SMR",
+    "SOM",
+    "SPM",
+    "SRB",
+    "SSD",
+    "STP",
+    "SUR",
+    "SVK",
+    "SVN",
+    "SWE",
+    "SWZ",
+    "SXM",
+    "SYC",
+    "SYR",
+    "TCA",
+    "TCD",
+    "TGO",
+    "THA",
+    "TJK",
+    "TKL",
+    "TKM",
+    "TLS",
+    "TON",
+    "TTO",
+    "TUN",
+    "TUR",
+    "TUV",
+    "TWN",
+    "TZA",
+    "UGA",
+    "UKR",
+    "URY",
+    "USA",
+    "UZB",
+    "VAT",
+    "VCT",
+    "VEN",
+    "VGB",
+    "VIR",
+    "VNM",
+    "VUT",
+    "WSM",
+    "XAC",
+    "XAP",
+    "XJK",
+    "YEM",
+    "ZAF",
+    "ZMB",
+    "ZWE"
+  ],
+  "countries": {
+    "ABW": {
+      "iso3cd": "ABW",
+      "id": "ABW",
+      "file": "countries_topojson/ABW.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -70.0643125195493,
+        12.4102915009755,
+        -69.8675768725338,
+        12.6227903633073
+      ],
+      "label_point": [
+        -69.97384939268497,
+        12.5086040025221
+      ],
+      "bbox_center": [
+        -69.96594469604156,
+        12.5165409321414
+      ],
+      "area_m2_equal_area": 203635817.9820802,
+      "area_rank": 227,
+      "draw_order": 227,
+      "feature_count": 1
+    },
+    "AFG": {
+      "iso3cd": "AFG",
+      "id": "AFG",
+      "file": "countries_topojson/AFG.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        60.5210951929927,
+        29.4203334966706,
+        74.8898620002189,
+        38.4772730002792
+      ],
+      "label_point": [
+        65.19882733070861,
+        33.938075000152196
+      ],
+      "bbox_center": [
+        67.7054785966058,
+        33.9488032484749
+      ],
+      "area_m2_equal_area": 642654902220.3423,
+      "area_rank": 42,
+      "draw_order": 42,
+      "feature_count": 1
+    },
+    "AGO": {
+      "iso3cd": "AGO",
+      "id": "AGO",
+      "file": "countries_topojson/AGO.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        11.7543132421766,
+        -18.0251060877531,
+        24.0334385688579,
+        -4.44204110825226
+      ],
+      "label_point": [
+        18.887439562629126,
+        -11.8806503693651
+      ],
+      "bbox_center": [
+        17.89387590551725,
+        -11.233573598002682
+      ],
+      "area_m2_equal_area": 1245282269499.8042,
+      "area_rank": 24,
+      "draw_order": 24,
+      "feature_count": 1
+    },
+    "AIA": {
+      "iso3cd": "AIA",
+      "id": "AIA",
+      "file": "countries_topojson/AIA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -63.1674404602966,
+        18.1611372897541,
+        -62.9797478180993,
+        18.269262404649
+      ],
+      "label_point": [
+        -63.078553697887095,
+        18.2012458023402
+      ],
+      "bbox_center": [
+        -63.07359413919795,
+        18.215199847201553
+      ],
+      "area_m2_equal_area": 88020755.03322981,
+      "area_rank": 233,
+      "draw_order": 233,
+      "feature_count": 1
+    },
+    "ALA": {
+      "iso3cd": "ALA",
+      "id": "ALA",
+      "file": "countries_topojson/ALA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        19.5285301225394,
+        59.9067420947645,
+        20.9355602257973,
+        60.4251098626189
+      ],
+      "label_point": [
+        20.061458367919165,
+        60.2274398810057
+      ],
+      "bbox_center": [
+        20.23204517416835,
+        60.1659259786917
+      ],
+      "area_m2_equal_area": 994595572.2585561,
+      "area_rank": 192,
+      "draw_order": 192,
+      "feature_count": 1
+    },
+    "ALB": {
+      "iso3cd": "ALB",
+      "id": "ALB",
+      "file": "countries_topojson/ALB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        19.2897300005578,
+        39.6770240637063,
+        21.0245410005489,
+        42.6604498076812
+      ],
+      "label_point": [
+        20.008942543230997,
+        41.188330000185346
+      ],
+      "bbox_center": [
+        20.157135500553352,
+        41.16873693569375
+      ],
+      "area_m2_equal_area": 28697189603.357975,
+      "area_rank": 148,
+      "draw_order": 148,
+      "feature_count": 1
+    },
+    "AND": {
+      "iso3cd": "AND",
+      "id": "AND",
+      "file": "countries_topojson/AND.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        1.42637200030602,
+        42.4302070004511,
+        1.7575340003318,
+        42.6552020001597
+      ],
+      "label_point": [
+        1.583440378868087,
+        42.5373163311577
+      ],
+      "bbox_center": [
+        1.59195300031891,
+        42.5427045003054
+      ],
+      "area_m2_equal_area": 499185037.3601478,
+      "area_rank": 204,
+      "draw_order": 204,
+      "feature_count": 1
+    },
+    "ARE": {
+      "iso3cd": "ARE",
+      "id": "ARE",
+      "file": "countries_topojson/ARE.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        51.5905560003433,
+        22.6477974052487,
+        56.37464000035,
+        26.0506359999778
+      ],
+      "label_point": [
+        55.16858195097464,
+        24.4391262281655
+      ],
+      "bbox_center": [
+        53.98259800034665,
+        24.349216702613248
+      ],
+      "area_m2_equal_area": 68696247712.87892,
+      "area_rank": 123,
+      "draw_order": 123,
+      "feature_count": 1
+    },
+    "ARG": {
+      "iso3cd": "ARG",
+      "id": "ARG",
+      "file": "countries_topojson/ARG.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -73.5163789995091,
+        -54.9891929631681,
+        -53.6771347233107,
+        -21.7879350978412
+      ],
+      "label_point": [
+        -64.05581583767186,
+        -37.2594635306992
+      ],
+      "bbox_center": [
+        -63.5967568614099,
+        -38.388564030504654
+      ],
+      "area_m2_equal_area": 2780199183337.628,
+      "area_rank": 10,
+      "draw_order": 10,
+      "feature_count": 1
+    },
+    "ARM": {
+      "iso3cd": "ARM",
+      "id": "ARM",
+      "file": "countries_topojson/ARM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        43.4480989994704,
+        38.8428109883429,
+        46.5337293632462,
+        41.2970859996741
+      ],
+      "label_point": [
+        44.816144670007105,
+        40.078449500263304
+      ],
+      "bbox_center": [
+        44.990914181358306,
+        40.0699484940085
+      ],
+      "area_m2_equal_area": 29895447891.809982,
+      "area_rank": 147,
+      "draw_order": 147,
+      "feature_count": 1
+    },
+    "ASM": {
+      "iso3cd": "ASM",
+      "id": "ASM",
+      "file": "countries_topojson/ASM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -170.843514999851,
+        -14.3688354998852,
+        -169.418801999836,
+        -14.2113440003144
+      ],
+      "label_point": [
+        -170.75114538728693,
+        -14.312078499776199
+      ],
+      "bbox_center": [
+        -170.1311584998435,
+        -14.2900897500998
+      ],
+      "area_m2_equal_area": 231414893.5599956,
+      "area_rank": 223,
+      "draw_order": 223,
+      "feature_count": 1
+    },
+    "ATA": {
+      "iso3cd": "ATA",
+      "id": "ATA",
+      "file": "countries_topojson/ATA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -180.0,
+        -89.9000015089999,
+        180.0,
+        -61.912269593
+      ],
+      "label_point": [
+        66.85825675521521,
+        -76.59601211499995
+      ],
+      "bbox_center": [
+        0.0,
+        -75.90613555099995
+      ],
+      "area_m2_equal_area": 12523584269467.803,
+      "area_rank": 2,
+      "draw_order": 2,
+      "feature_count": 1
+    },
+    "ATF": {
+      "iso3cd": "ATF",
+      "id": "ATF",
+      "file": "countries_topojson/ATF.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        40.3261445557891,
+        -49.7329124450104,
+        77.5988006584509,
+        -22.3362690737021
+      ],
+      "label_point": [
+        69.09635819670603,
+        -49.1955394739849
+      ],
+      "bbox_center": [
+        58.96247260712,
+        -36.03459075935625
+      ],
+      "area_m2_equal_area": 6901910561.034062,
+      "area_rank": 175,
+      "draw_order": 175,
+      "feature_count": 1
+    },
+    "ATG": {
+      "iso3cd": "ATG",
+      "id": "ATG",
+      "file": "countries_topojson/ATG.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -61.9002151475999,
+        17.0031909938172,
+        -61.6724205023712,
+        17.70460891877
+      ],
+      "label_point": [
+        -61.79475148513839,
+        17.0802455632629
+      ],
+      "bbox_center": [
+        -61.78631782498555,
+        17.3538999562936
+      ],
+      "area_m2_equal_area": 472405987.1757965,
+      "area_rank": 207,
+      "draw_order": 207,
+      "feature_count": 1
+    },
+    "AUS": {
+      "iso3cd": "AUS",
+      "id": "AUS",
+      "file": "countries_topojson/AUS.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        112.911056520055,
+        -43.6335182186377,
+        153.613525391602,
+        -10.7048425667262
+      ],
+      "label_point": [
+        133.13012121142216,
+        -25.0064296726386
+      ],
+      "bbox_center": [
+        133.2622909558285,
+        -27.169180392681948
+      ],
+      "area_m2_equal_area": 7663330986761.289,
+      "area_rank": 7,
+      "draw_order": 7,
+      "feature_count": 1
+    },
+    "AUT": {
+      "iso3cd": "AUT",
+      "id": "AUT",
+      "file": "countries_topojson/AUT.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        9.53082987730432,
+        46.3926633345249,
+        17.1608069994174,
+        48.9997057491077
+      ],
+      "label_point": [
+        14.896565884233889,
+        47.68524411333985
+      ],
+      "bbox_center": [
+        13.34581843836086,
+        47.696184541816294
+      ],
+      "area_m2_equal_area": 83555414197.2239,
+      "area_rank": 117,
+      "draw_order": 117,
+      "feature_count": 1
+    },
+    "AZE": {
+      "iso3cd": "AZE",
+      "id": "AZE",
+      "file": "countries_topojson/AZE.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        44.7667739996402,
+        38.2868359201279,
+        51.675840000497,
+        42.7107599999871
+      ],
+      "label_point": [
+        48.613254746148534,
+        40.43315350023455
+      ],
+      "bbox_center": [
+        48.2213070000686,
+        40.4987979600575
+      ],
+      "area_m2_equal_area": 164091150563.2081,
+      "area_rank": 94,
+      "draw_order": 94,
+      "feature_count": 1
+    },
+    "BDI": {
+      "iso3cd": "BDI",
+      "id": "BDI",
+      "file": "countries_topojson/BDI.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        29.0406414495416,
+        -4.45143423399898,
+        30.8377935077811,
+        -2.33269418211844
+      ],
+      "label_point": [
+        29.896633331086655,
+        -3.4680995789470153
+      ],
+      "bbox_center": [
+        29.939217478661348,
+        -3.3920642080587102
+      ],
+      "area_m2_equal_area": 27081766662.74812,
+      "area_rank": 151,
+      "draw_order": 151,
+      "feature_count": 1
+    },
+    "BEL": {
+      "iso3cd": "BEL",
+      "id": "BEL",
+      "file": "countries_topojson/BEL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        2.54544093636567,
+        49.5461076800646,
+        6.34148299943718,
+        51.4966390004714
+      ],
+      "label_point": [
+        4.81440141243531,
+        50.567441749807855
+      ],
+      "bbox_center": [
+        4.443461967901425,
+        50.521373340268
+      ],
+      "area_m2_equal_area": 30652529411.397022,
+      "area_rank": 146,
+      "draw_order": 146,
+      "feature_count": 1
+    },
+    "BEN": {
+      "iso3cd": "BEN",
+      "id": "BEN",
+      "file": "countries_topojson/BEN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        0.776557540508865,
+        6.23629932084563,
+        3.84276768938132,
+        12.4035139888203
+      ],
+      "label_point": [
+        2.304438485083973,
+        9.37579752108709
+      ],
+      "bbox_center": [
+        2.3096626149450925,
+        9.319906654832966
+      ],
+      "area_m2_equal_area": 114772086144.45496,
+      "area_rank": 105,
+      "draw_order": 105,
+      "feature_count": 1
+    },
+    "BES": {
+      "iso3cd": "BES",
+      "id": "BES",
+      "file": "countries_topojson/BES.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -68.3489643260583,
+        12.0254770851762,
+        -62.9436683663727,
+        17.6561012267821
+      ],
+      "label_point": [
+        -68.23682331612157,
+        12.145528946498551
+      ],
+      "bbox_center": [
+        -65.6463163462155,
+        14.840789155979149
+      ],
+      "area_m2_equal_area": 248640066.89730805,
+      "area_rank": 222,
+      "draw_order": 222,
+      "feature_count": 3
+    },
+    "BFA": {
+      "iso3cd": "BFA",
+      "id": "BFA",
+      "file": "countries_topojson/BFA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -5.51320699968832,
+        9.41151430507942,
+        2.4074270002128,
+        15.0828160001603
+      ],
+      "label_point": [
+        -1.180255130544944,
+        12.2579425000482
+      ],
+      "bbox_center": [
+        -1.5528899997377599,
+        12.24716515261986
+      ],
+      "area_m2_equal_area": 272520096258.74994,
+      "area_rank": 75,
+      "draw_order": 75,
+      "feature_count": 1
+    },
+    "BGD": {
+      "iso3cd": "BGD",
+      "id": "BGD",
+      "file": "countries_topojson/BGD.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        88.0165070004677,
+        20.8897764248786,
+        92.6097242520556,
+        26.5747340001642
+      ],
+      "label_point": [
+        89.88428915278196,
+        23.77709753499405
+      ],
+      "bbox_center": [
+        90.31311562626165,
+        23.7322552125214
+      ],
+      "area_m2_equal_area": 129934766027.56638,
+      "area_rank": 99,
+      "draw_order": 99,
+      "feature_count": 1
+    },
+    "BGR": {
+      "iso3cd": "BGR",
+      "id": "BGR",
+      "file": "countries_topojson/BGR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        22.359805611444,
+        41.2773233531566,
+        28.5958557135197,
+        44.2154509999256
+      ],
+      "label_point": [
+        25.084434500637613,
+        42.7141896149206
+      ],
+      "bbox_center": [
+        25.47783066248185,
+        42.746387176541106
+      ],
+      "area_m2_equal_area": 111008617208.42503,
+      "area_rank": 107,
+      "draw_order": 107,
+      "feature_count": 1
+    },
+    "BHR": {
+      "iso3cd": "BHR",
+      "id": "BHR",
+      "file": "countries_topojson/BHR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        50.4546165471801,
+        25.8032855997058,
+        50.6350440994584,
+        26.231790542305
+      ],
+      "label_point": [
+        50.55433848516631,
+        25.978796005114198
+      ],
+      "bbox_center": [
+        50.544830323319246,
+        26.017538071005397
+      ],
+      "area_m2_equal_area": 581056951.9797493,
+      "area_rank": 200,
+      "draw_order": 200,
+      "feature_count": 1
+    },
+    "BHS": {
+      "iso3cd": "BHS",
+      "id": "BHS",
+      "file": "countries_topojson/BHS.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -79.3057098393769,
+        20.9160671240823,
+        -72.7300287877223,
+        27.0241991680473
+      ],
+      "label_point": [
+        -73.33905697873513,
+        21.11453529946365
+      ],
+      "bbox_center": [
+        -76.0178693135496,
+        23.9701331460648
+      ],
+      "area_m2_equal_area": 12742159057.841125,
+      "area_rank": 166,
+      "draw_order": 166,
+      "feature_count": 1
+    },
+    "BIH": {
+      "iso3cd": "BIH",
+      "id": "BIH",
+      "file": "countries_topojson/BIH.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        15.7601403641869,
+        42.5565023797546,
+        19.5812030000222,
+        45.2367203410746
+      ],
+      "label_point": [
+        18.074846638460958,
+        43.80034499991454
+      ],
+      "bbox_center": [
+        17.670671682104548,
+        43.896611360414596
+      ],
+      "area_m2_equal_area": 51565776813.54997,
+      "area_rank": 132,
+      "draw_order": 132,
+      "feature_count": 1
+    },
+    "BLM": {
+      "iso3cd": "BLM",
+      "id": "BLM",
+      "file": "countries_topojson/BLM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -62.8669125904374,
+        17.8792347109752,
+        -62.7897603371744,
+        17.9207906883172
+      ],
+      "label_point": [
+        -62.824964932710486,
+        17.90090696257255
+      ],
+      "bbox_center": [
+        -62.8283364638059,
+        17.9000126996462
+      ],
+      "area_m2_equal_area": 25646052.022733156,
+      "area_rank": 243,
+      "draw_order": 243,
+      "feature_count": 1
+    },
+    "BLR": {
+      "iso3cd": "BLR",
+      "id": "BLR",
+      "file": "countries_topojson/BLR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        23.1788361634433,
+        51.3700229996825,
+        32.7492729999139,
+        56.1707430004044
+      ],
+      "label_point": [
+        27.932403328923943,
+        53.762966000283754
+      ],
+      "bbox_center": [
+        27.9640545816786,
+        53.77038300004345
+      ],
+      "area_m2_equal_area": 207877690414.9902,
+      "area_rank": 87,
+      "draw_order": 87,
+      "feature_count": 1
+    },
+    "BLZ": {
+      "iso3cd": "BLZ",
+      "id": "BLZ",
+      "file": "countries_topojson/BLZ.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -89.215127999686,
+        15.8900350003273,
+        -88.1241302487644,
+        18.4873533772112
+      ],
+      "label_point": [
+        -88.70773800036483,
+        17.154561865273102
+      ],
+      "bbox_center": [
+        -88.6696291242252,
+        17.18869418876925
+      ],
+      "area_m2_equal_area": 21870029313.83601,
+      "area_rank": 156,
+      "draw_order": 156,
+      "feature_count": 1
+    },
+    "BMU": {
+      "iso3cd": "BMU",
+      "id": "BMU",
+      "file": "countries_topojson/BMU.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -64.8865949027849,
+        32.2464420061282,
+        -64.6887868114074,
+        32.3570816578788
+      ],
+      "label_point": [
+        -64.7574429975275,
+        32.301813938725005
+      ],
+      "bbox_center": [
+        -64.78769085709615,
+        32.3017618320035
+      ],
+      "area_m2_equal_area": 45502189.77314225,
+      "area_rank": 238,
+      "draw_order": 238,
+      "feature_count": 1
+    },
+    "BOL": {
+      "iso3cd": "BOL",
+      "id": "BOL",
+      "file": "countries_topojson/BOL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -69.5757330003349,
+        -22.896864378398,
+        -57.5655423478328,
+        -9.67200155489302
+      ],
+      "label_point": [
+        -64.09467923141584,
+        -16.28961568690695
+      ],
+      "bbox_center": [
+        -63.570637674083855,
+        -16.28443296664551
+      ],
+      "area_m2_equal_area": 1084237210754.9104,
+      "area_rank": 29,
+      "draw_order": 29,
+      "feature_count": 1
+    },
+    "BRA": {
+      "iso3cd": "BRA",
+      "id": "BRA",
+      "file": "countries_topojson/BRA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -73.8723699997917,
+        -33.7444540661795,
+        -34.7957420344564,
+        5.27025653825613
+      ],
+      "label_point": [
+        -49.72900471877655,
+        -14.19693477099485
+      ],
+      "bbox_center": [
+        -54.334056017124055,
+        -14.237098763961685
+      ],
+      "area_m2_equal_area": 8471678905898.94,
+      "area_rank": 6,
+      "draw_order": 6,
+      "feature_count": 1
+    },
+    "BRB": {
+      "iso3cd": "BRB",
+      "id": "BRB",
+      "file": "countries_topojson/BRB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -59.6489219669222,
+        13.0398435582731,
+        -59.4203758241841,
+        13.3272571566246
+      ],
+      "label_point": [
+        -59.56407146913239,
+        13.2149081238863
+      ],
+      "bbox_center": [
+        -59.53464889555315,
+        13.183550357448851
+      ],
+      "area_m2_equal_area": 494683094.1945916,
+      "area_rank": 205,
+      "draw_order": 205,
+      "feature_count": 1
+    },
+    "BRN": {
+      "iso3cd": "BRN",
+      "id": "BRN",
+      "file": "countries_topojson/BRN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        114.071456909015,
+        4.00892396703812,
+        115.334799703613,
+        5.04717302376565
+      ],
+      "label_point": [
+        114.48527157659711,
+        4.54993975745474
+      ],
+      "bbox_center": [
+        114.703128306314,
+        4.528048495401885
+      ],
+      "area_m2_equal_area": 5770731811.032435,
+      "area_rank": 177,
+      "draw_order": 177,
+      "feature_count": 1
+    },
+    "BTN": {
+      "iso3cd": "BTN",
+      "id": "BTN",
+      "file": "countries_topojson/BTN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        88.7739810003301,
+        26.7418819996987,
+        92.1157020003899,
+        28.227948999595
+      ],
+      "label_point": [
+        90.42347400627983,
+        27.47750149973115
+      ],
+      "bbox_center": [
+        90.44484150036,
+        27.48491549964685
+      ],
+      "area_m2_equal_area": 39545892764.97378,
+      "area_rank": 139,
+      "draw_order": 139,
+      "feature_count": 1
+    },
+    "BVT": {
+      "iso3cd": "BVT",
+      "id": "BVT",
+      "file": "countries_topojson/BVT.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        3.33549904816788,
+        -54.4623794558337,
+        3.4879760728258,
+        -54.4030532837892
+      ],
+      "label_point": [
+        3.4128333268318225,
+        -54.4318084715088
+      ],
+      "bbox_center": [
+        3.4117375604968396,
+        -54.432716369811445
+      ],
+      "area_m2_equal_area": 50826884.64360603,
+      "area_rank": 236,
+      "draw_order": 236,
+      "feature_count": 1
+    },
+    "BWA": {
+      "iso3cd": "BWA",
+      "id": "BWA",
+      "file": "countries_topojson/BWA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        19.9993180003289,
+        -26.8856280003602,
+        29.3753040002947,
+        -17.7922441737116
+      ],
+      "label_point": [
+        24.498881229644248,
+        -22.294761499977803
+      ],
+      "bbox_center": [
+        24.6873110003118,
+        -22.3389360870359
+      ],
+      "area_m2_equal_area": 578305273033.2366,
+      "area_rank": 49,
+      "draw_order": 49,
+      "feature_count": 1
+    },
+    "CAF": {
+      "iso3cd": "CAF",
+      "id": "CAF",
+      "file": "countries_topojson/CAF.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        14.5870586046119,
+        2.22033489605374,
+        27.4549974757236,
+        11.0072700000927
+      ],
+      "label_point": [
+        20.617400925355625,
+        6.598210319619005
+      ],
+      "bbox_center": [
+        21.02102804016775,
+        6.613802448073219
+      ],
+      "area_m2_equal_area": 619015158259.7269,
+      "area_rank": 45,
+      "draw_order": 45,
+      "feature_count": 1
+    },
+    "CAN": {
+      "iso3cd": "CAN",
+      "id": "CAN",
+      "file": "countries_topojson/CAN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -141.001980017999,
+        41.6765874022969,
+        -52.6419702727782,
+        83.1112645935394
+      ],
+      "label_point": [
+        -110.40405110180282,
+        56.800926541953245
+      ],
+      "bbox_center": [
+        -96.82197514538859,
+        62.39392599791815
+      ],
+      "area_m2_equal_area": 9902681590251.656,
+      "area_rank": 3,
+      "draw_order": 3,
+      "feature_count": 1
+    },
+    "CCK": {
+      "iso3cd": "CCK",
+      "id": "CCK",
+      "file": "countries_topojson/CCK.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        96.8169489447675,
+        -12.2087705696499,
+        96.9296813218255,
+        -12.148788271161
+      ],
+      "label_point": [
+        96.91132276995242,
+        -12.186625542035099
+      ],
+      "bbox_center": [
+        96.8733151332965,
+        -12.17877942040545
+      ],
+      "area_m2_equal_area": 29478141.863029607,
+      "area_rank": 242,
+      "draw_order": 242,
+      "feature_count": 1
+    },
+    "CHE": {
+      "iso3cd": "CHE",
+      "id": "CHE",
+      "file": "countries_topojson/CHE.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        5.96367799953594,
+        45.8589935002071,
+        10.4835774992472,
+        47.7655014985407
+      ],
+      "label_point": [
+        8.434647112749984,
+        46.8134174999904
+      ],
+      "bbox_center": [
+        8.22362774939157,
+        46.812247499373896
+      ],
+      "area_m2_equal_area": 41068920943.66612,
+      "area_rank": 137,
+      "draw_order": 137,
+      "feature_count": 1
+    },
+    "CHL": {
+      "iso3cd": "CHL",
+      "id": "CHL",
+      "file": "countries_topojson/CHL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -75.6942443841244,
+        -55.7177658077819,
+        -66.9905000003072,
+        -17.4983440003008
+      ],
+      "label_point": [
+        -71.50097018731206,
+        -35.632359071839645
+      ],
+      "bbox_center": [
+        -71.3423721922158,
+        -36.60805490404135
+      ],
+      "area_m2_equal_area": 711837992739.1506,
+      "area_rank": 40,
+      "draw_order": 40,
+      "feature_count": 1
+    },
+    "CHN": {
+      "iso3cd": "CHN",
+      "id": "CHN",
+      "file": "countries_topojson/CHN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        73.5338405254289,
+        18.1927599170086,
+        134.771520487955,
+        53.5375906632456
+      ],
+      "label_point": [
+        98.5710771489209,
+        36.891931847998706
+      ],
+      "bbox_center": [
+        104.15268050669195,
+        35.8651752901271
+      ],
+      "area_m2_equal_area": 9332713404487.48,
+      "area_rank": 5,
+      "draw_order": 5,
+      "feature_count": 1
+    },
+    "CIV": {
+      "iso3cd": "CIV",
+      "id": "CIV",
+      "file": "countries_topojson/CIV.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -8.59500399966072,
+        4.36233088584608,
+        -2.4927159479605,
+        10.7160900002276
+      ],
+      "label_point": [
+        -5.696079790848504,
+        7.511949000217054
+      ],
+      "bbox_center": [
+        -5.54385997381061,
+        7.53921044303684
+      ],
+      "area_m2_equal_area": 321594511852.98175,
+      "area_rank": 69,
+      "draw_order": 69,
+      "feature_count": 1
+    },
+    "CMR": {
+      "iso3cd": "CMR",
+      "id": "CMR",
+      "file": "countries_topojson/CMR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        8.49895280044887,
+        1.78013800003985,
+        16.1917970280986,
+        13.0833329996153
+      ],
+      "label_point": [
+        13.703614041604105,
+        7.481010050541145
+      ],
+      "bbox_center": [
+        12.345374914273734,
+        7.431735499827575
+      ],
+      "area_m2_equal_area": 465748802840.151,
+      "area_rank": 54,
+      "draw_order": 54,
+      "feature_count": 1
+    },
+    "COD": {
+      "iso3cd": "COD",
+      "id": "COD",
+      "file": "countries_topojson/COD.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        12.1956567451814,
+        -13.444839297682,
+        31.3146119995137,
+        5.37315388206728
+      ],
+      "label_point": [
+        22.44298173763577,
+        -4.1273410417207
+      ],
+      "bbox_center": [
+        21.755134372347552,
+        -4.03584270780736
+      ],
+      "area_m2_equal_area": 2331173706294.0337,
+      "area_rank": 11,
+      "draw_order": 11,
+      "feature_count": 1
+    },
+    "COG": {
+      "iso3cd": "COG",
+      "id": "COG",
+      "file": "countries_topojson/COG.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        11.1531652453811,
+        -4.99921432136873,
+        18.6302415653584,
+        3.64562203427062
+      ],
+      "label_point": [
+        16.016933692155774,
+        -0.7820904488851195
+      ],
+      "bbox_center": [
+        14.89170340536975,
+        -0.676796143549055
+      ],
+      "area_m2_equal_area": 341451907821.71405,
+      "area_rank": 65,
+      "draw_order": 65,
+      "feature_count": 1
+    },
+    "COK": {
+      "iso3cd": "COK",
+      "id": "COK",
+      "file": "countries_topojson/COK.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -159.824890138289,
+        -21.944166182755,
+        -157.312133788619,
+        -18.8264484401882
+      ],
+      "label_point": [
+        -159.77070045107808,
+        -21.227780914401848
+      ],
+      "bbox_center": [
+        -158.568511963454,
+        -20.3853073114716
+      ],
+      "area_m2_equal_area": 205521959.90797567,
+      "area_rank": 226,
+      "draw_order": 226,
+      "feature_count": 1
+    },
+    "COL": {
+      "iso3cd": "COL",
+      "id": "COL",
+      "file": "countries_topojson/COL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -78.9021530161832,
+        -4.22710999993766,
+        -66.852916276033,
+        12.4589878426619
+      ],
+      "label_point": [
+        -72.6380533346385,
+        4.133049996157145
+      ],
+      "bbox_center": [
+        -72.8775346461081,
+        4.11593892136212
+      ],
+      "area_m2_equal_area": 1135970074614.5916,
+      "area_rank": 27,
+      "draw_order": 27,
+      "feature_count": 1
+    },
+    "COM": {
+      "iso3cd": "COM",
+      "id": "COM",
+      "file": "countries_topojson/COM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        43.2287333000333,
+        -12.3889942339491,
+        44.5340693999091,
+        -11.36644470015
+      ],
+      "label_point": [
+        43.34832792424585,
+        -11.59099818998105
+      ],
+      "bbox_center": [
+        43.8814013499712,
+        -11.87771946704955
+      ],
+      "area_m2_equal_area": 1890682728.6108766,
+      "area_rank": 186,
+      "draw_order": 186,
+      "feature_count": 1
+    },
+    "CPV": {
+      "iso3cd": "CPV",
+      "id": "CPV",
+      "file": "countries_topojson/CPV.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -25.361106277681,
+        14.8052832791668,
+        -22.6697578619682,
+        17.1922510912705
+      ],
+      "label_point": [
+        -25.179713560653163,
+        17.0487663135061
+      ],
+      "bbox_center": [
+        -24.015432069824598,
+        15.99876718521865
+      ],
+      "area_m2_equal_area": 4325407059.252739,
+      "area_rank": 179,
+      "draw_order": 179,
+      "feature_count": 1
+    },
+    "CRI": {
+      "iso3cd": "CRI",
+      "id": "CRI",
+      "file": "countries_topojson/CRI.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -85.8653495924937,
+        8.04008050480977,
+        -82.5638697895205,
+        11.1974411610167
+      ],
+      "label_point": [
+        -83.63982968179732,
+        9.653418781086579
+      ],
+      "bbox_center": [
+        -84.2146096910071,
+        9.618760832913235
+      ],
+      "area_m2_equal_area": 51053071314.54605,
+      "area_rank": 133,
+      "draw_order": 133,
+      "feature_count": 1
+    },
+    "CUB": {
+      "iso3cd": "CUB",
+      "id": "CUB",
+      "file": "countries_topojson/CUB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -84.8163311916628,
+        19.8257673081985,
+        -74.1360369394918,
+        23.1850614890322
+      ],
+      "label_point": [
+        -77.7774685578299,
+        21.4882521154242
+      ],
+      "bbox_center": [
+        -79.4761840655773,
+        21.50541439861535
+      ],
+      "area_m2_equal_area": 109298187828.80626,
+      "area_rank": 108,
+      "draw_order": 108,
+      "feature_count": 1
+    },
+    "CUW": {
+      "iso3cd": "CUW",
+      "id": "CUW",
+      "file": "countries_topojson/CUW.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -69.1614982941432,
+        12.0437358610177,
+        -68.7387066775308,
+        12.3888762983513
+      ],
+      "label_point": [
+        -69.03791485149999,
+        12.2449764354129
+      ],
+      "bbox_center": [
+        -68.950102485837,
+        12.2163060796845
+      ],
+      "area_m2_equal_area": 550898061.2519362,
+      "area_rank": 201,
+      "draw_order": 201,
+      "feature_count": 1
+    },
+    "CXR": {
+      "iso3cd": "CXR",
+      "id": "CXR",
+      "file": "countries_topojson/CXR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        105.544925144958,
+        -10.5374708181669,
+        105.715583801126,
+        -10.4186851496991
+      ],
+      "label_point": [
+        105.6294913801273,
+        -10.4883972804541
+      ],
+      "bbox_center": [
+        105.630254473042,
+        -10.478077983933
+      ],
+      "area_m2_equal_area": 161600178.5282187,
+      "area_rank": 230,
+      "draw_order": 230,
+      "feature_count": 1
+    },
+    "CYM": {
+      "iso3cd": "CYM",
+      "id": "CYM",
+      "file": "countries_topojson/CYM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -81.4235014800225,
+        19.2641669968459,
+        -79.7272720335684,
+        19.7616977688728
+      ],
+      "label_point": [
+        -81.16857803008728,
+        19.33733451145825
+      ],
+      "bbox_center": [
+        -80.57538675679544,
+        19.51293238285935
+      ],
+      "area_m2_equal_area": 365803115.8941462,
+      "area_rank": 215,
+      "draw_order": 215,
+      "feature_count": 1
+    },
+    "CYP": {
+      "iso3cd": "CYP",
+      "id": "CYP",
+      "file": "countries_topojson/CYP.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        32.288343500395,
+        34.5627594986543,
+        34.5859175005656,
+        35.6940129993229
+      ],
+      "label_point": [
+        33.2121278336292,
+        35.11941399900725
+      ],
+      "bbox_center": [
+        33.4371305004803,
+        35.128386248988605
+      ],
+      "area_m2_equal_area": 9849035121.36075,
+      "area_rank": 173,
+      "draw_order": 173,
+      "feature_count": 1
+    },
+    "CZE": {
+      "iso3cd": "CZE",
+      "id": "CZE",
+      "file": "countries_topojson/CZE.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        12.1003420004873,
+        48.5651114485659,
+        18.8508989994312,
+        51.0540861513691
+      ],
+      "label_point": [
+        15.565508593306085,
+        49.771018999957946
+      ],
+      "bbox_center": [
+        15.475620499959252,
+        49.8095987999675
+      ],
+      "area_m2_equal_area": 78784448405.13358,
+      "area_rank": 119,
+      "draw_order": 119,
+      "feature_count": 1
+    },
+    "DEU": {
+      "iso3cd": "DEU",
+      "id": "DEU",
+      "file": "countries_topojson/DEU.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        5.97159940716946,
+        47.2941849537517,
+        15.0397499996551,
+        54.9096686918059
+      ],
+      "label_point": [
+        10.549986415706059,
+        51.128360582268996
+      ],
+      "bbox_center": [
+        10.50567470341228,
+        51.1019268227788
+      ],
+      "area_m2_equal_area": 355833692792.6951,
+      "area_rank": 64,
+      "draw_order": 64,
+      "feature_count": 1
+    },
+    "DJI": {
+      "iso3cd": "DJI",
+      "id": "DJI",
+      "file": "countries_topojson/DJI.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        41.7777415456637,
+        10.9201533010463,
+        43.4172053640425,
+        12.7108546628354
+      ],
+      "label_point": [
+        42.390599589055135,
+        11.7789538905384
+      ],
+      "bbox_center": [
+        42.5974734548531,
+        11.81550398194085
+      ],
+      "area_m2_equal_area": 22016258734.87841,
+      "area_rank": 155,
+      "draw_order": 155,
+      "feature_count": 1
+    },
+    "DMA": {
+      "iso3cd": "DMA",
+      "id": "DMA",
+      "file": "countries_topojson/DMA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -61.4696458325123,
+        15.207752852367,
+        -61.2437651854966,
+        15.6394989137963
+      ],
+      "label_point": [
+        -61.33433353699823,
+        15.396887086656449
+      ],
+      "bbox_center": [
+        -61.35670550900445,
+        15.42362588308165
+      ],
+      "area_m2_equal_area": 797476040.3459588,
+      "area_rank": 193,
+      "draw_order": 193,
+      "feature_count": 1
+    },
+    "DNK": {
+      "iso3cd": "DNK",
+      "id": "DNK",
+      "file": "countries_topojson/DNK.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        8.11051845600454,
+        54.6377410885348,
+        15.1567659382352,
+        57.7288436902494
+      ],
+      "label_point": [
+        9.241554699484663,
+        55.9267616273765
+      ],
+      "bbox_center": [
+        11.633642197119869,
+        56.1832923893921
+      ],
+      "area_m2_equal_area": 39615588681.50939,
+      "area_rank": 138,
+      "draw_order": 138,
+      "feature_count": 1
+    },
+    "DOM": {
+      "iso3cd": "DOM",
+      "id": "DOM",
+      "file": "countries_topojson/DOM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -72.0075100004005,
+        17.6574677842105,
+        -68.3237291873739,
+        19.9291102446269
+      ],
+      "label_point": [
+        -70.15032381346319,
+        18.826787093419547
+      ],
+      "bbox_center": [
+        -70.1656195938872,
+        18.7932890144187
+      ],
+      "area_m2_equal_area": 48232602594.825226,
+      "area_rank": 135,
+      "draw_order": 135,
+      "feature_count": 1
+    },
+    "DZA": {
+      "iso3cd": "DZA",
+      "id": "DZA",
+      "file": "countries_topojson/DZA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -8.66668810158578,
+        18.9761390000495,
+        11.9984999997637,
+        37.083013767937
+      ],
+      "label_point": [
+        0.6155304714254619,
+        28.18778817499835
+      ],
+      "bbox_center": [
+        1.6659059490889598,
+        28.02957638399325
+      ],
+      "area_m2_equal_area": 2310212132770.9697,
+      "area_rank": 12,
+      "draw_order": 12,
+      "feature_count": 1
+    },
+    "ECU": {
+      "iso3cd": "ECU",
+      "id": "ECU",
+      "file": "countries_topojson/ECU.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -91.6576016740801,
+        -4.97334802037008,
+        -75.2302036293997,
+        1.44635781101714
+      ],
+      "label_point": [
+        -78.22506458802789,
+        -1.71727446238175
+      ],
+      "bbox_center": [
+        -83.4439026517399,
+        -1.7634951046764702
+      ],
+      "area_m2_equal_area": 255373589163.52878,
+      "area_rank": 79,
+      "draw_order": 79,
+      "feature_count": 2
+    },
+    "EGY": {
+      "iso3cd": "EGY",
+      "id": "EGY",
+      "file": "countries_topojson/EGY.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        24.7112098746218,
+        21.72538999997,
+        35.6233756030727,
+        31.6496900810489
+      ],
+      "label_point": [
+        29.471807770804524,
+        26.75753942675665
+      ],
+      "bbox_center": [
+        30.16729273884725,
+        26.68754004050945
+      ],
+      "area_m2_equal_area": 979124953935.1321,
+      "area_rank": 31,
+      "draw_order": 31,
+      "feature_count": 2
+    },
+    "ERI": {
+      "iso3cd": "ERI",
+      "id": "ERI",
+      "file": "countries_topojson/ERI.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        36.4418434384787,
+        12.4686389996839,
+        43.126691539512,
+        18.0030860901236
+      ],
+      "label_point": [
+        38.09333880290352,
+        15.2280707360633
+      ],
+      "bbox_center": [
+        39.784267488995354,
+        15.23586254490375
+      ],
+      "area_m2_equal_area": 119172921167.9952,
+      "area_rank": 103,
+      "draw_order": 103,
+      "feature_count": 1
+    },
+    "ESH": {
+      "iso3cd": "ESH",
+      "id": "ESH",
+      "file": "countries_topojson/ESH.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -17.0916137705416,
+        20.7733696900141,
+        -8.66666499560532,
+        27.6670169830729
+      ],
+      "label_point": [
+        -13.77231462597419,
+        24.13644599889465
+      ],
+      "bbox_center": [
+        -12.87913938307346,
+        24.220193336543502
+      ],
+      "area_m2_equal_area": 268767159629.15808,
+      "area_rank": 76,
+      "draw_order": 76,
+      "feature_count": 1
+    },
+    "ESP": {
+      "iso3cd": "ESP",
+      "id": "ESP",
+      "file": "countries_topojson/ESP.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -18.1307106005921,
+        27.6541366583438,
+        4.29993581748013,
+        43.7689323433569
+      ],
+      "label_point": [
+        -3.4343270034880806,
+        39.97139932946445
+      ],
+      "bbox_center": [
+        -6.915387391555985,
+        35.71153450085035
+      ],
+      "area_m2_equal_area": 506129624695.5142,
+      "area_rank": 53,
+      "draw_order": 53,
+      "feature_count": 2
+    },
+    "EST": {
+      "iso3cd": "EST",
+      "id": "EST",
+      "file": "countries_topojson/EST.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        21.8835525509957,
+        57.5180740003732,
+        28.2089549997125,
+        59.6165542603766
+      ],
+      "label_point": [
+        25.505002533757022,
+        58.649580001147555
+      ],
+      "bbox_center": [
+        25.0462537753541,
+        58.567314130374896
+      ],
+      "area_m2_equal_area": 45161121021.965454,
+      "area_rank": 136,
+      "draw_order": 136,
+      "feature_count": 1
+    },
+    "ETH": {
+      "iso3cd": "ETH",
+      "id": "ETH",
+      "file": "countries_topojson/ETH.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        33.0008200002131,
+        3.42268891115411,
+        47.9734970715056,
+        14.8921193741062
+      ],
+      "label_point": [
+        38.88876907660354,
+        9.29302999996416
+      ],
+      "bbox_center": [
+        40.48715853585935,
+        9.157404142630154
+      ],
+      "area_m2_equal_area": 1129046768868.9922,
+      "area_rank": 28,
+      "draw_order": 28,
+      "feature_count": 1
+    },
+    "FIN": {
+      "iso3cd": "FIN",
+      "id": "FIN",
+      "file": "countries_topojson/FIN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        20.5503289993715,
+        59.8920707696655,
+        31.5870999999353,
+        70.0852344882503
+      ],
+      "label_point": [
+        27.510503235493786,
+        64.97936756826266
+      ],
+      "bbox_center": [
+        26.068714499653403,
+        64.9886526289579
+      ],
+      "area_m2_equal_area": 330779240710.26776,
+      "area_rank": 66,
+      "draw_order": 66,
+      "feature_count": 1
+    },
+    "FJI": {
+      "iso3cd": "FJI",
+      "id": "FJI",
+      "file": "countries_topojson/FJI.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -180.0,
+        -19.1932301909999,
+        180.0,
+        -12.4815062769999
+      ],
+      "label_point": [
+        177.94639253180458,
+        -17.80840016549995
+      ],
+      "bbox_center": [
+        0.0,
+        -15.8373682339999
+      ],
+      "area_m2_equal_area": 17507381618.82588,
+      "area_rank": 162,
+      "draw_order": 162,
+      "feature_count": 1
+    },
+    "FLK": {
+      "iso3cd": "FLK",
+      "id": "FLK",
+      "file": "countries_topojson/FLK.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -61.3451919554344,
+        -52.3980484005832,
+        -57.7279683893828,
+        -51.0149459831335
+      ],
+      "label_point": [
+        -58.751320375161924,
+        -51.78922653260715
+      ],
+      "bbox_center": [
+        -59.536580172408605,
+        -51.70649719185835
+      ],
+      "area_m2_equal_area": 11594823577.321045,
+      "area_rank": 169,
+      "draw_order": 169,
+      "feature_count": 1
+    },
+    "FRA": {
+      "iso3cd": "FRA",
+      "id": "FRA",
+      "file": "countries_topojson/FRA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -4.77786397926158,
+        41.4227027893186,
+        9.56123447448166,
+        51.0902184989534
+      ],
+      "label_point": [
+        2.1416937609268794,
+        46.690856848219894
+      ],
+      "bbox_center": [
+        2.39168524761004,
+        46.256460644136
+      ],
+      "area_m2_equal_area": 548204112622.70123,
+      "area_rank": 51,
+      "draw_order": 51,
+      "feature_count": 1
+    },
+    "FRO": {
+      "iso3cd": "FRO",
+      "id": "FRO",
+      "file": "countries_topojson/FRO.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -7.67042136106245,
+        61.3949356077877,
+        -6.25860977165486,
+        62.378306959445
+      ],
+      "label_point": [
+        -7.237871379656985,
+        62.09488281798335
+      ],
+      "bbox_center": [
+        -6.964515566358655,
+        61.88662128361635
+      ],
+      "area_m2_equal_area": 1551739859.3106863,
+      "area_rank": 188,
+      "draw_order": 188,
+      "feature_count": 1
+    },
+    "FSM": {
+      "iso3cd": "FSM",
+      "id": "FSM",
+      "file": "countries_topojson/FSM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        138.052810670395,
+        5.26669025413253,
+        163.027526854465,
+        9.61226940168522
+      ],
+      "label_point": [
+        158.23084091358385,
+        6.8661533199968705
+      ],
+      "bbox_center": [
+        150.54016876243,
+        7.439479827908874
+      ],
+      "area_m2_equal_area": 596388670.6569248,
+      "area_rank": 199,
+      "draw_order": 199,
+      "feature_count": 1
+    },
+    "GAB": {
+      "iso3cd": "GAB",
+      "id": "GAB",
+      "file": "countries_topojson/GAB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        8.79401969943979,
+        -3.96012752835873,
+        14.5186059995172,
+        2.31437599991248
+      ],
+      "label_point": [
+        11.659872224142003,
+        -0.8356600410726456
+      ],
+      "bbox_center": [
+        11.656312849478496,
+        -0.822875764223125
+      ],
+      "area_m2_equal_area": 263433160830.83734,
+      "area_rank": 77,
+      "draw_order": 77,
+      "feature_count": 1
+    },
+    "GBR": {
+      "iso3cd": "GBR",
+      "id": "GBR",
+      "file": "countries_topojson/GBR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -8.17771799950915,
+        50.0296325691199,
+        1.74798512594898,
+        58.6723327638806
+      ],
+      "label_point": [
+        -1.9404617060767624,
+        54.3439807890705
+      ],
+      "bbox_center": [
+        -3.214866436780085,
+        54.350982666500244
+      ],
+      "area_m2_equal_area": 237374291614.4579,
+      "area_rank": 84,
+      "draw_order": 84,
+      "feature_count": 1
+    },
+    "GEO": {
+      "iso3cd": "GEO",
+      "id": "GEO",
+      "file": "countries_topojson/GEO.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        40.008472119768,
+        41.0790069997867,
+        46.7254010000825,
+        43.583587999797
+      ],
+      "label_point": [
+        43.57971716615874,
+        42.4128127498618
+      ],
+      "bbox_center": [
+        43.36693655992525,
+        42.331297499791845
+      ],
+      "area_m2_equal_area": 69624513247.49437,
+      "area_rank": 122,
+      "draw_order": 122,
+      "feature_count": 1
+    },
+    "GGY": {
+      "iso3cd": "GGY",
+      "id": "GGY",
+      "file": "countries_topojson/GGY.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -2.67484943859777,
+        49.4188611672128,
+        -2.50750761118921,
+        49.5081072803046
+      ],
+      "label_point": [
+        -2.5730776358183736,
+        49.4633532527984
+      ],
+      "bbox_center": [
+        -2.5911785248934898,
+        49.4634842237587
+      ],
+      "area_m2_equal_area": 70978733.69643402,
+      "area_rank": 234,
+      "draw_order": 234,
+      "feature_count": 1
+    },
+    "GHA": {
+      "iso3cd": "GHA",
+      "id": "GHA",
+      "file": "countries_topojson/GHA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -3.24606758572106,
+        4.74369866418034,
+        1.19816460112199,
+        11.1625148812742
+      ],
+      "label_point": [
+        -1.0616574350283288,
+        7.973598488505065
+      ],
+      "bbox_center": [
+        -1.0239514922995352,
+        7.953106772727271
+      ],
+      "area_m2_equal_area": 239338243888.48322,
+      "area_rank": 82,
+      "draw_order": 82,
+      "feature_count": 1
+    },
+    "GIB": {
+      "iso3cd": "GIB",
+      "id": "GIB",
+      "file": "countries_topojson/GIB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -5.35322189349089,
+        36.1124038707728,
+        -5.3400268565281,
+        36.1597976691544
+      ],
+      "label_point": [
+        -5.3451987833592405,
+        36.136075973768754
+      ],
+      "bbox_center": [
+        -5.346624375009495,
+        36.136100769963605
+      ],
+      "area_m2_equal_area": 3120562.131675672,
+      "area_rank": 247,
+      "draw_order": 247,
+      "feature_count": 1
+    },
+    "GIN": {
+      "iso3cd": "GIN",
+      "id": "GIN",
+      "file": "countries_topojson/GIN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -14.9256153850539,
+        7.21546300018342,
+        -7.7572169997495,
+        12.6762199998934
+      ],
+      "label_point": [
+        -9.658332263504757,
+        9.96610607130718
+      ],
+      "bbox_center": [
+        -11.3414161924017,
+        9.94584150003841
+      ],
+      "area_m2_equal_area": 244134744769.27908,
+      "area_rank": 80,
+      "draw_order": 80,
+      "feature_count": 1
+    },
+    "GLP": {
+      "iso3cd": "GLP",
+      "id": "GLP",
+      "file": "countries_topojson/GLP.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -61.806475205998,
+        15.8690710060011,
+        -60.99999999861,
+        16.5102615359824
+      ],
+      "label_point": [
+        -61.59650088537175,
+        16.2471303941007
+      ],
+      "bbox_center": [
+        -61.403237602304,
+        16.18966627099175
+      ],
+      "area_m2_equal_area": 1721901454.0161595,
+      "area_rank": 187,
+      "draw_order": 187,
+      "feature_count": 1
+    },
+    "GMB": {
+      "iso3cd": "GMB",
+      "id": "GMB",
+      "file": "countries_topojson/GMB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -16.8081356237296,
+        13.0642071002369,
+        -13.8019871196357,
+        13.8154887287711
+      ],
+      "label_point": [
+        -14.310293692429578,
+        13.4381906949836
+      ],
+      "bbox_center": [
+        -15.305061371682651,
+        13.439847914504
+      ],
+      "area_m2_equal_area": 10827238250.302393,
+      "area_rank": 170,
+      "draw_order": 170,
+      "feature_count": 1
+    },
+    "GNB": {
+      "iso3cd": "GNB",
+      "id": "GNB",
+      "file": "countries_topojson/GNB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -16.7116853196615,
+        10.961324188359,
+        -13.6772975017348,
+        12.6778090300259
+      ],
+      "label_point": [
+        -14.64300624858808,
+        11.778879945417149
+      ],
+      "bbox_center": [
+        -15.194491410698149,
+        11.81956660919245
+      ],
+      "area_m2_equal_area": 31642451193.585327,
+      "area_rank": 143,
+      "draw_order": 143,
+      "feature_count": 1
+    },
+    "GNQ": {
+      "iso3cd": "GNQ",
+      "id": "GNQ",
+      "file": "countries_topojson/GNQ.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        8.42311382291736,
+        0.977489999761512,
+        11.3347800002726,
+        3.76414013001089
+      ],
+      "label_point": [
+        10.51250784278427,
+        1.79584646259374
+      ],
+      "bbox_center": [
+        9.87894691159498,
+        2.3708150648862008
+      ],
+      "area_m2_equal_area": 27139151381.98351,
+      "area_rank": 150,
+      "draw_order": 150,
+      "feature_count": 1
+    },
+    "GRC": {
+      "iso3cd": "GRC",
+      "id": "GRC",
+      "file": "countries_topojson/GRC.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        20.0083876135085,
+        34.9729766842178,
+        28.2399559024711,
+        41.7332316139396
+      ],
+      "label_point": [
+        21.804700721101423,
+        39.09317207396195
+      ],
+      "bbox_center": [
+        24.1241717579898,
+        38.3531041490787
+      ],
+      "area_m2_equal_area": 122376492324.19583,
+      "area_rank": 101,
+      "draw_order": 101,
+      "feature_count": 1
+    },
+    "GRD": {
+      "iso3cd": "GRD",
+      "id": "GRD",
+      "file": "countries_topojson/GRD.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -61.7907229834542,
+        12.000160535291,
+        -61.4196357721546,
+        12.5292148588013
+      ],
+      "label_point": [
+        -61.683742671983076,
+        12.1088721759704
+      ],
+      "bbox_center": [
+        -61.605179377804404,
+        12.26468769704615
+      ],
+      "area_m2_equal_area": 387361500.14391035,
+      "area_rank": 214,
+      "draw_order": 214,
+      "feature_count": 1
+    },
+    "GRL": {
+      "iso3cd": "GRL",
+      "id": "GRL",
+      "file": "countries_topojson/GRL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -72.8847122175991,
+        59.906600952153,
+        -11.312318801327,
+        83.6176528921196
+      ],
+      "label_point": [
+        -40.40582973614986,
+        71.80694580110026
+      ],
+      "bbox_center": [
+        -42.09851550946305,
+        71.7621269221363
+      ],
+      "area_m2_equal_area": 2141867501603.5632,
+      "area_rank": 13,
+      "draw_order": 13,
+      "feature_count": 1
+    },
+    "GTM": {
+      "iso3cd": "GTM",
+      "id": "GTM",
+      "file": "countries_topojson/GTM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -92.2311338129883,
+        13.7453552459263,
+        -88.2316933899005,
+        17.815695168813
+      ],
+      "label_point": [
+        -90.11384899325719,
+        15.783052718177
+      ],
+      "bbox_center": [
+        -90.2314136014444,
+        15.78052520736965
+      ],
+      "area_m2_equal_area": 108377056005.45457,
+      "area_rank": 109,
+      "draw_order": 109,
+      "feature_count": 1
+    },
+    "GUF": {
+      "iso3cd": "GUF",
+      "id": "GUF",
+      "file": "countries_topojson/GUF.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -54.5736663006943,
+        2.13867300006189,
+        -51.6164841784844,
+        5.77020025185509
+      ],
+      "label_point": [
+        -53.01516323864875,
+        3.841522643565155
+      ],
+      "bbox_center": [
+        -53.09507523958935,
+        3.9544366259584898
+      ],
+      "area_m2_equal_area": 83162302037.91689,
+      "area_rank": 118,
+      "draw_order": 118,
+      "feature_count": 1
+    },
+    "GUM": {
+      "iso3cd": "GUM",
+      "id": "GUM",
+      "file": "countries_topojson/GUM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        144.640411999758,
+        13.2462640002862,
+        144.952561499783,
+        13.613762399741
+      ],
+      "label_point": [
+        144.7615087843775,
+        13.4439300002591
+      ],
+      "bbox_center": [
+        144.7964867497705,
+        13.430013200013601
+      ],
+      "area_m2_equal_area": 637402290.5817618,
+      "area_rank": 196,
+      "draw_order": 196,
+      "feature_count": 1
+    },
+    "GUY": {
+      "iso3cd": "GUY",
+      "id": "GUY",
+      "file": "countries_topojson/GUY.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -61.3505428014478,
+        1.22337099964634,
+        -56.477367208685,
+        8.54575127713214
+      ],
+      "label_point": [
+        -58.871524798163364,
+        4.891972795904925
+      ],
+      "bbox_center": [
+        -58.9139550050664,
+        4.88456113838924
+      ],
+      "area_m2_equal_area": 212024449859.59457,
+      "area_rank": 86,
+      "draw_order": 86,
+      "feature_count": 1
+    },
+    "HKG": {
+      "iso3cd": "HKG",
+      "id": "HKG",
+      "file": "countries_topojson/HKG.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        113.917556931853,
+        22.2534221331789,
+        114.295721566245,
+        22.5611149999136
+      ],
+      "label_point": [
+        114.07064462044853,
+        22.40872145048445
+      ],
+      "bbox_center": [
+        114.10663924904901,
+        22.40726856654625
+      ],
+      "area_m2_equal_area": 632481503.4228715,
+      "area_rank": 197,
+      "draw_order": 197,
+      "feature_count": 1
+    },
+    "HMD": {
+      "iso3cd": "HMD",
+      "id": "HMD",
+      "file": "countries_topojson/HMD.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        73.2989335495799,
+        -53.192001342983,
+        73.7624740593345,
+        -53.0006523134939
+      ],
+      "label_point": [
+        73.52408729762098,
+        -53.0746114249318
+      ],
+      "bbox_center": [
+        73.5307038044572,
+        -53.096326828238446
+      ],
+      "area_m2_equal_area": 395050134.49321413,
+      "area_rank": 213,
+      "draw_order": 213,
+      "feature_count": 1
+    },
+    "HND": {
+      "iso3cd": "HND",
+      "id": "HND",
+      "file": "countries_topojson/HND.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -89.355960740413,
+        12.9875958137191,
+        -83.156377702492,
+        15.9373064042594
+      ],
+      "label_point": [
+        -87.24286452590943,
+        14.4782866167349
+      ],
+      "bbox_center": [
+        -86.2561692214525,
+        14.46245110898925
+      ],
+      "area_m2_equal_area": 112393580809.07184,
+      "area_rank": 106,
+      "draw_order": 106,
+      "feature_count": 1
+    },
+    "HRV": {
+      "iso3cd": "HRV",
+      "id": "HRV",
+      "file": "countries_topojson/HRV.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        13.4932257509601,
+        42.4204890986021,
+        19.1760005173197,
+        46.4758203246925
+      ],
+      "label_point": [
+        15.374246583779145,
+        44.748743381305104
+      ],
+      "bbox_center": [
+        16.3346131341399,
+        44.4481547116473
+      ],
+      "area_m2_equal_area": 52431777028.39729,
+      "area_rank": 131,
+      "draw_order": 131,
+      "feature_count": 1
+    },
+    "HTI": {
+      "iso3cd": "HTI",
+      "id": "HTI",
+      "file": "countries_topojson/HTI.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -74.4803763311377,
+        18.0315421976302,
+        -71.6531739996626,
+        19.9512327326281
+      ],
+      "label_point": [
+        -72.20069320426052,
+        18.9390388534866
+      ],
+      "bbox_center": [
+        -73.06677516540014,
+        18.99138746512915
+      ],
+      "area_m2_equal_area": 26820754098.791515,
+      "area_rank": 152,
+      "draw_order": 152,
+      "feature_count": 1
+    },
+    "HUN": {
+      "iso3cd": "HUN",
+      "id": "HUN",
+      "file": "countries_topojson/HUN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        16.1137950003207,
+        45.75540099902,
+        22.896020372608,
+        48.5784040003694
+      ],
+      "label_point": [
+        19.18764674927405,
+        47.26940249967945
+      ],
+      "bbox_center": [
+        19.50490768646435,
+        47.1669024996947
+      ],
+      "area_m2_equal_area": 93107561173.70677,
+      "area_rank": 113,
+      "draw_order": 113,
+      "feature_count": 1
+    },
+    "IDN": {
+      "iso3cd": "IDN",
+      "id": "IDN",
+      "file": "countries_topojson/IDN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        95.2169600005713,
+        -10.9333019258761,
+        141.019444349865,
+        5.6564399987817
+      ],
+      "label_point": [
+        113.31882728531946,
+        0.07165500014531816
+      ],
+      "bbox_center": [
+        118.11820217521816,
+        -2.6384309635472
+      ],
+      "area_m2_equal_area": 1846641060234.6978,
+      "area_rank": 17,
+      "draw_order": 17,
+      "feature_count": 1
+    },
+    "IMN": {
+      "iso3cd": "IMN",
+      "id": "IMN",
+      "file": "countries_topojson/IMN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -4.7584361494613,
+        54.0608823982433,
+        -4.31682085898546,
+        54.4182698214964
+      ],
+      "label_point": [
+        -4.502123627196654,
+        54.2613455399035
+      ],
+      "bbox_center": [
+        -4.53762850422338,
+        54.23957610986985
+      ],
+      "area_m2_equal_area": 628167963.658075,
+      "area_rank": 198,
+      "draw_order": 198,
+      "feature_count": 1
+    },
+    "IND": {
+      "iso3cd": "IND",
+      "id": "IND",
+      "file": "countries_topojson/IND.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        68.4389622102623,
+        6.75647063774532,
+        97.0633962986978,
+        33.1708300002715
+      ],
+      "label_point": [
+        79.90724949425855,
+        20.638229126728852
+      ],
+      "bbox_center": [
+        82.75117925448005,
+        19.96365031900841
+      ],
+      "area_m2_equal_area": 2969412551338.371,
+      "area_rank": 8,
+      "draw_order": 8,
+      "feature_count": 1
+    },
+    "IRL": {
+      "iso3cd": "IRL",
+      "id": "IRL",
+      "file": "countries_topojson/IRL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -10.47085380651,
+        51.5027008045975,
+        -6.0677838324125,
+        55.38790893597
+      ],
+      "label_point": [
+        -8.104743765134376,
+        53.446355818716995
+      ],
+      "bbox_center": [
+        -8.269318819461251,
+        53.44530487028375
+      ],
+      "area_m2_equal_area": 68316487141.658485,
+      "area_rank": 124,
+      "draw_order": 124,
+      "feature_count": 1
+    },
+    "IRN": {
+      "iso3cd": "IRN",
+      "id": "IRN",
+      "file": "countries_topojson/IRN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        44.0973790005232,
+        25.1438171386357,
+        63.3198182027197,
+        39.7816759995764
+      ],
+      "label_point": [
+        54.025369843824926,
+        32.4329715673207
+      ],
+      "bbox_center": [
+        53.708598601621446,
+        32.46274656910605
+      ],
+      "area_m2_equal_area": 1678298611879.3835,
+      "area_rank": 18,
+      "draw_order": 18,
+      "feature_count": 1
+    },
+    "IRQ": {
+      "iso3cd": "IRQ",
+      "id": "IRQ",
+      "file": "countries_topojson/IRQ.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        38.7936740004722,
+        29.0707213997123,
+        48.5754547132658,
+        37.3721838242384
+      ],
+      "label_point": [
+        42.51422020162275,
+        33.2367258164831
+      ],
+      "bbox_center": [
+        43.684564356869004,
+        33.22145261197535
+      ],
+      "area_m2_equal_area": 436503588931.622,
+      "area_rank": 59,
+      "draw_order": 59,
+      "feature_count": 1
+    },
+    "ISL": {
+      "iso3cd": "ISL",
+      "id": "ISL",
+      "file": "countries_topojson/ISL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -24.463953999446,
+        63.3980845004286,
+        -13.5541900005661,
+        66.5159054997449
+      ],
+      "label_point": [
+        -18.543178730720374,
+        64.97036074979499
+      ],
+      "bbox_center": [
+        -19.00907200000605,
+        64.95699500008675
+      ],
+      "area_m2_equal_area": 101924823710.37863,
+      "area_rank": 110,
+      "draw_order": 110,
+      "feature_count": 1
+    },
+    "ISR": {
+      "iso3cd": "ISR",
+      "id": "ISR",
+      "file": "countries_topojson/ISR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        34.2688393929402,
+        29.492945876056,
+        35.6720410000765,
+        33.2423020003359
+      ],
+      "label_point": [
+        34.64498876065164,
+        31.36740112304835
+      ],
+      "bbox_center": [
+        34.97044019650835,
+        31.367623938195948
+      ],
+      "area_m2_equal_area": 20601263630.930473,
+      "area_rank": 159,
+      "draw_order": 159,
+      "feature_count": 1
+    },
+    "ITA": {
+      "iso3cd": "ITA",
+      "id": "ITA",
+      "file": "countries_topojson/ITA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        6.62684599965323,
+        36.6758719993775,
+        18.5156605,
+        47.02278889806
+      ],
+      "label_point": [
+        12.93519664852804,
+        42.34884124885165
+      ],
+      "bbox_center": [
+        12.571253249826615,
+        41.849330448718746
+      ],
+      "area_m2_equal_area": 299099079041.68335,
+      "area_rank": 73,
+      "draw_order": 73,
+      "feature_count": 1
+    },
+    "JAM": {
+      "iso3cd": "JAM",
+      "id": "JAM",
+      "file": "countries_topojson/JAM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -78.2556991571062,
+        17.7576026912493,
+        -76.1811447160194,
+        18.5250492088895
+      ],
+      "label_point": [
+        -77.15004357913008,
+        18.0569353102657
+      ],
+      "bbox_center": [
+        -77.2184219365628,
+        18.1413259500694
+      ],
+      "area_m2_equal_area": 10791957529.826374,
+      "area_rank": 171,
+      "draw_order": 171,
+      "feature_count": 1
+    },
+    "JEY": {
+      "iso3cd": "JEY",
+      "id": "JEY",
+      "file": "countries_topojson/JEY.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -2.2557360346179,
+        49.1664267454748,
+        -2.02011887315148,
+        49.2584494501215
+      ],
+      "label_point": [
+        -2.1311389077337104,
+        49.205297365190106
+      ],
+      "bbox_center": [
+        -2.13792745388469,
+        49.212438097798156
+      ],
+      "area_m2_equal_area": 139849515.7919353,
+      "area_rank": 231,
+      "draw_order": 231,
+      "feature_count": 1
+    },
+    "JOR": {
+      "iso3cd": "JOR",
+      "id": "JOR",
+      "file": "countries_topojson/JOR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        34.9593414837267,
+        29.1984939997482,
+        39.2009360003102,
+        33.3747350001067
+      ],
+      "label_point": [
+        36.31456711065458,
+        31.33274300026645
+      ],
+      "bbox_center": [
+        37.08013874201845,
+        31.286614499927452
+      ],
+      "area_m2_equal_area": 89158702032.69916,
+      "area_rank": 115,
+      "draw_order": 115,
+      "feature_count": 1
+    },
+    "JPN": {
+      "iso3cd": "JPN",
+      "id": "JPN",
+      "file": "countries_topojson/JPN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        127.655693053776,
+        26.0789375320881,
+        145.82087707425,
+        45.505973816091
+      ],
+      "label_point": [
+        143.303040691815,
+        43.5997009265742
+      ],
+      "bbox_center": [
+        136.738285064013,
+        35.79245567408955
+      ],
+      "area_m2_equal_area": 362762246002.4628,
+      "area_rank": 63,
+      "draw_order": 63,
+      "feature_count": 1
+    },
+    "KAZ": {
+      "iso3cd": "KAZ",
+      "id": "KAZ",
+      "file": "countries_topojson/KAZ.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        46.4936720002647,
+        40.5685840000729,
+        87.2857899999659,
+        55.3661589995285
+      ],
+      "label_point": [
+        66.32710017798327,
+        47.9871205000305
+      ],
+      "bbox_center": [
+        66.8897310001153,
+        47.967371499800706
+      ],
+      "area_m2_equal_area": 2841220640708.3037,
+      "area_rank": 9,
+      "draw_order": 9,
+      "feature_count": 1
+    },
+    "KEN": {
+      "iso3cd": "KEN",
+      "id": "KEN",
+      "file": "countries_topojson/KEN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        33.9293227370864,
+        -4.67959829627974,
+        41.9101189999214,
+        4.62022527179481
+      ],
+      "label_point": [
+        37.47956442072494,
+        -0.1581557035913685
+      ],
+      "bbox_center": [
+        37.9197208685039,
+        -0.02968651224246477
+      ],
+      "area_m2_equal_area": 582448216759.8478,
+      "area_rank": 48,
+      "draw_order": 48,
+      "feature_count": 1
+    },
+    "KGZ": {
+      "iso3cd": "KGZ",
+      "id": "KGZ",
+      "file": "countries_topojson/KGZ.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        69.256951000345,
+        39.268816000073,
+        80.1744059997032,
+        43.2342045711062
+      ],
+      "label_point": [
+        75.01095573378402,
+        41.2670099997262
+      ],
+      "bbox_center": [
+        74.7156785000241,
+        41.2515102855896
+      ],
+      "area_m2_equal_area": 199885582890.75897,
+      "area_rank": 88,
+      "draw_order": 88,
+      "feature_count": 1
+    },
+    "KHM": {
+      "iso3cd": "KHM",
+      "id": "KHM",
+      "file": "countries_topojson/KHM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        102.351580000011,
+        10.4260688556821,
+        107.631307082544,
+        14.6866017780214
+      ],
+      "label_point": [
+        105.10933768399534,
+        12.47790027023895
+      ],
+      "bbox_center": [
+        104.9914435412775,
+        12.55633531685175
+      ],
+      "area_m2_equal_area": 181154981451.51175,
+      "area_rank": 92,
+      "draw_order": 92,
+      "feature_count": 1
+    },
+    "KIR": {
+      "iso3cd": "KIR",
+      "id": "KIR",
+      "file": "countries_topojson/KIR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -174.546661377,
+        -5.64173609899996,
+        176.482761383,
+        3.93993783000008
+      ],
+      "label_point": [
+        -157.63679510686438,
+        1.873955905500055
+      ],
+      "bbox_center": [
+        0.9680500030000019,
+        -0.8508991344999401
+      ],
+      "area_m2_equal_area": 1210255713.6926396,
+      "area_rank": 189,
+      "draw_order": 189,
+      "feature_count": 1
+    },
+    "KNA": {
+      "iso3cd": "KNA",
+      "id": "KNA",
+      "file": "countries_topojson/KNA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -62.868153763142,
+        17.0953426361161,
+        -62.5432662956288,
+        17.4201183317205
+      ],
+      "label_point": [
+        -62.769434681541455,
+        17.3372618648892
+      ],
+      "bbox_center": [
+        -62.7057100293854,
+        17.2577304839183
+      ],
+      "area_m2_equal_area": 297047222.7577822,
+      "area_rank": 220,
+      "draw_order": 220,
+      "feature_count": 1
+    },
+    "KOR": {
+      "iso3cd": "KOR",
+      "id": "KOR",
+      "file": "countries_topojson/KOR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        126.147990641556,
+        33.2025351431242,
+        129.528919649235,
+        38.6149762182529
+      ],
+      "label_point": [
+        127.97018587607371,
+        36.3955011205056
+      ],
+      "bbox_center": [
+        127.8384551453955,
+        35.90875568068855
+      ],
+      "area_m2_equal_area": 95384409517.90741,
+      "area_rank": 111,
+      "draw_order": 111,
+      "feature_count": 1
+    },
+    "KWT": {
+      "iso3cd": "KWT",
+      "id": "KWT",
+      "file": "countries_topojson/KWT.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        46.5530397502629,
+        28.5249707791235,
+        48.4330608296875,
+        30.1036994701704
+      ],
+      "label_point": [
+        47.376089203727865,
+        29.2797085618083
+      ],
+      "bbox_center": [
+        47.4930502899752,
+        29.314335124646952
+      ],
+      "area_m2_equal_area": 16838404224.620594,
+      "area_rank": 163,
+      "draw_order": 163,
+      "feature_count": 1
+    },
+    "LAO": {
+      "iso3cd": "LAO",
+      "id": "LAO",
+      "file": "countries_topojson/LAO.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        100.085316174854,
+        13.9168684931343,
+        107.560892847936,
+        22.4985053782705
+      ],
+      "label_point": [
+        102.1665897512353,
+        18.24714327432155
+      ],
+      "bbox_center": [
+        103.823104511395,
+        18.2076869357024
+      ],
+      "area_m2_equal_area": 229599204153.39105,
+      "area_rank": 85,
+      "draw_order": 85,
+      "feature_count": 1
+    },
+    "LBN": {
+      "iso3cd": "LBN",
+      "id": "LBN",
+      "file": "countries_topojson/LBN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        35.1036560003455,
+        33.0818789998753,
+        36.6167600003093,
+        34.6640400001832
+      ],
+      "label_point": [
+        35.970849813071844,
+        33.98180769565915
+      ],
+      "bbox_center": [
+        35.860208000327404,
+        33.87295950002925
+      ],
+      "area_m2_equal_area": 10647091640.618128,
+      "area_rank": 172,
+      "draw_order": 172,
+      "feature_count": 1
+    },
+    "LBR": {
+      "iso3cd": "LBR",
+      "id": "LBR",
+      "file": "countries_topojson/LBR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -11.4994563257376,
+        4.36233088584608,
+        -7.38891299994461,
+        8.52462599997908
+      ],
+      "label_point": [
+        -9.62006653912926,
+        6.410693499947605
+      ],
+      "bbox_center": [
+        -9.444184662841106,
+        6.44347844291258
+      ],
+      "area_m2_equal_area": 95296479943.72653,
+      "area_rank": 112,
+      "draw_order": 112,
+      "feature_count": 1
+    },
+    "LBY": {
+      "iso3cd": "LBY",
+      "id": "LBY",
+      "file": "countries_topojson/LBY.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        9.41444388901498,
+        19.4999999999291,
+        25.14715478741,
+        33.1651089820213
+      ],
+      "label_point": [
+        17.31551365738744,
+        26.33780664796755
+      ],
+      "bbox_center": [
+        17.28079933821249,
+        26.3325544909752
+      ],
+      "area_m2_equal_area": 1617684966809.0435,
+      "area_rank": 19,
+      "draw_order": 19,
+      "feature_count": 1
+    },
+    "LCA": {
+      "iso3cd": "LCA",
+      "id": "LCA",
+      "file": "countries_topojson/LCA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -61.0741500846924,
+        13.7196912767904,
+        -60.8742370603772,
+        14.1032447808281
+      ],
+      "label_point": [
+        -60.97217164128662,
+        13.89270782531345
+      ],
+      "bbox_center": [
+        -60.9741935725348,
+        13.91146802880925
+      ],
+      "area_m2_equal_area": 638305522.2690996,
+      "area_rank": 195,
+      "draw_order": 195,
+      "feature_count": 1
+    },
+    "LIE": {
+      "iso3cd": "LIE",
+      "id": "LIE",
+      "file": "countries_topojson/LIE.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        9.47215799974413,
+        47.0607733080075,
+        9.63508938096481,
+        47.2705426367723
+      ],
+      "label_point": [
+        9.546906813590528,
+        47.199288318162345
+      ],
+      "bbox_center": [
+        9.55362369035447,
+        47.165657972389894
+      ],
+      "area_m2_equal_area": 165524775.32381892,
+      "area_rank": 229,
+      "draw_order": 229,
+      "feature_count": 1
+    },
+    "LKA": {
+      "iso3cd": "LKA",
+      "id": "LKA",
+      "file": "countries_topojson/LKA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        79.7560851394117,
+        5.92566154584999,
+        81.8778419817559,
+        9.81814352478625
+      ],
+      "label_point": [
+        80.72103016183567,
+        7.7864306416643245
+      ],
+      "bbox_center": [
+        80.8169635605838,
+        7.871902535318119
+      ],
+      "area_m2_equal_area": 65225280431.6859,
+      "area_rank": 127,
+      "draw_order": 127,
+      "feature_count": 1
+    },
+    "LSO": {
+      "iso3cd": "LSO",
+      "id": "LSO",
+      "file": "countries_topojson/LSO.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        27.0186264547165,
+        -30.6731535631799,
+        29.4460827925091,
+        -28.5798705230064
+      ],
+      "label_point": [
+        28.14661223001829,
+        -29.6429446971269
+      ],
+      "bbox_center": [
+        28.2323546236128,
+        -29.62651204309315
+      ],
+      "area_m2_equal_area": 30863037359.059765,
+      "area_rank": 145,
+      "draw_order": 145,
+      "feature_count": 1
+    },
+    "LTU": {
+      "iso3cd": "LTU",
+      "id": "LTU",
+      "file": "countries_topojson/LTU.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        20.9549044501977,
+        53.9228019997866,
+        26.8320306874138,
+        56.4232539997688
+      ],
+      "label_point": [
+        24.09505716077698,
+        55.13913320288165
+      ],
+      "bbox_center": [
+        23.893467568805747,
+        55.1730279997777
+      ],
+      "area_m2_equal_area": 65235989671.86714,
+      "area_rank": 126,
+      "draw_order": 126,
+      "feature_count": 1
+    },
+    "LUX": {
+      "iso3cd": "LUX",
+      "id": "LUX",
+      "file": "countries_topojson/LUX.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        5.74076700018266,
+        49.4629719996823,
+        6.43981099993991,
+        50.181804999656
+      ],
+      "label_point": [
+        6.053244226911493,
+        49.8143829998964
+      ],
+      "bbox_center": [
+        6.090289000061285,
+        49.82238849966915
+      ],
+      "area_m2_equal_area": 2507349469.457948,
+      "area_rank": 184,
+      "draw_order": 184,
+      "feature_count": 1
+    },
+    "LVA": {
+      "iso3cd": "LVA",
+      "id": "LVA",
+      "file": "countries_topojson/LVA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        20.9769959994595,
+        55.6793780005403,
+        28.2388910002279,
+        58.0798170002747
+      ],
+      "label_point": [
+        24.506193255705725,
+        56.8847502494836
+      ],
+      "bbox_center": [
+        24.6079434998437,
+        56.8795975004075
+      ],
+      "area_m2_equal_area": 64883150237.03108,
+      "area_rank": 128,
+      "draw_order": 128,
+      "feature_count": 1
+    },
+    "MAC": {
+      "iso3cd": "MAC",
+      "id": "MAC",
+      "file": "countries_topojson/MAC.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        113.542013688673,
+        22.1106743886338,
+        113.59106382299,
+        22.1627646079207
+      ],
+      "label_point": [
+        113.56433033668009,
+        22.1331932310856
+      ],
+      "bbox_center": [
+        113.56653875583149,
+        22.13671949827725
+      ],
+      "area_m2_equal_area": 17075442.15055141,
+      "area_rank": 246,
+      "draw_order": 246,
+      "feature_count": 1
+    },
+    "MAF": {
+      "iso3cd": "MAF",
+      "id": "MAF",
+      "file": "countries_topojson/MAF.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -63.1379583235182,
+        18.0528057849444,
+        -63.0123952248621,
+        18.1244727930702
+      ],
+      "label_point": [
+        -63.04872607376254,
+        18.09432172594245
+      ],
+      "bbox_center": [
+        -63.07517677419015,
+        18.0886392890073
+      ],
+      "area_m2_equal_area": 44217130.40413449,
+      "area_rank": 239,
+      "draw_order": 239,
+      "feature_count": 1
+    },
+    "MAR": {
+      "iso3cd": "MAR",
+      "id": "MAR",
+      "file": "countries_topojson/MAR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -13.1685857764802,
+        27.6620365957115,
+        -1.0552020584544,
+        35.9124660840997
+      ],
+      "label_point": [
+        -6.257996076163053,
+        31.873332092411303
+      ],
+      "bbox_center": [
+        -7.1118939174673,
+        31.7872513399056
+      ],
+      "area_m2_equal_area": 413368339212.51263,
+      "area_rank": 60,
+      "draw_order": 60,
+      "feature_count": 1
+    },
+    "MCO": {
+      "iso3cd": "MCO",
+      "id": "MCO",
+      "file": "countries_topojson/MCO.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        7.41169899986169,
+        43.724600508703,
+        7.43911263132748,
+        43.749088029083
+      ],
+      "label_point": [
+        7.430066988977707,
+        43.74168551461215
+      ],
+      "bbox_center": [
+        7.425405815594585,
+        43.736844268892995
+      ],
+      "area_m2_equal_area": 2119277.4144799844,
+      "area_rank": 248,
+      "draw_order": 248,
+      "feature_count": 1
+    },
+    "MDA": {
+      "iso3cd": "MDA",
+      "id": "MDA",
+      "file": "countries_topojson/MDA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        26.6164249994966,
+        45.4674379630451,
+        30.1635900001385,
+        48.4581160030395
+      ],
+      "label_point": [
+        28.860109704601662,
+        46.96937800278185
+      ],
+      "bbox_center": [
+        28.39000749981755,
+        46.9627769830423
+      ],
+      "area_m2_equal_area": 33884353120.77777,
+      "area_rank": 142,
+      "draw_order": 142,
+      "feature_count": 1
+    },
+    "MDG": {
+      "iso3cd": "MDG",
+      "id": "MDG",
+      "file": "countries_topojson/MDG.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        43.2306869265648,
+        -25.5767630277922,
+        50.4764811233232,
+        -11.9533011460845
+      ],
+      "label_point": [
+        46.70137369260951,
+        -18.66511004451165
+      ],
+      "bbox_center": [
+        46.853584024944,
+        -18.76503208693835
+      ],
+      "area_m2_equal_area": 589777000639.431,
+      "area_rank": 47,
+      "draw_order": 47,
+      "feature_count": 1
+    },
+    "MDV": {
+      "iso3cd": "MDV",
+      "id": "MDV",
+      "file": "countries_topojson/MDV.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        72.683898924857,
+        -0.692701995854872,
+        73.7179550890802,
+        7.09836292300107
+      ],
+      "label_point": [
+        73.56852436134164,
+        2.1073462317161953
+      ],
+      "bbox_center": [
+        73.20092700696861,
+        3.202830463573099
+      ],
+      "area_m2_equal_area": 216753191.7678997,
+      "area_rank": 225,
+      "draw_order": 225,
+      "feature_count": 1
+    },
+    "MEX": {
+      "iso3cd": "MEX",
+      "id": "MEX",
+      "file": "countries_topojson/MEX.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -117.123381213795,
+        14.5365504726572,
+        -86.753480769287,
+        32.7187000036438
+      ],
+      "label_point": [
+        -102.27579341097868,
+        23.7290369601921
+      ],
+      "bbox_center": [
+        -101.938430991541,
+        23.6276252381505
+      ],
+      "area_m2_equal_area": 1958001443183.3367,
+      "area_rank": 14,
+      "draw_order": 14,
+      "feature_count": 1
+    },
+    "MHL": {
+      "iso3cd": "MHL",
+      "id": "MHL",
+      "file": "countries_topojson/MHL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        165.260025025451,
+        4.57487201709644,
+        172.161987305476,
+        14.6551685342244
+      ],
+      "label_point": [
+        171.098007598138,
+        7.115165666304845
+      ],
+      "bbox_center": [
+        168.71100616546352,
+        9.61502027566042
+      ],
+      "area_m2_equal_area": 330263071.87990737,
+      "area_rank": 219,
+      "draw_order": 219,
+      "feature_count": 1
+    },
+    "MKD": {
+      "iso3cd": "MKD",
+      "id": "MKD",
+      "file": "countries_topojson/MKD.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        20.4730639994387,
+        40.8552219997852,
+        22.9905929525106,
+        42.3526079995438
+      ],
+      "label_point": [
+        21.743318765720243,
+        41.66432739646215
+      ],
+      "bbox_center": [
+        21.731828475974652,
+        41.6039149996645
+      ],
+      "area_m2_equal_area": 25816417526.33139,
+      "area_rank": 154,
+      "draw_order": 154,
+      "feature_count": 1
+    },
+    "MLI": {
+      "iso3cd": "MLI",
+      "id": "MLI",
+      "file": "countries_topojson/MLI.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -12.2397644098202,
+        10.1587500001669,
+        4.24298381988903,
+        25.0000000000733
+      ],
+      "label_point": [
+        -0.7770367815699837,
+        18.08169325445555
+      ],
+      "bbox_center": [
+        -3.998390294965585,
+        17.579375000120102
+      ],
+      "area_m2_equal_area": 1255636158578.859,
+      "area_rank": 23,
+      "draw_order": 23,
+      "feature_count": 1
+    },
+    "MLT": {
+      "iso3cd": "MLT",
+      "id": "MLT",
+      "file": "countries_topojson/MLT.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        14.191581726427,
+        35.8102912897052,
+        14.5776271825658,
+        36.0820159912413
+      ],
+      "label_point": [
+        14.423377756110716,
+        35.9200921370698
+      ],
+      "bbox_center": [
+        14.384604454496401,
+        35.94615364047325
+      ],
+      "area_m2_equal_area": 341269820.58826005,
+      "area_rank": 217,
+      "draw_order": 217,
+      "feature_count": 1
+    },
+    "MMR": {
+      "iso3cd": "MMR",
+      "id": "MMR",
+      "file": "countries_topojson/MMR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        92.1882425304421,
+        10.1259353177955,
+        101.167821054598,
+        28.4924934421121
+      ],
+      "label_point": [
+        95.93674187309594,
+        19.1206618956453
+      ],
+      "bbox_center": [
+        96.67803179252004,
+        19.3092143799538
+      ],
+      "area_m2_equal_area": 654691228121.7567,
+      "area_rank": 41,
+      "draw_order": 41,
+      "feature_count": 1
+    },
+    "MNE": {
+      "iso3cd": "MNE",
+      "id": "MNE",
+      "file": "countries_topojson/MNE.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        18.4375961534911,
+        41.8439507701576,
+        20.3491750004259,
+        43.5351489995906
+      ],
+      "label_point": [
+        19.359328060393505,
+        42.6909624037946
+      ],
+      "bbox_center": [
+        19.3933855769585,
+        42.6895498848741
+      ],
+      "area_m2_equal_area": 13918449460.508175,
+      "area_rank": 165,
+      "draw_order": 165,
+      "feature_count": 1
+    },
+    "MNG": {
+      "iso3cd": "MNG",
+      "id": "MNG",
+      "file": "countries_topojson/MNG.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        87.8145246374563,
+        41.5818329989014,
+        119.925860999674,
+        52.1483520003006
+      ],
+      "label_point": [
+        105.44036502519556,
+        46.85382559463745
+      ],
+      "bbox_center": [
+        103.87019281856516,
+        46.865092499601
+      ],
+      "area_m2_equal_area": 1565422578139.041,
+      "area_rank": 20,
+      "draw_order": 20,
+      "feature_count": 1
+    },
+    "MNP": {
+      "iso3cd": "MNP",
+      "id": "MNP",
+      "file": "countries_topojson/MNP.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        145.126428000013,
+        14.114355999633,
+        145.851656000036,
+        18.8128469996624
+      ],
+      "label_point": [
+        145.21655225666905,
+        14.15830599994835
+      ],
+      "bbox_center": [
+        145.48904200002448,
+        16.4636014996477
+      ],
+      "area_m2_equal_area": 513281499.44205046,
+      "area_rank": 202,
+      "draw_order": 202,
+      "feature_count": 1
+    },
+    "MOZ": {
+      "iso3cd": "MOZ",
+      "id": "MOZ",
+      "file": "countries_topojson/MOZ.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        30.2350525270164,
+        -26.8561763768207,
+        40.8349151612457,
+        -10.4820165898779
+      ],
+      "label_point": [
+        34.69537464681917,
+        -18.59666271534695
+      ],
+      "bbox_center": [
+        35.53498384413105,
+        -18.6690964833493
+      ],
+      "area_m2_equal_area": 782018353828.7649,
+      "area_rank": 37,
+      "draw_order": 37,
+      "feature_count": 1
+    },
+    "MRT": {
+      "iso3cd": "MRT",
+      "id": "MRT",
+      "file": "countries_topojson/MRT.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -17.0697882823601,
+        14.7352399999352,
+        -4.83333300033788,
+        27.3132216019036
+      ],
+      "label_point": [
+        -11.506756662162227,
+        21.08278770466145
+      ],
+      "bbox_center": [
+        -10.95156064134899,
+        21.024230800919398
+      ],
+      "area_m2_equal_area": 1035582428545.1506,
+      "area_rank": 30,
+      "draw_order": 30,
+      "feature_count": 1
+    },
+    "MSR": {
+      "iso3cd": "MSR",
+      "id": "MSR",
+      "file": "countries_topojson/MSR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -62.238540649663,
+        16.6710071562508,
+        -62.1464195260276,
+        16.8173294072643
+      ],
+      "label_point": [
+        -62.1966077280365,
+        16.73777198864645
+      ],
+      "bbox_center": [
+        -62.1924800878453,
+        16.74416828175755
+      ],
+      "area_m2_equal_area": 106948431.20219763,
+      "area_rank": 232,
+      "draw_order": 232,
+      "feature_count": 1
+    },
+    "MTQ": {
+      "iso3cd": "MTQ",
+      "id": "MTQ",
+      "file": "countries_topojson/MTQ.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -61.226397351675,
+        14.3970458877054,
+        -60.8134754460023,
+        14.8836028957354
+      ],
+      "label_point": [
+        -61.01812542001048,
+        14.6425726796953
+      ],
+      "bbox_center": [
+        -61.01993639883865,
+        14.6403243917204
+      ],
+      "area_m2_equal_area": 1186456431.1357925,
+      "area_rank": 190,
+      "draw_order": 190,
+      "feature_count": 1
+    },
+    "MUS": {
+      "iso3cd": "MUS",
+      "id": "MUS",
+      "file": "countries_topojson/MUS.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        56.5852566672692,
+        -20.5236177022407,
+        72.4882371694969,
+        -7.2347040189903
+      ],
+      "label_point": [
+        57.587934230450315,
+        -20.2545263406426
+      ],
+      "bbox_center": [
+        64.53674691838305,
+        -13.8791608606155
+      ],
+      "area_m2_equal_area": 2206690256.539171,
+      "area_rank": 185,
+      "draw_order": 185,
+      "feature_count": 2
+    },
+    "MWI": {
+      "iso3cd": "MWI",
+      "id": "MWI",
+      "file": "countries_topojson/MWI.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        32.7247803671727,
+        -17.1293030000942,
+        35.9186399999831,
+        -9.39882738518052
+      ],
+      "label_point": [
+        33.822204641161846,
+        -13.381793608334501
+      ],
+      "bbox_center": [
+        34.3217101835779,
+        -13.26406519263736
+      ],
+      "area_m2_equal_area": 118307515108.05078,
+      "area_rank": 104,
+      "draw_order": 104,
+      "feature_count": 1
+    },
+    "MYS": {
+      "iso3cd": "MYS",
+      "id": "MYS",
+      "file": "countries_topojson/MYS.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        100.12120923409,
+        0.855219999738924,
+        119.263496398802,
+        7.035140037792
+      ],
+      "label_point": [
+        102.0645904107257,
+        3.989055872258285
+      ],
+      "bbox_center": [
+        109.692352816446,
+        3.9451800187654618
+      ],
+      "area_m2_equal_area": 323880308031.0484,
+      "area_rank": 68,
+      "draw_order": 68,
+      "feature_count": 1
+    },
+    "MYT": {
+      "iso3cd": "MYT",
+      "id": "MYT",
+      "file": "countries_topojson/MYT.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        45.03932190021,
+        -12.9933185578999,
+        45.2929496760712,
+        -12.6488895421721
+      ],
+      "label_point": [
+        45.12270278658515,
+        -12.805361509767
+      ],
+      "bbox_center": [
+        45.1661357881406,
+        -12.821104050036
+      ],
+      "area_m2_equal_area": 418485434.89370644,
+      "area_rank": 210,
+      "draw_order": 210,
+      "feature_count": 1
+    },
+    "NAM": {
+      "iso3cd": "NAM",
+      "id": "NAM",
+      "file": "countries_topojson/NAM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        11.7381916519685,
+        -28.9064137771856,
+        25.262804431907,
+        -16.9643628219509
+      ],
+      "label_point": [
+        17.262171185212924,
+        -22.9168006584327
+      ],
+      "bbox_center": [
+        18.50049804193775,
+        -22.93538829956825
+      ],
+      "area_m2_equal_area": 823903586065.6201,
+      "area_rank": 35,
+      "draw_order": 35,
+      "feature_count": 1
+    },
+    "NCL": {
+      "iso3cd": "NCL",
+      "id": "NCL",
+      "file": "countries_topojson/NCL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        159.913284302277,
+        -22.6980113968964,
+        168.117819214154,
+        -19.1038017266455
+      ],
+      "label_point": [
+        165.30893451178994,
+        -21.25312843265695
+      ],
+      "bbox_center": [
+        164.0155517582155,
+        -20.900906561770952
+      ],
+      "area_m2_equal_area": 19078386027.865154,
+      "area_rank": 160,
+      "draw_order": 160,
+      "feature_count": 1
+    },
+    "NER": {
+      "iso3cd": "NER",
+      "id": "NER",
+      "file": "countries_topojson/NER.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        0.161694000437385,
+        11.7108333297271,
+        15.982548130292,
+        23.5149999998315
+      ],
+      "label_point": [
+        9.899104171561497,
+        17.962033756868948
+      ],
+      "bbox_center": [
+        8.072121065364692,
+        17.6129166647793
+      ],
+      "area_m2_equal_area": 1181270288036.5278,
+      "area_rank": 26,
+      "draw_order": 26,
+      "feature_count": 1
+    },
+    "NFK": {
+      "iso3cd": "NFK",
+      "id": "NFK",
+      "file": "countries_topojson/NFK.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        167.917601173504,
+        -29.0622588633484,
+        167.988539284099,
+        -28.9972605836881
+      ],
+      "label_point": [
+        167.9528413942378,
+        -29.03044281207545
+      ],
+      "bbox_center": [
+        167.9530702288015,
+        -29.02975972351825
+      ],
+      "area_m2_equal_area": 38026804.24986121,
+      "area_rank": 241,
+      "draw_order": 241,
+      "feature_count": 1
+    },
+    "NGA": {
+      "iso3cd": "NGA",
+      "id": "NGA",
+      "file": "countries_topojson/NGA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        2.70872082603273,
+        4.27196032879137,
+        14.6559706844882,
+        13.8100344988841
+      ],
+      "label_point": [
+        7.79656316514324,
+        8.90778950655082
+      ],
+      "bbox_center": [
+        8.682345755260464,
+        9.040997413837735
+      ],
+      "area_m2_equal_area": 910733102354.3651,
+      "area_rank": 33,
+      "draw_order": 33,
+      "feature_count": 1
+    },
+    "NIC": {
+      "iso3cd": "NIC",
+      "id": "NIC",
+      "file": "countries_topojson/NIC.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -87.5205612174611,
+        10.7114367006947,
+        -83.156377702492,
+        15.0019414110065
+      ],
+      "label_point": [
+        -85.51916078588141,
+        12.872421574332002
+      ],
+      "bbox_center": [
+        -85.33846945997655,
+        12.8566890558506
+      ],
+      "area_m2_equal_area": 127640505945.26285,
+      "area_rank": 100,
+      "draw_order": 100,
+      "feature_count": 1
+    },
+    "NIU": {
+      "iso3cd": "NIU",
+      "id": "NIU",
+      "file": "countries_topojson/NIU.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -169.93739318742,
+        -19.1506595602124,
+        -169.779083251688,
+        -18.951068878884
+      ],
+      "label_point": [
+        -169.85456845322906,
+        -19.03982480374895
+      ],
+      "bbox_center": [
+        -169.858238219554,
+        -19.050864219548203
+      ],
+      "area_m2_equal_area": 268018639.43675604,
+      "area_rank": 221,
+      "draw_order": 221,
+      "feature_count": 1
+    },
+    "NLD": {
+      "iso3cd": "NLD",
+      "id": "NLD",
+      "file": "countries_topojson/NLD.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        3.36398600025542,
+        50.7542830004815,
+        7.21139847504797,
+        53.4544754035887
+      ],
+      "label_point": [
+        5.546340148672395,
+        52.07664298886715
+      ],
+      "bbox_center": [
+        5.287692237651695,
+        52.104379202035105
+      ],
+      "area_m2_equal_area": 34987908960.319565,
+      "area_rank": 141,
+      "draw_order": 141,
+      "feature_count": 1
+    },
+    "NOR": {
+      "iso3cd": "NOR",
+      "id": "NOR",
+      "file": "countries_topojson/NOR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        4.99999999975901,
+        58.0169868483538,
+        31.0652465812482,
+        71.0765609733201
+      ],
+      "label_point": [
+        12.706032190144104,
+        64.5525169365081
+      ],
+      "bbox_center": [
+        18.032623290503604,
+        64.54677391083695
+      ],
+      "area_m2_equal_area": 308343116608.213,
+      "area_rank": 71,
+      "draw_order": 71,
+      "feature_count": 1
+    },
+    "NPL": {
+      "iso3cd": "NPL",
+      "id": "NPL",
+      "file": "countries_topojson/NPL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        80.0584698961714,
+        26.367298443151,
+        88.1936251146852,
+        30.4238671936561
+      ],
+      "label_point": [
+        83.20911627306926,
+        28.3742525242295
+      ],
+      "bbox_center": [
+        84.1260475054283,
+        28.39558281840355
+      ],
+      "area_m2_equal_area": 148909890988.29535,
+      "area_rank": 96,
+      "draw_order": 96,
+      "feature_count": 1
+    },
+    "NRU": {
+      "iso3cd": "NRU",
+      "id": "NRU",
+      "file": "countries_topojson/NRU.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        166.899017334191,
+        -0.552322029024374,
+        166.945266724304,
+        -0.504297078202498
+      ],
+      "label_point": [
+        166.92297375484327,
+        -0.527192324300745
+      ],
+      "bbox_center": [
+        166.92214202924748,
+        -0.528309553613436
+      ],
+      "area_m2_equal_area": 18368770.635554753,
+      "area_rank": 245,
+      "draw_order": 245,
+      "feature_count": 1
+    },
+    "NZL": {
+      "iso3cd": "NZL",
+      "id": "NZL",
+      "file": "countries_topojson/NZL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -176.704574584,
+        -47.233726734,
+        178.465221668,
+        -34.4263571499999
+      ],
+      "label_point": [
+        171.14459686924482,
+        -43.5625034744999
+      ],
+      "bbox_center": [
+        0.8803235419999993,
+        -40.83004194199995
+      ],
+      "area_m2_equal_area": 262415789171.68475,
+      "area_rank": 78,
+      "draw_order": 78,
+      "feature_count": 1
+    },
+    "OMN": {
+      "iso3cd": "OMN",
+      "id": "OMN",
+      "file": "countries_topojson/OMN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        51.9999999998284,
+        16.6510639997653,
+        59.8365797620416,
+        26.3582137606724
+      ],
+      "label_point": [
+        57.008013451692456,
+        20.856406037231203
+      ],
+      "bbox_center": [
+        55.918289880935,
+        21.50463888021885
+      ],
+      "area_m2_equal_area": 308129401095.1183,
+      "area_rank": 72,
+      "draw_order": 72,
+      "feature_count": 1
+    },
+    "PAK": {
+      "iso3cd": "PAK",
+      "id": "PAK",
+      "file": "countries_topojson/PAK.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        60.872971999481,
+        23.9714500003517,
+        75.3829348964455,
+        36.9034606590325
+      ],
+      "label_point": [
+        70.12559485966707,
+        30.31414877450125
+      ],
+      "bbox_center": [
+        68.12795344796325,
+        30.4374553296921
+      ],
+      "area_m2_equal_area": 789726575244.98,
+      "area_rank": 36,
+      "draw_order": 36,
+      "feature_count": 1
+    },
+    "PAN": {
+      "iso3cd": "PAN",
+      "id": "PAN",
+      "file": "countries_topojson/PAN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -82.9343605304332,
+        7.20624971387902,
+        -77.1639430853718,
+        9.63751411421499
+      ],
+      "label_point": [
+        -81.42273825766412,
+        8.476751804522374
+      ],
+      "bbox_center": [
+        -80.04915180790249,
+        8.421881914047006
+      ],
+      "area_m2_equal_area": 73751291556.06241,
+      "area_rank": 120,
+      "draw_order": 120,
+      "feature_count": 1
+    },
+    "PCN": {
+      "iso3cd": "PCN",
+      "id": "PCN",
+      "file": "countries_topojson/PCN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -128.358279655186,
+        -24.4203411183169,
+        -128.291710342938,
+        -24.3322338183543
+      ],
+      "label_point": [
+        -128.32628378335187,
+        -24.37382005939265
+      ],
+      "bbox_center": [
+        -128.324994999062,
+        -24.3762874683356
+      ],
+      "area_m2_equal_area": 46604858.25169263,
+      "area_rank": 237,
+      "draw_order": 237,
+      "feature_count": 1
+    },
+    "PER": {
+      "iso3cd": "PER",
+      "id": "PER",
+      "file": "countries_topojson/PER.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -81.3170928953268,
+        -18.352311106883,
+        -68.6523289996822,
+        -0.0549889996992527
+      ],
+      "label_point": [
+        -75.77484360573044,
+        -9.190606970484584
+      ],
+      "bbox_center": [
+        -74.9847109475045,
+        -9.203650053291126
+      ],
+      "area_m2_equal_area": 1292747842411.939,
+      "area_rank": 21,
+      "draw_order": 21,
+      "feature_count": 1
+    },
+    "PHL": {
+      "iso3cd": "PHL",
+      "id": "PHL",
+      "file": "countries_topojson/PHL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        117.189165115139,
+        5.57201643966882,
+        126.594436896866,
+        18.6508159637912
+      ],
+      "label_point": [
+        125.23001913105072,
+        7.68217319877616
+      ],
+      "bbox_center": [
+        121.89180100600251,
+        12.111416201730009
+      ],
+      "area_m2_equal_area": 273544292853.15823,
+      "area_rank": 74,
+      "draw_order": 74,
+      "feature_count": 1
+    },
+    "PLW": {
+      "iso3cd": "PLW",
+      "id": "PLW",
+      "file": "countries_topojson/PLW.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        134.123229980142,
+        6.88628006033619,
+        134.647013346209,
+        7.70061206793168
+      ],
+      "label_point": [
+        134.57787203527582,
+        7.52893185576351
+      ],
+      "bbox_center": [
+        134.3851216631755,
+        7.293446064133935
+      ],
+      "area_m2_equal_area": 484049563.4826902,
+      "area_rank": 206,
+      "draw_order": 206,
+      "feature_count": 1
+    },
+    "PNG": {
+      "iso3cd": "PNG",
+      "id": "PNG",
+      "file": "countries_topojson/PNG.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        140.841789292292,
+        -11.6358337391837,
+        155.966217040815,
+        -1.96916699399247
+      ],
+      "label_point": [
+        144.3542181723838,
+        -6.630132650005555
+      ],
+      "bbox_center": [
+        148.40400316655348,
+        -6.802500366588085
+      ],
+      "area_m2_equal_area": 452222207487.25366,
+      "area_rank": 56,
+      "draw_order": 56,
+      "feature_count": 1
+    },
+    "POL": {
+      "iso3cd": "POL",
+      "id": "POL",
+      "file": "countries_topojson/POL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        14.2201650003143,
+        49.0720879641904,
+        24.0946720002515,
+        54.8245864991335
+      ],
+      "label_point": [
+        19.181210548113704,
+        51.941030500404096
+      ],
+      "bbox_center": [
+        19.1574185002829,
+        51.94833723166195
+      ],
+      "area_m2_equal_area": 311339926968.3543,
+      "area_rank": 70,
+      "draw_order": 70,
+      "feature_count": 1
+    },
+    "PRI": {
+      "iso3cd": "PRI",
+      "id": "PRI",
+      "file": "countries_topojson/PRI.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -67.2264579999424,
+        17.9257689998095,
+        -65.6119379997287,
+        18.5139638438323
+      ],
+      "label_point": [
+        -66.42876385432203,
+        18.2918605000294
+      ],
+      "bbox_center": [
+        -66.41919799983555,
+        18.2198664218209
+      ],
+      "area_m2_equal_area": 9019534785.432009,
+      "area_rank": 174,
+      "draw_order": 174,
+      "feature_count": 1
+    },
+    "PRK": {
+      "iso3cd": "PRK",
+      "id": "PRK",
+      "file": "countries_topojson/PRK.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        124.351721000299,
+        37.6850629100949,
+        130.639387379927,
+        42.9881239995731
+      ],
+      "label_point": [
+        126.64602685880969,
+        40.26838949963665
+      ],
+      "bbox_center": [
+        127.495554190113,
+        40.336593454834
+      ],
+      "area_m2_equal_area": 121459442779.24026,
+      "area_rank": 102,
+      "draw_order": 102,
+      "feature_count": 1
+    },
+    "PRT": {
+      "iso3cd": "PRT",
+      "id": "PRT",
+      "file": "countries_topojson/PRT.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -31.2652263643618,
+        32.4698908489001,
+        -6.18984950012366,
+        42.1350744996538
+      ],
+      "label_point": [
+        -8.268129139410712,
+        39.57342242306425
+      ],
+      "bbox_center": [
+        -18.727537932242733,
+        37.302482674276945
+      ],
+      "area_m2_equal_area": 91982522185.67458,
+      "area_rank": 114,
+      "draw_order": 114,
+      "feature_count": 3
+    },
+    "PRY": {
+      "iso3cd": "PRY",
+      "id": "PRY",
+      "file": "countries_topojson/PRY.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -62.6452023336576,
+        -27.5177059316377,
+        -54.2769722108357,
+        -19.2903101638311
+      ],
+      "label_point": [
+        -58.5721373252772,
+        -23.3105878106071
+      ],
+      "bbox_center": [
+        -58.46108727224665,
+        -23.4040080477344
+      ],
+      "area_m2_equal_area": 398620764626.29083,
+      "area_rank": 61,
+      "draw_order": 61,
+      "feature_count": 1
+    },
+    "PSE": {
+      "iso3cd": "PSE",
+      "id": "PSE",
+      "file": "countries_topojson/PSE.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        34.219108999842,
+        31.2205349368322,
+        35.5639936003418,
+        32.5429555694027
+      ],
+      "label_point": [
+        35.32086896464706,
+        31.883775317279152
+      ],
+      "bbox_center": [
+        34.891551300091905,
+        31.88174525311745
+      ],
+      "area_m2_equal_area": 6195972346.340528,
+      "area_rank": 176,
+      "draw_order": 176,
+      "feature_count": 2
+    },
+    "PYF": {
+      "iso3cd": "PYF",
+      "id": "PYF",
+      "file": "countries_topojson/PYF.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -152.877166748071,
+        -27.6502863560682,
+        -134.931065877521,
+        -7.90357303610722
+      ],
+      "label_point": [
+        -149.41025359709948,
+        -17.6827201853083
+      ],
+      "bbox_center": [
+        -143.90411631279602,
+        -17.77692969608771
+      ],
+      "area_m2_equal_area": 3867038170.0013404,
+      "area_rank": 181,
+      "draw_order": 181,
+      "feature_count": 1
+    },
+    "QAT": {
+      "iso3cd": "QAT",
+      "id": "QAT",
+      "file": "countries_topojson/QAT.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        50.7583965645028,
+        24.4999999999817,
+        51.6276791112688,
+        26.1587651952385
+      ],
+      "label_point": [
+        51.16266817264207,
+        25.3726560008395
+      ],
+      "bbox_center": [
+        51.1930378378858,
+        25.3293825976101
+      ],
+      "area_m2_equal_area": 11641101074.984938,
+      "area_rank": 168,
+      "draw_order": 168,
+      "feature_count": 1
+    },
+    "REU": {
+      "iso3cd": "REU",
+      "id": "REU",
+      "file": "countries_topojson/REU.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        55.230975544928,
+        -21.3874976882229,
+        55.8365951034889,
+        -20.8735091718725
+      ],
+      "label_point": [
+        55.52605596949004,
+        -21.12001485850745
+      ],
+      "bbox_center": [
+        55.53378532420845,
+        -21.1305034300477
+      ],
+      "area_m2_equal_area": 2647495981.053419,
+      "area_rank": 183,
+      "draw_order": 183,
+      "feature_count": 1
+    },
+    "ROU": {
+      "iso3cd": "ROU",
+      "id": "ROU",
+      "file": "countries_topojson/ROU.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        20.2637740002831,
+        43.6191869341767,
+        29.6891917835065,
+        48.2598241088943
+      ],
+      "label_point": [
+        24.310440540708335,
+        45.9240314997679
+      ],
+      "bbox_center": [
+        24.9764828918948,
+        45.9395055215355
+      ],
+      "area_m2_equal_area": 237758387069.62573,
+      "area_rank": 83,
+      "draw_order": 83,
+      "feature_count": 1
+    },
+    "RUS": {
+      "iso3cd": "RUS",
+      "id": "RUS",
+      "file": "countries_topojson/RUS.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -180.0,
+        41.196287,
+        180.0,
+        81.4083190440001
+      ],
+      "label_point": [
+        87.25257524093519,
+        59.451317358
+      ],
+      "bbox_center": [
+        0.0,
+        61.302303022000046
+      ],
+      "area_m2_equal_area": 16971434028010.744,
+      "area_rank": 1,
+      "draw_order": 1,
+      "feature_count": 2
+    },
+    "RWA": {
+      "iso3cd": "RWA",
+      "id": "RWA",
+      "file": "countries_topojson/RWA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        28.8683336105299,
+        -2.81955543870999,
+        30.8752068922687,
+        -1.0574784228597
+      ],
+      "label_point": [
+        29.997434586171863,
+        -1.959305833631955
+      ],
+      "bbox_center": [
+        29.871770251399298,
+        -1.938516930784845
+      ],
+      "area_m2_equal_area": 25837861400.2537,
+      "area_rank": 153,
+      "draw_order": 153,
+      "feature_count": 1
+    },
+    "SAU": {
+      "iso3cd": "SAU",
+      "id": "SAU",
+      "file": "countries_topojson/SAU.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        34.6255561911067,
+        16.4041111112836,
+        55.6666666998863,
+        32.1543299997087
+      ],
+      "label_point": [
+        44.60009101495038,
+        24.272185192200702
+      ],
+      "bbox_center": [
+        45.1461114454965,
+        24.279220555496153
+      ],
+      "area_m2_equal_area": 1921002977793.342,
+      "area_rank": 15,
+      "draw_order": 15,
+      "feature_count": 1
+    },
+    "SDN": {
+      "iso3cd": "SDN",
+      "id": "SDN",
+      "file": "countries_topojson/SDN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        21.8197566145397,
+        8.64215083181504,
+        38.5644340509673,
+        23.1468862299159
+      ],
+      "label_point": [
+        30.391023175668217,
+        15.886691871487852
+      ],
+      "bbox_center": [
+        30.1920953327535,
+        15.89451853086547
+      ],
+      "area_m2_equal_area": 1867516069337.0269,
+      "area_rank": 16,
+      "draw_order": 16,
+      "feature_count": 2
+    },
+    "SEN": {
+      "iso3cd": "SEN",
+      "id": "SEN",
+      "file": "countries_topojson/SEN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -17.2627315521548,
+        12.335269585131,
+        -11.3755777673977,
+        16.6396985809905
+      ],
+      "label_point": [
+        -14.60609489270265,
+        14.49251205326955
+      ],
+      "bbox_center": [
+        -14.31915465977625,
+        14.48748408306075
+      ],
+      "area_m2_equal_area": 195948285066.0819,
+      "area_rank": 89,
+      "draw_order": 89,
+      "feature_count": 1
+    },
+    "SGP": {
+      "iso3cd": "SGP",
+      "id": "SGP",
+      "file": "countries_topojson/SGP.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        103.638282774878,
+        1.29200708877584,
+        103.980346679869,
+        1.47127199212566
+      ],
+      "label_point": [
+        103.78224068445043,
+        1.36416409023444
+      ],
+      "bbox_center": [
+        103.8093147273735,
+        1.38163954045075
+      ],
+      "area_m2_equal_area": 424582531.74539745,
+      "area_rank": 209,
+      "draw_order": 209,
+      "feature_count": 1
+    },
+    "SGS": {
+      "iso3cd": "SGS",
+      "id": "SGS",
+      "file": "countries_topojson/SGS.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -38.017178852851,
+        -59.4842948917364,
+        -26.2374610902661,
+        -53.9958763116314
+      ],
+      "label_point": [
+        -36.44690362146763,
+        -54.42471317687675
+      ],
+      "bbox_center": [
+        -32.12731997155855,
+        -56.7400856016839
+      ],
+      "area_m2_equal_area": 4049232494.4136643,
+      "area_rank": 180,
+      "draw_order": 180,
+      "feature_count": 1
+    },
+    "SHN": {
+      "iso3cd": "SHN",
+      "id": "SHN",
+      "file": "countries_topojson/SHN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -14.4162471294699,
+        -40.3671379102898,
+        -5.6322027935828,
+        -7.89220985288112
+      ],
+      "label_point": [
+        -12.283051122459984,
+        -37.1160195576381
+      ],
+      "bbox_center": [
+        -10.02422496152635,
+        -24.12967388158546
+      ],
+      "area_m2_equal_area": 413101882.7883991,
+      "area_rank": 212,
+      "draw_order": 212,
+      "feature_count": 1
+    },
+    "SJM": {
+      "iso3cd": "SJM",
+      "id": "SJM",
+      "file": "countries_topojson/SJM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -8.83467647157927,
+        70.8681727816253,
+        33.4913826000854,
+        80.7620925899864
+      ],
+      "label_point": [
+        22.583484228921776,
+        79.88588854917116
+      ],
+      "bbox_center": [
+        12.328353064253065,
+        75.81513268580585
+      ],
+      "area_m2_equal_area": 62291763621.84436,
+      "area_rank": 129,
+      "draw_order": 129,
+      "feature_count": 1
+    },
+    "SLB": {
+      "iso3cd": "SLB",
+      "id": "SLB",
+      "file": "countries_topojson/SLB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        155.508621216194,
+        -11.7759172442149,
+        167.233505249056,
+        -6.59869909295486
+      ],
+      "label_point": [
+        160.12925366775477,
+        -9.59336519155913
+      ],
+      "bbox_center": [
+        161.371063232625,
+        -9.187308168584881
+      ],
+      "area_m2_equal_area": 28246269072.98032,
+      "area_rank": 149,
+      "draw_order": 149,
+      "feature_count": 1
+    },
+    "SLE": {
+      "iso3cd": "SLE",
+      "id": "SLE",
+      "file": "countries_topojson/SLE.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -13.3013809996833,
+        6.92371499562385,
+        -10.2792292998416,
+        9.99997300020321
+      ],
+      "label_point": [
+        -11.868816239017734,
+        8.46932726386499
+      ],
+      "bbox_center": [
+        -11.79030514976245,
+        8.46184399791353
+      ],
+      "area_m2_equal_area": 72730989124.77606,
+      "area_rank": 121,
+      "draw_order": 121,
+      "feature_count": 1
+    },
+    "SLV": {
+      "iso3cd": "SLV",
+      "id": "SLV",
+      "file": "countries_topojson/SLV.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -90.1346627323877,
+        13.1633079602813,
+        -87.7167289786837,
+        14.4204599493467
+      ],
+      "label_point": [
+        -88.95480631539338,
+        13.823943363007949
+      ],
+      "bbox_center": [
+        -88.92569585553571,
+        13.791883954814
+      ],
+      "area_m2_equal_area": 20859545480.484573,
+      "area_rank": 157,
+      "draw_order": 157,
+      "feature_count": 1
+    },
+    "SMR": {
+      "iso3cd": "SMR",
+      "id": "SMR",
+      "file": "countries_topojson/SMR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        12.4075930002889,
+        43.8948199999643,
+        12.5113709994195,
+        43.9916320004615
+      ],
+      "label_point": [
+        12.457169579892579,
+        43.9413643335961
+      ],
+      "bbox_center": [
+        12.4594819998542,
+        43.9432260002129
+      ],
+      "area_m2_equal_area": 61877057.344752714,
+      "area_rank": 235,
+      "draw_order": 235,
+      "feature_count": 1
+    },
+    "SOM": {
+      "iso3cd": "SOM",
+      "id": "SOM",
+      "file": "countries_topojson/SOM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        40.9956499996066,
+        -1.66443055962177,
+        51.2729263306959,
+        11.9703845987247
+      ],
+      "label_point": [
+        46.68575783141573,
+        5.067724346657845
+      ],
+      "bbox_center": [
+        46.13428816515125,
+        5.152977019551464
+      ],
+      "area_m2_equal_area": 633191388394.2434,
+      "area_rank": 44,
+      "draw_order": 44,
+      "feature_count": 1
+    },
+    "SPM": {
+      "iso3cd": "SPM",
+      "id": "SPM",
+      "file": "countries_topojson/SPM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -56.4206581114673,
+        46.7591209414159,
+        -56.1661186217079,
+        47.1011352536826
+      ],
+      "label_point": [
+        -56.32235306443256,
+        46.95633125319745
+      ],
+      "bbox_center": [
+        -56.2933883665876,
+        46.93012809754925
+      ],
+      "area_m2_equal_area": 335237999.93089527,
+      "area_rank": 218,
+      "draw_order": 218,
+      "feature_count": 1
+    },
+    "SRB": {
+      "iso3cd": "SRB",
+      "id": "SRB",
+      "file": "countries_topojson/SRB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        18.8564438595656,
+        41.8642772334427,
+        23.0063870055636,
+        46.1771460004372
+      ],
+      "label_point": [
+        21.01424179683114,
+        44.03598763682535
+      ],
+      "bbox_center": [
+        20.9314154325646,
+        44.02071161693995
+      ],
+      "area_m2_equal_area": 87591831692.09605,
+      "area_rank": 116,
+      "draw_order": 116,
+      "feature_count": 1
+    },
+    "SSD": {
+      "iso3cd": "SSD",
+      "id": "SSD",
+      "file": "countries_topojson/SSD.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        24.1506958699961,
+        3.48619869802696,
+        35.9476999998858,
+        12.2351912761242
+      ],
+      "label_point": [
+        29.097794486835134,
+        7.831190014898199
+      ],
+      "bbox_center": [
+        30.04919793494095,
+        7.86069498707558
+      ],
+      "area_m2_equal_area": 636008309671.431,
+      "area_rank": 43,
+      "draw_order": 43,
+      "feature_count": 2
+    },
+    "STP": {
+      "iso3cd": "STP",
+      "id": "STP",
+      "file": "countries_topojson/STP.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        6.47101926848261,
+        0.0264095466960796,
+        7.4581909179074,
+        1.70041060480696
+      ],
+      "label_point": [
+        6.607219368955292,
+        0.2277895364752185
+      ],
+      "bbox_center": [
+        6.964605093195005,
+        0.8634100757515198
+      ],
+      "area_m2_equal_area": 1046268418.8740443,
+      "area_rank": 191,
+      "draw_order": 191,
+      "feature_count": 1
+    },
+    "SUR": {
+      "iso3cd": "SUR",
+      "id": "SUR",
+      "file": "countries_topojson/SUR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -58.0498700969285,
+        1.85280409780506,
+        -53.9948247332036,
+        6.0001502028976
+      ],
+      "label_point": [
+        -56.027732030217436,
+        3.811546283467405
+      ],
+      "bbox_center": [
+        -56.02234741506605,
+        3.92647715035133
+      ],
+      "area_m2_equal_area": 145209044160.9388,
+      "area_rank": 97,
+      "draw_order": 97,
+      "feature_count": 1
+    },
+    "SVK": {
+      "iso3cd": "SVK",
+      "id": "SVK",
+      "file": "countries_topojson/SVK.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        16.8474086958216,
+        47.740222999573,
+        22.565738333112,
+        49.6047889997165
+      ],
+      "label_point": [
+        19.624636935089093,
+        48.692306788546844
+      ],
+      "bbox_center": [
+        19.7065735144668,
+        48.67250599964475
+      ],
+      "area_m2_equal_area": 49662192358.02873,
+      "area_rank": 134,
+      "draw_order": 134,
+      "feature_count": 1
+    },
+    "SVN": {
+      "iso3cd": "SVN",
+      "id": "SVN",
+      "file": "countries_topojson/SVN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        13.4438320002225,
+        45.4285661732485,
+        16.5967051285406,
+        46.8690859995811
+      ],
+      "label_point": [
+        14.580886639658932,
+        46.15194547822055
+      ],
+      "bbox_center": [
+        15.02026856438155,
+        46.1488260864148
+      ],
+      "area_m2_equal_area": 20780102201.460266,
+      "area_rank": 158,
+      "draw_order": 158,
+      "feature_count": 1
+    },
+    "SWE": {
+      "iso3cd": "SWE",
+      "id": "SWE",
+      "file": "countries_topojson/SWE.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        11.1708135603472,
+        55.3407478316031,
+        24.154066576272,
+        69.0600899992611
+      ],
+      "label_point": [
+        14.848861969224725,
+        62.1763950795432
+      ],
+      "bbox_center": [
+        17.6624400683096,
+        62.200418915432095
+      ],
+      "area_m2_equal_area": 444024206650.8488,
+      "area_rank": 58,
+      "draw_order": 58,
+      "feature_count": 1
+    },
+    "SWZ": {
+      "iso3cd": "SWZ",
+      "id": "SWZ",
+      "file": "countries_topojson/SWZ.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        30.7917906186652,
+        -27.3180057510435,
+        32.1351810416445,
+        -25.7273446771574
+      ],
+      "label_point": [
+        31.463020105080155,
+        -26.490101197491448
+      ],
+      "bbox_center": [
+        31.463485830154852,
+        -26.522675214100452
+      ],
+      "area_m2_equal_area": 17527398574.742332,
+      "area_rank": 161,
+      "draw_order": 161,
+      "feature_count": 1
+    },
+    "SXM": {
+      "iso3cd": "SXM",
+      "id": "SXM",
+      "file": "countries_topojson/SXM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -63.1379583235182,
+        18.0054165332015,
+        -63.0123952248621,
+        18.0641706588147
+      ],
+      "label_point": [
+        -63.059152386821665,
+        18.02911115907295
+      ],
+      "bbox_center": [
+        -63.07517677419015,
+        18.0347935960081
+      ],
+      "area_m2_equal_area": 43291171.408989936,
+      "area_rank": 240,
+      "draw_order": 240,
+      "feature_count": 1
+    },
+    "SYC": {
+      "iso3cd": "SYC",
+      "id": "SYC",
+      "file": "countries_topojson/SYC.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        46.1992034912641,
+        -10.1419534679296,
+        56.2795066834422,
+        -4.28371715576786
+      ],
+      "label_point": [
+        46.368534446254785,
+        -9.348743915061199
+      ],
+      "bbox_center": [
+        51.23935508735315,
+        -7.21283531184873
+      ],
+      "area_m2_equal_area": 437556230.0471816,
+      "area_rank": 208,
+      "draw_order": 208,
+      "feature_count": 1
+    },
+    "SYR": {
+      "iso3cd": "SYR",
+      "id": "SYR",
+      "file": "countries_topojson/SYR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        35.6215766928024,
+        32.3159738137337,
+        42.35239324825,
+        37.2606778739447
+      ],
+      "label_point": [
+        38.56586557686879,
+        34.798119492822295
+      ],
+      "bbox_center": [
+        38.9869849705262,
+        34.7883258438392
+      ],
+      "area_m2_equal_area": 187425509182.54135,
+      "area_rank": 90,
+      "draw_order": 90,
+      "feature_count": 1
+    },
+    "TCA": {
+      "iso3cd": "TCA",
+      "id": "TCA",
+      "file": "countries_topojson/TCA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -72.4838714599757,
+        21.4226264953166,
+        -71.1236419680437,
+        21.961879729732
+      ],
+      "label_point": [
+        -72.23880548006471,
+        21.7907752991431
+      ],
+      "bbox_center": [
+        -71.8037567140097,
+        21.6922531125243
+      ],
+      "area_m2_equal_area": 512485904.4031596,
+      "area_rank": 203,
+      "draw_order": 203,
+      "feature_count": 1
+    },
+    "TCD": {
+      "iso3cd": "TCD",
+      "id": "TCD",
+      "file": "countries_topojson/TCD.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        13.4788300000958,
+        7.4577700001085,
+        23.9999999998119,
+        23.4394439997034
+      ],
+      "label_point": [
+        18.55323467850691,
+        15.38307538287855
+      ],
+      "bbox_center": [
+        18.73941499995385,
+        15.44860699990595
+      ],
+      "area_m2_equal_area": 1268864315883.2554,
+      "area_rank": 22,
+      "draw_order": 22,
+      "feature_count": 1
+    },
+    "TGO": {
+      "iso3cd": "TGO",
+      "id": "TGO",
+      "file": "countries_topojson/TGO.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -0.135712755637333,
+        6.1118321791756,
+        1.80332674153177,
+        11.1384954796847
+      ],
+      "label_point": [
+        1.0623512023442192,
+        8.664919250482011
+      ],
+      "bbox_center": [
+        0.8338069929472185,
+        8.62516382943015
+      ],
+      "area_m2_equal_area": 56990502008.67282,
+      "area_rank": 130,
+      "draw_order": 130,
+      "feature_count": 1
+    },
+    "THA": {
+      "iso3cd": "THA",
+      "id": "THA",
+      "file": "countries_topojson/THA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        97.5409406347127,
+        5.61313096135067,
+        105.602406756403,
+        20.4636135610729
+      ],
+      "label_point": [
+        101.67190432916973,
+        13.01664772131925
+      ],
+      "bbox_center": [
+        101.57167369555785,
+        13.038372261211785
+      ],
+      "area_m2_equal_area": 512443093528.67957,
+      "area_rank": 52,
+      "draw_order": 52,
+      "feature_count": 1
+    },
+    "TJK": {
+      "iso3cd": "TJK",
+      "id": "TJK",
+      "file": "countries_topojson/TJK.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        67.4227709997917,
+        36.6752579999529,
+        75.0553870001726,
+        41.040045999651
+      ],
+      "label_point": [
+        70.87937496817476,
+        38.889337000078044
+      ],
+      "bbox_center": [
+        71.23907899998215,
+        38.857651999801945
+      ],
+      "area_m2_equal_area": 140604720055.98535,
+      "area_rank": 98,
+      "draw_order": 98,
+      "feature_count": 1
+    },
+    "TKL": {
+      "iso3cd": "TKL",
+      "id": "TKL",
+      "file": "countries_topojson/TKL.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -172.520273389882,
+        -9.42610169791632,
+        -171.179748732965,
+        -8.52811223692658
+      ],
+      "label_point": [
+        -171.81860882592798,
+        -9.168288464329791
+      ],
+      "bbox_center": [
+        -171.85001106142352,
+        -8.977106967421449
+      ],
+      "area_m2_equal_area": 217128865.05843815,
+      "area_rank": 224,
+      "draw_order": 224,
+      "feature_count": 1
+    },
+    "TKM": {
+      "iso3cd": "TKM",
+      "id": "TKM",
+      "file": "countries_topojson/TKM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        51.2501800002392,
+        35.2121599999564,
+        66.6908730005688,
+        42.7199909997832
+      ],
+      "label_point": [
+        57.73178517834907,
+        39.0679656543856
+      ],
+      "bbox_center": [
+        58.970526500404,
+        38.9660754998698
+      ],
+      "area_m2_equal_area": 555412822521.9436,
+      "area_rank": 50,
+      "draw_order": 50,
+      "feature_count": 1
+    },
+    "TLS": {
+      "iso3cd": "TLS",
+      "id": "TLS",
+      "file": "countries_topojson/TLS.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        124.04310899954,
+        -9.48511299965999,
+        127.297180174952,
+        -8.38319921514104
+      ],
+      "label_point": [
+        125.69994936609419,
+        -8.91771365967163
+      ],
+      "bbox_center": [
+        125.670144587246,
+        -8.934156107400515
+      ],
+      "area_m2_equal_area": 14732045819.462605,
+      "area_rank": 164,
+      "draw_order": 164,
+      "feature_count": 1
+    },
+    "TON": {
+      "iso3cd": "TON",
+      "id": "TON",
+      "file": "countries_topojson/TON.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -175.679806999522,
+        -21.4579529867041,
+        -173.747002000383,
+        -15.5664451996602
+      ],
+      "label_point": [
+        -173.98220470343097,
+        -18.6208165749946
+      ],
+      "bbox_center": [
+        -174.7134044999525,
+        -18.51219909318215
+      ],
+      "area_m2_equal_area": 701346028.2916784,
+      "area_rank": 194,
+      "draw_order": 194,
+      "feature_count": 1
+    },
+    "TTO": {
+      "iso3cd": "TTO",
+      "id": "TTO",
+      "file": "countries_topojson/TTO.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -61.8988541753947,
+        10.0427610609971,
+        -60.5179328920998,
+        11.3383426656996
+      ],
+      "label_point": [
+        -61.218700837581466,
+        10.4417121122118
+      ],
+      "bbox_center": [
+        -61.208393533747255,
+        10.69055186334835
+      ],
+      "area_m2_equal_area": 5389269085.928346,
+      "area_rank": 178,
+      "draw_order": 178,
+      "feature_count": 1
+    },
+    "TUN": {
+      "iso3cd": "TUN",
+      "id": "TUN",
+      "file": "countries_topojson/TUN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        7.52791396637996,
+        30.2463859998025,
+        11.5643194541295,
+        37.343913905058
+      ],
+      "label_point": [
+        8.857631094149836,
+        33.8389715375126
+      ],
+      "bbox_center": [
+        9.54611671025473,
+        33.79514995243025
+      ],
+      "area_m2_equal_area": 153546387731.57852,
+      "area_rank": 95,
+      "draw_order": 95,
+      "feature_count": 1
+    },
+    "TUR": {
+      "iso3cd": "TUR",
+      "id": "TUR",
+      "file": "countries_topojson/TUR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        26.0364176531859,
+        35.8764810660377,
+        44.8078549993616,
+        42.096034999685
+      ],
+      "label_point": [
+        35.63461272810187,
+        38.8975345414777
+      ],
+      "bbox_center": [
+        35.42213632627375,
+        38.98625803286135
+      ],
+      "area_m2_equal_area": 776996961267.2883,
+      "area_rank": 38,
+      "draw_order": 38,
+      "feature_count": 1
+    },
+    "TUV": {
+      "iso3cd": "TUV",
+      "id": "TUV",
+      "file": "countries_topojson/TUV.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        178.657470702367,
+        -9.37809371983603,
+        179.837203978284,
+        -7.44872188523102
+      ],
+      "label_point": [
+        178.68084137661984,
+        -7.4712598329778945
+      ],
+      "bbox_center": [
+        179.2473373403255,
+        -8.413407802533525
+      ],
+      "area_m2_equal_area": 24224964.98643659,
+      "area_rank": 244,
+      "draw_order": 244,
+      "feature_count": 1
+    },
+    "TWN": {
+      "iso3cd": "TWN",
+      "id": "TWN",
+      "file": "countries_topojson/TWN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        120.064620971874,
+        22.0925292963581,
+        121.919189452652,
+        25.2930068972734
+      ],
+      "label_point": [
+        120.85652777534509,
+        23.67504882779005
+      ],
+      "bbox_center": [
+        120.991905212263,
+        23.69276809681575
+      ],
+      "area_m2_equal_area": 36208818522.79231,
+      "area_rank": 140,
+      "draw_order": 140,
+      "feature_count": 1
+    },
+    "TZA": {
+      "iso3cd": "TZA",
+      "id": "TZA",
+      "file": "countries_topojson/TZA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        29.3652755240299,
+        -11.7313999997418,
+        40.4379163003786,
+        -0.995874039000447
+      ],
+      "label_point": [
+        34.21841802247994,
+        -6.343456918733535
+      ],
+      "bbox_center": [
+        34.90159591220425,
+        -6.363637019371124
+      ],
+      "area_m2_equal_area": 937410375697.109,
+      "area_rank": 32,
+      "draw_order": 32,
+      "feature_count": 1
+    },
+    "UGA": {
+      "iso3cd": "UGA",
+      "id": "UGA",
+      "file": "countries_topojson/UGA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        29.5895829807622,
+        -1.47973954198841,
+        35.001017886495,
+        4.22789171530935
+      ],
+      "label_point": [
+        32.77154862827379,
+        1.432428066743365
+      ],
+      "bbox_center": [
+        32.2953004336286,
+        1.37407608666047
+      ],
+      "area_m2_equal_area": 241841526885.2535,
+      "area_rank": 81,
+      "draw_order": 81,
+      "feature_count": 1
+    },
+    "UKR": {
+      "iso3cd": "UKR",
+      "id": "UKR",
+      "file": "countries_topojson/UKR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        22.1380460003731,
+        44.3956413266907,
+        40.1625335341999,
+        52.3612174788734
+      ],
+      "label_point": [
+        33.93305792709171,
+        48.35423000303355
+      ],
+      "bbox_center": [
+        31.150289767286502,
+        48.37842940278205
+      ],
+      "area_m2_equal_area": 600654983252.1998,
+      "area_rank": 46,
+      "draw_order": 46,
+      "feature_count": 1
+    },
+    "URY": {
+      "iso3cd": "URY",
+      "id": "URY",
+      "file": "countries_topojson/URY.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -58.4263343817914,
+        -34.9590873718822,
+        -53.2113755998017,
+        -30.0894140000558
+      ],
+      "label_point": [
+        -55.889180948738684,
+        -32.31251043771705
+      ],
+      "bbox_center": [
+        -55.81885499079655,
+        -32.524250685969
+      ],
+      "area_m2_equal_area": 177905879178.46313,
+      "area_rank": 93,
+      "draw_order": 93,
+      "feature_count": 1
+    },
+    "USA": {
+      "iso3cd": "USA",
+      "id": "USA",
+      "file": "countries_topojson/USA.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -178.229801999,
+        19.0260879999172,
+        173.42767,
+        71.352561
+      ],
+      "label_point": [
+        -99.3923293387507,
+        37.26601100000005
+      ],
+      "bbox_center": [
+        -2.401065999499991,
+        45.189324499958595
+      ],
+      "area_m2_equal_area": 9475987158050.246,
+      "area_rank": 4,
+      "draw_order": 4,
+      "feature_count": 2
+    },
+    "UZB": {
+      "iso3cd": "UZB",
+      "id": "UZB",
+      "file": "countries_topojson/UZB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        55.9982179995241,
+        37.1722570001983,
+        73.0300870004815,
+        45.5900749995929
+      ],
+      "label_point": [
+        63.42272708330408,
+        41.365804000219995
+      ],
+      "bbox_center": [
+        64.51415250000281,
+        41.3811659998956
+      ],
+      "area_m2_equal_area": 447261655180.83093,
+      "area_rank": 57,
+      "draw_order": 57,
+      "feature_count": 1
+    },
+    "VAT": {
+      "iso3cd": "VAT",
+      "id": "VAT",
+      "file": "countries_topojson/VAT.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        12.4459049998826,
+        41.9003809997281,
+        12.4576390002407,
+        41.9058210003851
+      ],
+      "label_point": [
+        12.453620219227389,
+        41.90387700001045
+      ],
+      "bbox_center": [
+        12.45177200006165,
+        41.9031010000566
+      ],
+      "area_m2_equal_area": 185328.40386784385,
+      "area_rank": 249,
+      "draw_order": 249,
+      "feature_count": 1
+    },
+    "VCT": {
+      "iso3cd": "VCT",
+      "id": "VCT",
+      "file": "countries_topojson/VCT.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -61.4592552188158,
+        12.5810108188508,
+        -61.1138801576866,
+        13.3778343192846
+      ],
+      "label_point": [
+        -61.19550172486671,
+        13.24754333478745
+      ],
+      "bbox_center": [
+        -61.286567688251196,
+        12.979422569067701
+      ],
+      "area_m2_equal_area": 415935998.16739225,
+      "area_rank": 211,
+      "draw_order": 211,
+      "feature_count": 1
+    },
+    "VEN": {
+      "iso3cd": "VEN",
+      "id": "VEN",
+      "file": "countries_topojson/VEN.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -73.3469879783408,
+        0.778468082912307,
+        -59.8065070000701,
+        12.2019033421493
+      ],
+      "label_point": [
+        -65.46940505004707,
+        6.500592000222316
+      ],
+      "bbox_center": [
+        -66.57674748920545,
+        6.490185712530804
+      ],
+      "area_m2_equal_area": 910444870539.402,
+      "area_rank": 34,
+      "draw_order": 34,
+      "feature_count": 1
+    },
+    "VGB": {
+      "iso3cd": "VGB",
+      "id": "VGB",
+      "file": "countries_topojson/VGB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -64.7717293107897,
+        18.3860182021045,
+        -64.2730089291335,
+        18.7495881092334
+      ],
+      "label_point": [
+        -64.62059841261777,
+        18.4214025164927
+      ],
+      "bbox_center": [
+        -64.5223691199616,
+        18.567803155668948
+      ],
+      "area_m2_equal_area": 166536716.26887158,
+      "area_rank": 228,
+      "draw_order": 228,
+      "feature_count": 1
+    },
+    "VIR": {
+      "iso3cd": "VIR",
+      "id": "VIR",
+      "file": "countries_topojson/VIR.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -65.0394429999981,
+        17.6856250003714,
+        -64.5830069996798,
+        18.3743000003361
+      ],
+      "label_point": [
+        -64.75708903286282,
+        17.73120486520585
+      ],
+      "bbox_center": [
+        -64.81122499983894,
+        18.029962500353747
+      ],
+      "area_m2_equal_area": 355166294.1757668,
+      "area_rank": 216,
+      "draw_order": 216,
+      "feature_count": 1
+    },
+    "VNM": {
+      "iso3cd": "VNM",
+      "id": "VNM",
+      "file": "countries_topojson/VNM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        102.143885071677,
+        8.56711347587299,
+        109.4361778228,
+        23.391450001281
+      ],
+      "label_point": [
+        107.83473257182548,
+        15.99046511002595
+      ],
+      "bbox_center": [
+        105.7900314472385,
+        15.979281738576995
+      ],
+      "area_m2_equal_area": 326230554426.58746,
+      "area_rank": 67,
+      "draw_order": 67,
+      "feature_count": 1
+    },
+    "VUT": {
+      "iso3cd": "VUT",
+      "id": "VUT",
+      "file": "countries_topojson/VUT.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        166.544059218747,
+        -20.2515692207414,
+        170.238283920515,
+        -13.0717068759258
+      ],
+      "label_point": [
+        166.86041648489024,
+        -15.1199297796943
+      ],
+      "bbox_center": [
+        168.391171569631,
+        -16.6616380483336
+      ],
+      "area_m2_equal_area": 12683119857.590406,
+      "area_rank": 167,
+      "draw_order": 167,
+      "feature_count": 1
+    },
+    "WSM": {
+      "iso3cd": "WSM",
+      "id": "WSM",
+      "file": "countries_topojson/WSM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        -172.726313272574,
+        -14.040939332173,
+        -171.415740967401,
+        -13.4328305731346
+      ],
+      "label_point": [
+        -172.4434023237084,
+        -13.61475888890815
+      ],
+      "bbox_center": [
+        -172.0710271199875,
+        -13.7368849526538
+      ],
+      "area_m2_equal_area": 2939847873.870186,
+      "area_rank": 182,
+      "draw_order": 182,
+      "feature_count": 1
+    },
+    "XAC": {
+      "iso3cd": "XAC",
+      "id": "XAC",
+      "file": "countries_topojson/XAC.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        77.9241200001586,
+        33.3869160004072,
+        80.4201819996374,
+        35.9766610002853
+      ],
+      "label_point": [
+        79.06890875313255,
+        34.67562299987995
+      ],
+      "bbox_center": [
+        79.17215099989801,
+        34.681788500346244
+      ],
+      "area_m2_equal_area": 31457095460.50592,
+      "area_rank": 144,
+      "draw_order": 144,
+      "feature_count": 1
+    },
+    "XAP": {
+      "iso3cd": "XAP",
+      "id": "XAP",
+      "file": "countries_topojson/XAP.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        91.5623080004331,
+        26.8937450000159,
+        97.3681631109254,
+        29.3686340001072
+      ],
+      "label_point": [
+        94.10646841828064,
+        28.105390667470253
+      ],
+      "bbox_center": [
+        94.46523555567924,
+        28.131189500061552
+      ],
+      "area_m2_equal_area": 68307218907.971794,
+      "area_rank": 125,
+      "draw_order": 125,
+      "feature_count": 1
+    },
+    "XJK": {
+      "iso3cd": "XJK",
+      "id": "XJK",
+      "file": "countries_topojson/XJK.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        72.5127700005908,
+        32.3213799999481,
+        79.3845430141666,
+        37.0507029999679
+      ],
+      "label_point": [
+        75.95703901777392,
+        34.68624499971075
+      ],
+      "bbox_center": [
+        75.9486565073787,
+        34.686041499958
+      ],
+      "area_m2_equal_area": 186539903276.29233,
+      "area_rank": 91,
+      "draw_order": 91,
+      "feature_count": 1
+    },
+    "YEM": {
+      "iso3cd": "YEM",
+      "id": "YEM",
+      "file": "countries_topojson/YEM.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        42.770926208861,
+        12.3046561317352,
+        54.4942884996076,
+        19.000000000278
+      ],
+      "label_point": [
+        47.4595218149524,
+        15.707952838377949
+      ],
+      "bbox_center": [
+        48.632607354234295,
+        15.6523280660066
+      ],
+      "area_m2_equal_area": 453183575553.1133,
+      "area_rank": 55,
+      "draw_order": 55,
+      "feature_count": 1
+    },
+    "ZAF": {
+      "iso3cd": "ZAF",
+      "id": "ZAF",
+      "file": "countries_topojson/ZAF.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        16.4524058444889,
+        -34.7986300033023,
+        32.8929901119095,
+        -22.1318789998694
+      ],
+      "label_point": [
+        26.17191790461968,
+        -28.4569491164876
+      ],
+      "bbox_center": [
+        24.6726979781992,
+        -28.46525450158585
+      ],
+      "area_m2_equal_area": 1219860341729.8743,
+      "area_rank": 25,
+      "draw_order": 25,
+      "feature_count": 1
+    },
+    "ZMB": {
+      "iso3cd": "ZMB",
+      "id": "ZMB",
+      "file": "countries_topojson/ZMB.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        21.9993612178324,
+        -18.0199079998091,
+        33.6901276695493,
+        -8.27675891464377
+      ],
+      "label_point": [
+        25.447372724208,
+        -13.1773486130185
+      ],
+      "bbox_center": [
+        27.84474444369085,
+        -13.148333457226435
+      ],
+      "area_m2_equal_area": 750681373144.754,
+      "area_rank": 39,
+      "draw_order": 39,
+      "feature_count": 1
+    },
+    "ZWE": {
+      "iso3cd": "ZWE",
+      "id": "ZWE",
+      "file": "countries_topojson/ZWE.topo.json",
+      "object": "data",
+      "has_file": true,
+      "bbox": [
+        25.2455400000207,
+        -22.4183689726825,
+        33.0606842036866,
+        -15.6120070257841
+      ],
+      "label_point": [
+        29.36129246353685,
+        -18.9014400001729
+      ],
+      "bbox_center": [
+        29.15311210185365,
+        -19.0151879992333
+      ],
+      "area_m2_equal_area": 391851701589.5763,
+      "area_rank": 62,
+      "draw_order": 62,
+      "feature_count": 1
+    }
+  },
+  "extras_topo_without_source_row": [],
+  "notes": {
+    "world_fit": "Single dissolved world geometry used once for projection.fitSize([w,h], world_fit).",
+    "area_rank": "Computed in EPSG:6933 equal-area; draw big->small so islands stay visible; also useful for animation scaling."
+  }
+}

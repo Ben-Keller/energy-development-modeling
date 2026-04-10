@@ -1,0 +1,1234 @@
+{
+  "calibration_steps": [
+    {
+      "action": "Extract baseline energy shares",
+      "notes": "Query Exiobase 2021 Z-matrix output shares for each electricity sector in each target region",
+      "step": "1"
+    },
+    {
+      "action": "Compute fossil share",
+      "notes": "Sum coal+gas+oil electricity as % of total electricity output for each region",
+      "step": "2"
+    },
+    {
+      "action": "Derive shock multipliers",
+      "notes": "Shock = (target share / baseline share); if target = 0, use New Value = 0 mode",
+      "step": "3"
+    },
+    {
+      "action": "Apply reallocation",
+      "notes": "Reduction in fossil coefficients must sum to increase in renewable coefficients (row sums preserved)",
+      "step": "4"
+    },
+    {
+      "action": "Validate satellite accounts",
+      "notes": "Verify CO2 intensity reductions are proportional to fossil share reduction",
+      "step": "5"
+    },
+    {
+      "action": "Run model and check Leontief inverse",
+      "notes": "Ensure no negative outputs; check Leontief stability conditions",
+      "step": "6"
+    }
+  ],
+  "generated_at_utc": "2026-04-10T12:28:58.934532+00:00",
+  "geographies": {
+    "BR": {
+      "exiobase_code": "BR",
+      "name": "Brazil",
+      "source_code_label": "BR",
+      "type": "Country"
+    },
+    "IN": {
+      "exiobase_code": "IN",
+      "name": "India",
+      "source_code_label": "IN",
+      "type": "Country"
+    },
+    "WF": {
+      "exiobase_code": "WF",
+      "name": "Rest of Africa",
+      "source_code_label": "WF (Africa aggregate)",
+      "type": "Region"
+    },
+    "WM": {
+      "exiobase_code": "WM",
+      "name": "Rest of Middle East",
+      "source_code_label": "WM (MENA aggregate)",
+      "type": "Region"
+    },
+    "ZA": {
+      "exiobase_code": "ZA",
+      "name": "South Africa",
+      "source_code_label": "ZA",
+      "type": "Country"
+    }
+  },
+  "scenario_ids": [
+    "BR-S1",
+    "BR-S2",
+    "IN-S1",
+    "IN-S2",
+    "WF-S1",
+    "WF-S2",
+    "WM-S1",
+    "WM-S2",
+    "ZA-S1",
+    "ZA-S2"
+  ],
+  "scenario_labels": {
+    "S1": {
+      "description": "100% renewable electricity by 2050 \u2014 upper-bound transition shock replacing all fossil generation",
+      "label": "Full Decarbonization"
+    },
+    "S2": {
+      "description": "Country/region-specific targets from the most recent NDCs, national energy plans, and JETP commitments (2023\u20132025)",
+      "label": "National Policy Target"
+    }
+  },
+  "scenarios": {
+    "BR-S1": {
+      "description": "100% renewable electricity by 2050 \u2014 upper-bound transition shock replacing all fossil generation",
+      "geography": {
+        "exiobase_code": "BR",
+        "name": "Brazil",
+        "source_code_label": "BR",
+        "type": "Country"
+      },
+      "geography_code": "BR",
+      "implementation_notes": "",
+      "label": "Full Decarbonization",
+      "policy_sources": "",
+      "provenance": {
+        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
+        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+      },
+      "scenario_code": "S1",
+      "scenario_id": "BR-S1",
+      "scenario_type": "full_decarbonization",
+      "shock_categories": {
+        "A/Z": [
+          {
+            "parameter": "Fossil electricity share",
+            "target_2030": "~10% \u2192 0% by 2030 (aggressive)",
+            "target_2050": "0% (complete phase-out)"
+          },
+          {
+            "parameter": "Renewable electricity share",
+            "target_2030": "88% \u2192 100% by 2030",
+            "target_2050": "100% maintained"
+          },
+          {
+            "parameter": "Gas electricity coefficient",
+            "target_2030": "Reduce to 0 in A-matrix by 2030",
+            "target_2050": "0 (maintained)"
+          },
+          {
+            "parameter": "Oil electricity coefficient",
+            "target_2030": "Reduce to 0 in A-matrix by 2030",
+            "target_2050": "0 (maintained)"
+          }
+        ],
+        "E": [
+          {
+            "parameter": "CO2 emission intensity (elec.)",
+            "target_2030": "Reduce to near-zero by 2030",
+            "target_2050": "0 by 2050"
+          }
+        ],
+        "Y": []
+      },
+      "summary": {
+        "fossil_delta_2030": "-100%*",
+        "fossil_delta_2030_numeric": -1.0,
+        "geography_name": "Brazil",
+        "net_zero_year": "2050",
+        "net_zero_year_numeric": 2050,
+        "renewable_share_2030": "100%",
+        "renewable_share_2030_numeric": 1.0,
+        "renewable_share_2050": "100%",
+        "renewable_share_2050_numeric": 1.0,
+        "scenario_id": "BR-S1",
+        "shock_type": "Full"
+      },
+      "target_years": [
+        2030,
+        2050
+      ],
+      "targets": [
+        {
+          "parameter": "Fossil electricity share",
+          "target_2030": "~10% \u2192 0% by 2030 (aggressive)",
+          "target_2050": "0% (complete phase-out)"
+        },
+        {
+          "parameter": "Renewable electricity share",
+          "target_2030": "88% \u2192 100% by 2030",
+          "target_2050": "100% maintained"
+        },
+        {
+          "parameter": "Gas electricity coefficient",
+          "target_2030": "Reduce to 0 in A-matrix by 2030",
+          "target_2050": "0 (maintained)"
+        },
+        {
+          "parameter": "Oil electricity coefficient",
+          "target_2030": "Reduce to 0 in A-matrix by 2030",
+          "target_2050": "0 (maintained)"
+        },
+        {
+          "parameter": "Hydro + Wind + Solar",
+          "target_2030": "Proportional reallocation to 100%",
+          "target_2050": "Maintained at 100%"
+        },
+        {
+          "parameter": "CO2 emission intensity (elec.)",
+          "target_2030": "Reduce to near-zero by 2030",
+          "target_2050": "0 by 2050"
+        },
+        {
+          "parameter": "Shock kind in MARIO",
+          "target_2030": "New Value = 0 (gas/oil electricity)",
+          "target_2050": "New Value = 0"
+        }
+      ]
+    },
+    "BR-S2": {
+      "description": "5. Rest of Africa (WF Region)1 5.1 Policy Context1",
+      "geography": {
+        "exiobase_code": "BR",
+        "name": "Brazil",
+        "source_code_label": "BR",
+        "type": "Country"
+      },
+      "geography_code": "BR",
+      "implementation_notes": "",
+      "label": "National Policy Target",
+      "policy_sources": "",
+      "provenance": {
+        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
+        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+      },
+      "scenario_code": "S2",
+      "scenario_id": "BR-S2",
+      "scenario_type": "policy_target",
+      "shock_categories": {
+        "A/Z": [
+          {
+            "parameter": "Total renewable energy share",
+            "target_2030": "45\u201350% of primary energy by 2030",
+            "target_2050": "Climate neutral by 2050"
+          },
+          {
+            "parameter": "Gas electricity coefficient",
+            "target_2030": "Reduce by ~80% by 2030",
+            "target_2050": "Reduce to ~0 by 2050"
+          }
+        ],
+        "E": [
+          {
+            "parameter": "GHG emissions target",
+            "target_2030": "-53% by 2030 vs. 2005",
+            "target_2050": "-59 to -67% by 2035; net-zero 2050"
+          }
+        ],
+        "Y": []
+      },
+      "summary": {
+        "fossil_delta_2030": "-80%",
+        "fossil_delta_2030_numeric": -0.8,
+        "geography_name": "Brazil",
+        "net_zero_year": "2050",
+        "net_zero_year_numeric": 2050,
+        "renewable_share_2030": "90%",
+        "renewable_share_2030_numeric": 0.9,
+        "renewable_share_2050": "95%+",
+        "renewable_share_2050_numeric": 0.95,
+        "scenario_id": "BR-S2",
+        "shock_type": "Policy"
+      },
+      "target_years": [
+        2030,
+        2050
+      ],
+      "targets": [
+        {
+          "parameter": "Renewable electricity",
+          "target_2030": "90% by 2030 (target, ~achieved)",
+          "target_2050": "95%+ by 2050"
+        },
+        {
+          "parameter": "Total renewable energy share",
+          "target_2030": "45\u201350% of primary energy by 2030",
+          "target_2050": "Climate neutral by 2050"
+        },
+        {
+          "parameter": "GHG emissions target",
+          "target_2030": "-53% by 2030 vs. 2005",
+          "target_2050": "-59 to -67% by 2035; net-zero 2050"
+        },
+        {
+          "parameter": "Deforestation (LULUCF)",
+          "target_2030": "Zero illegal deforestation 2030",
+          "target_2050": "LULUCF carbon sink by 2050"
+        },
+        {
+          "parameter": "Industrial decarbonization",
+          "target_2030": "R$300B Nova Industria 2024-2026",
+          "target_2050": "Full hard-to-abate coverage"
+        },
+        {
+          "parameter": "Gas electricity coefficient",
+          "target_2030": "Reduce by ~80% by 2030",
+          "target_2050": "Reduce to ~0 by 2050"
+        },
+        {
+          "parameter": "Shock kind in MARIO",
+          "target_2030": "Percentage (electricity minor)",
+          "target_2050": "New Value (LULUCF shock large)"
+        }
+      ]
+    },
+    "IN-S1": {
+      "description": "100% renewable electricity by 2050 \u2014 upper-bound transition shock replacing all fossil generation",
+      "geography": {
+        "exiobase_code": "IN",
+        "name": "India",
+        "source_code_label": "IN",
+        "type": "Country"
+      },
+      "geography_code": "IN",
+      "implementation_notes": "",
+      "label": "Full Decarbonization",
+      "policy_sources": "",
+      "provenance": {
+        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
+        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+      },
+      "scenario_code": "S1",
+      "scenario_id": "IN-S1",
+      "scenario_type": "full_decarbonization",
+      "shock_categories": {
+        "A/Z": [
+          {
+            "parameter": "Fossil electricity share",
+            "target_2030": "50% \u2192 25% by 2030",
+            "target_2050": "0% by 2070 (net-zero year)"
+          },
+          {
+            "parameter": "Renewable electricity share",
+            "target_2030": "50% \u2192 75% by 2030",
+            "target_2050": "100% by 2070"
+          },
+          {
+            "parameter": "Coal A-matrix coefficient",
+            "target_2030": "Reduce by 25% (2030)",
+            "target_2050": "Reduce to 0 (2070)"
+          },
+          {
+            "parameter": "Solar PV coefficient",
+            "target_2030": "Increase by +30%",
+            "target_2050": "Scale to 65% of total mix"
+          },
+          {
+            "parameter": "Wind coefficient",
+            "target_2030": "Increase by +15%",
+            "target_2050": "Scale to 25% of total mix"
+          }
+        ],
+        "E": [
+          {
+            "parameter": "CO2 emission intensity",
+            "target_2030": "Reduce by ~45% (NDC target)",
+            "target_2050": "Reduce to 0"
+          }
+        ],
+        "Y": []
+      },
+      "summary": {
+        "fossil_delta_2030": "-25%",
+        "fossil_delta_2030_numeric": -0.25,
+        "geography_name": "India",
+        "net_zero_year": "2070",
+        "net_zero_year_numeric": 2070,
+        "renewable_share_2030": "75%",
+        "renewable_share_2030_numeric": 0.75,
+        "renewable_share_2050": "100%",
+        "renewable_share_2050_numeric": 1.0,
+        "scenario_id": "IN-S1",
+        "shock_type": "Full"
+      },
+      "target_years": [
+        2030,
+        2050,
+        2070
+      ],
+      "targets": [
+        {
+          "parameter": "Fossil electricity share",
+          "target_2030": "50% \u2192 25% by 2030",
+          "target_2050": "0% by 2070 (net-zero year)"
+        },
+        {
+          "parameter": "Renewable electricity share",
+          "target_2030": "50% \u2192 75% by 2030",
+          "target_2050": "100% by 2070"
+        },
+        {
+          "parameter": "Coal A-matrix coefficient",
+          "target_2030": "Reduce by 25% (2030)",
+          "target_2050": "Reduce to 0 (2070)"
+        },
+        {
+          "parameter": "Solar PV coefficient",
+          "target_2030": "Increase by +30%",
+          "target_2050": "Scale to 65% of total mix"
+        },
+        {
+          "parameter": "Wind coefficient",
+          "target_2030": "Increase by +15%",
+          "target_2050": "Scale to 25% of total mix"
+        },
+        {
+          "parameter": "CO2 emission intensity",
+          "target_2030": "Reduce by ~45% (NDC target)",
+          "target_2050": "Reduce to 0"
+        },
+        {
+          "parameter": "Shock kind in MARIO",
+          "target_2030": "Percentage (large)",
+          "target_2050": "New Value = 0 (fossils)"
+        }
+      ]
+    },
+    "IN-S2": {
+      "description": "4. Brazil1 4.1 Policy Context1",
+      "geography": {
+        "exiobase_code": "IN",
+        "name": "India",
+        "source_code_label": "IN",
+        "type": "Country"
+      },
+      "geography_code": "IN",
+      "implementation_notes": "",
+      "label": "National Policy Target",
+      "policy_sources": "",
+      "provenance": {
+        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
+        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+      },
+      "scenario_code": "S2",
+      "scenario_id": "IN-S2",
+      "scenario_type": "policy_target",
+      "shock_categories": {
+        "A/Z": [
+          {
+            "parameter": "Coal share (capacity)",
+            "target_2030": "~32% by 2031-32 (down from 59%)",
+            "target_2050": "~4% by 2070 (LT-LEDS)"
+          },
+          {
+            "parameter": "Coal A-matrix coefficient",
+            "target_2030": "Reduce by ~35% by 2030",
+            "target_2050": "Reduce to near-zero by 2070"
+          }
+        ],
+        "E": [
+          {
+            "parameter": "Emissions intensity (GDP)",
+            "target_2030": "-45% by 2030 vs. 2005 (NDC)",
+            "target_2050": "Net-zero by 2070"
+          }
+        ],
+        "Y": [
+          {
+            "parameter": "Non-fossil capacity",
+            "target_2030": "500 GW by 2030 (Panchamrit)",
+            "target_2050": "~1,200\u20131,500 GW by 2070"
+          },
+          {
+            "parameter": "Solar capacity",
+            "target_2030": "364 GW by 2031-32 (NEP 2023)",
+            "target_2050": "Dominant source by 2070"
+          },
+          {
+            "parameter": "Wind capacity",
+            "target_2030": "122 GW by 2031-32 (NEP 2023)",
+            "target_2050": "Second largest source"
+          },
+          {
+            "parameter": "Coal share (capacity)",
+            "target_2030": "~32% by 2031-32 (down from 59%)",
+            "target_2050": "~4% by 2070 (LT-LEDS)"
+          }
+        ]
+      },
+      "summary": {
+        "fossil_delta_2030": "-35%",
+        "fossil_delta_2030_numeric": -0.35,
+        "geography_name": "India",
+        "net_zero_year": "2070",
+        "net_zero_year_numeric": 2070,
+        "renewable_share_2030": "66%",
+        "renewable_share_2030_numeric": 0.66,
+        "renewable_share_2050": "~96%*",
+        "renewable_share_2050_numeric": 0.96,
+        "scenario_id": "IN-S2",
+        "shock_type": "Policy"
+      },
+      "target_years": [
+        2030,
+        2050,
+        2070
+      ],
+      "targets": [
+        {
+          "parameter": "Non-fossil capacity",
+          "target_2030": "500 GW by 2030 (Panchamrit)",
+          "target_2050": "~1,200\u20131,500 GW by 2070"
+        },
+        {
+          "parameter": "Solar capacity",
+          "target_2030": "364 GW by 2031-32 (NEP 2023)",
+          "target_2050": "Dominant source by 2070"
+        },
+        {
+          "parameter": "Wind capacity",
+          "target_2030": "122 GW by 2031-32 (NEP 2023)",
+          "target_2050": "Second largest source"
+        },
+        {
+          "parameter": "Coal share (capacity)",
+          "target_2030": "~32% by 2031-32 (down from 59%)",
+          "target_2050": "~4% by 2070 (LT-LEDS)"
+        },
+        {
+          "parameter": "Emissions intensity (GDP)",
+          "target_2030": "-45% by 2030 vs. 2005 (NDC)",
+          "target_2050": "Net-zero by 2070"
+        },
+        {
+          "parameter": "Coal A-matrix coefficient",
+          "target_2030": "Reduce by ~35% by 2030",
+          "target_2050": "Reduce to near-zero by 2070"
+        },
+        {
+          "parameter": "Shock kind in MARIO",
+          "target_2030": "Percentage (moderate-large)",
+          "target_2050": "New Value (near-zero fossils)"
+        }
+      ]
+    },
+    "WF-S1": {
+      "description": "100% renewable electricity by 2050 \u2014 upper-bound transition shock replacing all fossil generation",
+      "geography": {
+        "exiobase_code": "WF",
+        "name": "Rest of Africa",
+        "source_code_label": "WF (Africa aggregate)",
+        "type": "Region"
+      },
+      "geography_code": "WF",
+      "implementation_notes": "",
+      "label": "Full Decarbonization",
+      "policy_sources": "",
+      "provenance": {
+        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
+        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+      },
+      "scenario_code": "S1",
+      "scenario_id": "WF-S1",
+      "scenario_type": "full_decarbonization",
+      "shock_categories": {
+        "A/Z": [
+          {
+            "parameter": "Fossil electricity share",
+            "target_2030": "~45% \u2192 20% by 2030",
+            "target_2050": "0% by 2050"
+          },
+          {
+            "parameter": "Renewable electricity share",
+            "target_2030": "55% \u2192 80% by 2030",
+            "target_2050": "100% by 2050"
+          },
+          {
+            "parameter": "Coal coefficient (A-matrix)",
+            "target_2030": "Reduce by 40%",
+            "target_2050": "Reduce to 0"
+          },
+          {
+            "parameter": "Gas coefficient (A-matrix)",
+            "target_2030": "Reduce by 35%",
+            "target_2050": "Reduce to 0"
+          },
+          {
+            "parameter": "Solar PV + Wind coefficient",
+            "target_2030": "+0.45 share reallocation",
+            "target_2050": "+1.0 (absorb all fossil)"
+          }
+        ],
+        "E": [
+          {
+            "parameter": "CO2 emission intensity (elec.)",
+            "target_2030": "Reduce by ~40%",
+            "target_2050": "Reduce to 0"
+          }
+        ],
+        "Y": []
+      },
+      "summary": {
+        "fossil_delta_2030": "-40%",
+        "fossil_delta_2030_numeric": -0.4,
+        "geography_name": "Rest Africa",
+        "net_zero_year": "2050",
+        "net_zero_year_numeric": 2050,
+        "renewable_share_2030": "80%",
+        "renewable_share_2030_numeric": 0.8,
+        "renewable_share_2050": "100%",
+        "renewable_share_2050_numeric": 1.0,
+        "scenario_id": "WF-S1",
+        "shock_type": "Full"
+      },
+      "target_years": [
+        2030,
+        2050
+      ],
+      "targets": [
+        {
+          "parameter": "Fossil electricity share",
+          "target_2030": "~45% \u2192 20% by 2030",
+          "target_2050": "0% by 2050"
+        },
+        {
+          "parameter": "Renewable electricity share",
+          "target_2030": "55% \u2192 80% by 2030",
+          "target_2050": "100% by 2050"
+        },
+        {
+          "parameter": "Coal coefficient (A-matrix)",
+          "target_2030": "Reduce by 40%",
+          "target_2050": "Reduce to 0"
+        },
+        {
+          "parameter": "Gas coefficient (A-matrix)",
+          "target_2030": "Reduce by 35%",
+          "target_2050": "Reduce to 0"
+        },
+        {
+          "parameter": "Oil/diesel generation",
+          "target_2030": "Reduce by 50%",
+          "target_2050": "Reduce to 0"
+        },
+        {
+          "parameter": "Solar PV + Wind coefficient",
+          "target_2030": "+0.45 share reallocation",
+          "target_2050": "+1.0 (absorb all fossil)"
+        },
+        {
+          "parameter": "CO2 emission intensity (elec.)",
+          "target_2030": "Reduce by ~40%",
+          "target_2050": "Reduce to 0"
+        }
+      ]
+    },
+    "WF-S2": {
+      "description": "6. Rest of Middle East (WM Region)1 6.1 Policy Context1",
+      "geography": {
+        "exiobase_code": "WF",
+        "name": "Rest of Africa",
+        "source_code_label": "WF (Africa aggregate)",
+        "type": "Region"
+      },
+      "geography_code": "WF",
+      "implementation_notes": "",
+      "label": "National Policy Target",
+      "policy_sources": "",
+      "provenance": {
+        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
+        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+      },
+      "scenario_code": "S2",
+      "scenario_id": "WF-S2",
+      "scenario_type": "policy_target",
+      "shock_categories": {
+        "A/Z": [
+          {
+            "parameter": "Renewable electricity share",
+            "target_2030": "80% of new additions from RE",
+            "target_2050": "85%+ of total generation"
+          },
+          {
+            "parameter": "Fossil share reduction",
+            "target_2030": "45% \u2192 30% by 2030",
+            "target_2050": "15% by 2050 (gas bridge)"
+          },
+          {
+            "parameter": "Renewable A-matrix coefficient",
+            "target_2030": "+435% capacity increase (2022-2030)",
+            "target_2050": "Sustained expansion"
+          }
+        ],
+        "E": [],
+        "Y": [
+          {
+            "parameter": "Renewable capacity",
+            "target_2030": "300 GW by 2030 (AREI/Nairobi)",
+            "target_2050": "600+ GW by 2050 (estimated)"
+          },
+          {
+            "parameter": "Energy access expansion",
+            "target_2030": "+300M people electrified by 2030",
+            "target_2050": "Universal access by 2040"
+          },
+          {
+            "parameter": "Final demand (Y) shock",
+            "target_2030": "+electricity demand from 300M new consumers",
+            "target_2050": "Full access demand"
+          }
+        ]
+      },
+      "summary": {
+        "fossil_delta_2030": "-30%",
+        "fossil_delta_2030_numeric": -0.3,
+        "geography_name": "Rest Africa",
+        "net_zero_year": "2060*",
+        "net_zero_year_numeric": 2060,
+        "renewable_share_2030": "80%**",
+        "renewable_share_2030_numeric": 0.8,
+        "renewable_share_2050": "85%+",
+        "renewable_share_2050_numeric": 0.85,
+        "scenario_id": "WF-S2",
+        "shock_type": "Policy"
+      },
+      "target_years": [
+        2030,
+        2050,
+        2060
+      ],
+      "targets": [
+        {
+          "parameter": "Renewable capacity",
+          "target_2030": "300 GW by 2030 (AREI/Nairobi)",
+          "target_2050": "600+ GW by 2050 (estimated)"
+        },
+        {
+          "parameter": "Energy access expansion",
+          "target_2030": "+300M people electrified by 2030",
+          "target_2050": "Universal access by 2040"
+        },
+        {
+          "parameter": "Renewable electricity share",
+          "target_2030": "80% of new additions from RE",
+          "target_2050": "85%+ of total generation"
+        },
+        {
+          "parameter": "Fossil share reduction",
+          "target_2030": "45% \u2192 30% by 2030",
+          "target_2050": "15% by 2050 (gas bridge)"
+        },
+        {
+          "parameter": "Renewable A-matrix coefficient",
+          "target_2030": "+435% capacity increase (2022-2030)",
+          "target_2050": "Sustained expansion"
+        },
+        {
+          "parameter": "Final demand (Y) shock",
+          "target_2030": "+electricity demand from 300M new consumers",
+          "target_2050": "Full access demand"
+        },
+        {
+          "parameter": "Shock kind in MARIO",
+          "target_2030": "Percentage + demand expansion",
+          "target_2050": "Combined supply-demand shock"
+        }
+      ]
+    },
+    "WM-S1": {
+      "description": "100% renewable electricity by 2050 \u2014 upper-bound transition shock replacing all fossil generation",
+      "geography": {
+        "exiobase_code": "WM",
+        "name": "Rest of Middle East",
+        "source_code_label": "WM (MENA aggregate)",
+        "type": "Region"
+      },
+      "geography_code": "WM",
+      "implementation_notes": "",
+      "label": "Full Decarbonization",
+      "policy_sources": "",
+      "provenance": {
+        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
+        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+      },
+      "scenario_code": "S1",
+      "scenario_id": "WM-S1",
+      "scenario_type": "full_decarbonization",
+      "shock_categories": {
+        "A/Z": [
+          {
+            "parameter": "Gas electricity share",
+            "target_2030": "~70% \u2192 35% by 2030",
+            "target_2050": "0% by 2050"
+          },
+          {
+            "parameter": "Oil electricity share",
+            "target_2030": "~20% \u2192 5% by 2030",
+            "target_2050": "0% by 2050"
+          },
+          {
+            "parameter": "Solar PV coefficient",
+            "target_2030": "+55% reallocation by 2030",
+            "target_2050": "Absorbs 80% of total mix"
+          },
+          {
+            "parameter": "Wind coefficient",
+            "target_2030": "+15% reallocation by 2030",
+            "target_2050": "Absorbs 20% of total mix"
+          },
+          {
+            "parameter": "Renewable electricity share",
+            "target_2030": "~10% \u2192 60% by 2030",
+            "target_2050": "100% by 2050"
+          }
+        ],
+        "E": [
+          {
+            "parameter": "CO2 emission intensity (elec.)",
+            "target_2030": "Reduce by ~55%",
+            "target_2050": "Reduce to 0"
+          }
+        ],
+        "Y": []
+      },
+      "summary": {
+        "fossil_delta_2030": "-55%",
+        "fossil_delta_2030_numeric": -0.55,
+        "geography_name": "Rest M.East",
+        "net_zero_year": "2050",
+        "net_zero_year_numeric": 2050,
+        "renewable_share_2030": "60%",
+        "renewable_share_2030_numeric": 0.6,
+        "renewable_share_2050": "100%",
+        "renewable_share_2050_numeric": 1.0,
+        "scenario_id": "WM-S1",
+        "shock_type": "Full"
+      },
+      "target_years": [
+        2030,
+        2050
+      ],
+      "targets": [
+        {
+          "parameter": "Gas electricity share",
+          "target_2030": "~70% \u2192 35% by 2030",
+          "target_2050": "0% by 2050"
+        },
+        {
+          "parameter": "Oil electricity share",
+          "target_2030": "~20% \u2192 5% by 2030",
+          "target_2050": "0% by 2050"
+        },
+        {
+          "parameter": "Solar PV coefficient",
+          "target_2030": "+55% reallocation by 2030",
+          "target_2050": "Absorbs 80% of total mix"
+        },
+        {
+          "parameter": "Wind coefficient",
+          "target_2030": "+15% reallocation by 2030",
+          "target_2050": "Absorbs 20% of total mix"
+        },
+        {
+          "parameter": "Renewable electricity share",
+          "target_2030": "~10% \u2192 60% by 2030",
+          "target_2050": "100% by 2050"
+        },
+        {
+          "parameter": "CO2 emission intensity (elec.)",
+          "target_2030": "Reduce by ~55%",
+          "target_2050": "Reduce to 0"
+        },
+        {
+          "parameter": "Shock kind in MARIO",
+          "target_2030": "Percentage (very large)",
+          "target_2050": "New Value = 0 (gas/oil)"
+        }
+      ]
+    },
+    "WM-S2": {
+      "description": "7. MARIO Model Implementation Guide1 7.1 Shock File Structure1",
+      "geography": {
+        "exiobase_code": "WM",
+        "name": "Rest of Middle East",
+        "source_code_label": "WM (MENA aggregate)",
+        "type": "Region"
+      },
+      "geography_code": "WM",
+      "implementation_notes": "",
+      "label": "National Policy Target",
+      "policy_sources": "",
+      "provenance": {
+        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
+        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+      },
+      "scenario_code": "S2",
+      "scenario_id": "WM-S2",
+      "scenario_type": "policy_target",
+      "shock_categories": {
+        "A/Z": [
+          {
+            "parameter": "Renewable electricity share",
+            "target_2030": "~35% by 2030 (weighted avg)",
+            "target_2050": "53% by 2050 (IRENA MENA)"
+          },
+          {
+            "parameter": "Gas electricity share",
+            "target_2030": "~70% \u2192 ~55% by 2030",
+            "target_2050": "~35% by 2050 (transition fuel)"
+          },
+          {
+            "parameter": "Gas A-matrix coefficient",
+            "target_2030": "Reduce by ~20%",
+            "target_2050": "Reduce by ~55%"
+          },
+          {
+            "parameter": "Solar coefficient",
+            "target_2030": "Increase by +30% (A-matrix)",
+            "target_2050": "Increase to 40-50% share"
+          }
+        ],
+        "E": [],
+        "Y": [
+          {
+            "parameter": "Solar PV capacity",
+            "target_2030": "+130 GW total (Saudi: 58.7 GW solar)",
+            "target_2050": "200 GW+ by 2035 (IRENA)"
+          }
+        ]
+      },
+      "summary": {
+        "fossil_delta_2030": "-20%",
+        "fossil_delta_2030_numeric": -0.2,
+        "geography_name": "Rest M.East",
+        "net_zero_year": "~2055",
+        "net_zero_year_numeric": 2055,
+        "renewable_share_2030": "~35%",
+        "renewable_share_2030_numeric": 0.35,
+        "renewable_share_2050": "53%",
+        "renewable_share_2050_numeric": 0.53,
+        "scenario_id": "WM-S2",
+        "shock_type": "Policy"
+      },
+      "target_years": [
+        2030,
+        2050,
+        2055
+      ],
+      "targets": [
+        {
+          "parameter": "Renewable electricity share",
+          "target_2030": "~35% by 2030 (weighted avg)",
+          "target_2050": "53% by 2050 (IRENA MENA)"
+        },
+        {
+          "parameter": "Solar PV capacity",
+          "target_2030": "+130 GW total (Saudi: 58.7 GW solar)",
+          "target_2050": "200 GW+ by 2035 (IRENA)"
+        },
+        {
+          "parameter": "Gas electricity share",
+          "target_2030": "~70% \u2192 ~55% by 2030",
+          "target_2050": "~35% by 2050 (transition fuel)"
+        },
+        {
+          "parameter": "Net-zero commitments",
+          "target_2030": "UAE/Oman: 2050; SA/Kuwait: 2060",
+          "target_2050": "Region net-zero ~2055 avg"
+        },
+        {
+          "parameter": "Grid carbon intensity",
+          "target_2030": "0.27 kgCO2/kWh (UAE 2030)",
+          "target_2050": "Near-zero by 2050"
+        },
+        {
+          "parameter": "Gas A-matrix coefficient",
+          "target_2030": "Reduce by ~20%",
+          "target_2050": "Reduce by ~55%"
+        },
+        {
+          "parameter": "Solar coefficient",
+          "target_2030": "Increase by +30% (A-matrix)",
+          "target_2050": "Increase to 40-50% share"
+        },
+        {
+          "parameter": "Shock kind in MARIO",
+          "target_2030": "Percentage (moderate)",
+          "target_2050": "Percentage / New Value mix"
+        }
+      ]
+    },
+    "ZA-S1": {
+      "description": "100% renewable electricity by 2050 \u2014 upper-bound transition shock replacing all fossil generation",
+      "geography": {
+        "exiobase_code": "ZA",
+        "name": "South Africa",
+        "source_code_label": "ZA",
+        "type": "Country"
+      },
+      "geography_code": "ZA",
+      "implementation_notes": "",
+      "label": "Full Decarbonization",
+      "policy_sources": "",
+      "provenance": {
+        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
+        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+      },
+      "scenario_code": "S1",
+      "scenario_id": "ZA-S1",
+      "scenario_type": "full_decarbonization",
+      "shock_categories": {
+        "A/Z": [
+          {
+            "parameter": "Fossil electricity share",
+            "target_2030": "50% \u2192 0% (partial by 2030)",
+            "target_2050": "0% (complete phase-out)"
+          },
+          {
+            "parameter": "Renewable electricity share",
+            "target_2030": "22% \u2192 60% by 2030",
+            "target_2050": "100% by 2050"
+          },
+          {
+            "parameter": "Coal electricity coefficient",
+            "target_2030": "Reduce by 50% in A-matrix",
+            "target_2050": "Reduce to 0 in A-matrix"
+          },
+          {
+            "parameter": "Gas electricity coefficient",
+            "target_2030": "Reduce by 30%",
+            "target_2050": "Reduce to 0"
+          },
+          {
+            "parameter": "Wind/Solar coefficient",
+            "target_2030": "+0.38 share reallocation",
+            "target_2050": "+1.0 (absorb all fossil share)"
+          }
+        ],
+        "E": [
+          {
+            "parameter": "CO2 emission intensity (elec.)",
+            "target_2030": "Reduce by ~50%",
+            "target_2050": "Reduce to 0"
+          }
+        ],
+        "Y": []
+      },
+      "summary": {
+        "fossil_delta_2030": "-50%",
+        "fossil_delta_2030_numeric": -0.5,
+        "geography_name": "South Africa",
+        "net_zero_year": "2050",
+        "net_zero_year_numeric": 2050,
+        "renewable_share_2030": "60%",
+        "renewable_share_2030_numeric": 0.6,
+        "renewable_share_2050": "100%",
+        "renewable_share_2050_numeric": 1.0,
+        "scenario_id": "ZA-S1",
+        "shock_type": "Full"
+      },
+      "target_years": [
+        2030,
+        2050
+      ],
+      "targets": [
+        {
+          "parameter": "Fossil electricity share",
+          "target_2030": "50% \u2192 0% (partial by 2030)",
+          "target_2050": "0% (complete phase-out)"
+        },
+        {
+          "parameter": "Renewable electricity share",
+          "target_2030": "22% \u2192 60% by 2030",
+          "target_2050": "100% by 2050"
+        },
+        {
+          "parameter": "Coal electricity coefficient",
+          "target_2030": "Reduce by 50% in A-matrix",
+          "target_2050": "Reduce to 0 in A-matrix"
+        },
+        {
+          "parameter": "Gas electricity coefficient",
+          "target_2030": "Reduce by 30%",
+          "target_2050": "Reduce to 0"
+        },
+        {
+          "parameter": "Wind/Solar coefficient",
+          "target_2030": "+0.38 share reallocation",
+          "target_2050": "+1.0 (absorb all fossil share)"
+        },
+        {
+          "parameter": "CO2 emission intensity (elec.)",
+          "target_2030": "Reduce by ~50%",
+          "target_2050": "Reduce to 0"
+        },
+        {
+          "parameter": "Shock kind in MARIO",
+          "target_2030": "Percentage / New Value",
+          "target_2050": "New Value = 0 (fossils)"
+        }
+      ]
+    },
+    "ZA-S2": {
+      "description": "3. India1 3.1 Policy Context1",
+      "geography": {
+        "exiobase_code": "ZA",
+        "name": "South Africa",
+        "source_code_label": "ZA",
+        "type": "Country"
+      },
+      "geography_code": "ZA",
+      "implementation_notes": "",
+      "label": "National Policy Target",
+      "policy_sources": "",
+      "provenance": {
+        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
+        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+      },
+      "scenario_code": "S2",
+      "scenario_id": "ZA-S2",
+      "scenario_type": "policy_target",
+      "shock_categories": {
+        "A/Z": [
+          {
+            "parameter": "Renewable electricity share",
+            "target_2030": "22% by 2030 (IRP 2023)",
+            "target_2050": "Net-zero electricity by 2050"
+          },
+          {
+            "parameter": "Coal electricity share",
+            "target_2030": "~70% in 2025 \u2192 ~55% by 2030",
+            "target_2050": "Phase-out post 2035; ~0% by 2050"
+          },
+          {
+            "parameter": "Coal A-matrix coefficient",
+            "target_2030": "Reduce by ~15% by 2030",
+            "target_2050": "Reduce to 0 by 2050"
+          }
+        ],
+        "E": [
+          {
+            "parameter": "GHG emissions target",
+            "target_2030": "350\u2013420 MtCO2e by 2030",
+            "target_2050": "212\u2013428 MtCO2e by 2050 (Act)"
+          }
+        ],
+        "Y": [
+          {
+            "parameter": "New gas capacity",
+            "target_2030": "+7 GW gas by 2030 (IRP 2023)",
+            "target_2050": "Gradual phase-down 2035\u20132050"
+          }
+        ]
+      },
+      "summary": {
+        "fossil_delta_2030": "-15%",
+        "fossil_delta_2030_numeric": -0.15,
+        "geography_name": "South Africa",
+        "net_zero_year": "2050",
+        "net_zero_year_numeric": 2050,
+        "renewable_share_2030": "22%",
+        "renewable_share_2030_numeric": 0.22,
+        "renewable_share_2050": "100%*",
+        "renewable_share_2050_numeric": 1.0,
+        "scenario_id": "ZA-S2",
+        "shock_type": "Policy"
+      },
+      "target_years": [
+        2030,
+        2050
+      ],
+      "targets": [
+        {
+          "parameter": "Renewable electricity share",
+          "target_2030": "22% by 2030 (IRP 2023)",
+          "target_2050": "Net-zero electricity by 2050"
+        },
+        {
+          "parameter": "Coal electricity share",
+          "target_2030": "~70% in 2025 \u2192 ~55% by 2030",
+          "target_2050": "Phase-out post 2035; ~0% by 2050"
+        },
+        {
+          "parameter": "New gas capacity",
+          "target_2030": "+7 GW gas by 2030 (IRP 2023)",
+          "target_2050": "Gradual phase-down 2035\u20132050"
+        },
+        {
+          "parameter": "Solar/Wind addition (GW)",
+          "target_2030": "+8.1\u201313.8 GW by 2030",
+          "target_2050": "+full capacity for net-zero"
+        },
+        {
+          "parameter": "GHG emissions target",
+          "target_2030": "350\u2013420 MtCO2e by 2030",
+          "target_2050": "212\u2013428 MtCO2e by 2050 (Act)"
+        },
+        {
+          "parameter": "Coal A-matrix coefficient",
+          "target_2030": "Reduce by ~15% by 2030",
+          "target_2050": "Reduce to 0 by 2050"
+        },
+        {
+          "parameter": "Shock kind in MARIO",
+          "target_2030": "Percentage (moderate)",
+          "target_2050": "New Value (net-zero state)"
+        }
+      ]
+    }
+  },
+  "schema_version": "scenario_report_v1",
+  "shock_file_structure": [
+    {
+      "description": "Inter-industry coefficient changes: fossil electricity rows decrease, renewable rows increase for the target region",
+      "mario_parameter": "Z matrix (flows) or A matrix (coefficients)",
+      "sheet_name": "Z_shocks / A_shocks"
+    },
+    {
+      "description": "CO2 emission intensity changes per unit of electricity produced (kg CO2 / EUR output)",
+      "mario_parameter": "Satellite extension (E) matrix",
+      "sheet_name": "E_shocks"
+    },
+    {
+      "description": "Demand-side shocks: capital investment in renewables, energy access expansion (WF region)",
+      "mario_parameter": "Final demand (Y) vector",
+      "sheet_name": "Y_shocks"
+    },
+    {
+      "description": "Scenario ID, geography, year, shock type, source citation, and model notes",
+      "mario_parameter": "N/A",
+      "sheet_name": "Metadata"
+    }
+  ],
+  "shock_structure": [
+    {
+      "description": "Reallocate fossil electricity production to renewable alternatives (proportional substitution)",
+      "mario_parameter": "Z matrix / A matrix",
+      "shock_type": "Technology shift"
+    },
+    {
+      "description": "Reduce CO2 emission coefficients for electricity sectors in proportion to fossil phase-out",
+      "mario_parameter": "Satellite (E matrix)",
+      "shock_type": "Emission intensity"
+    },
+    {
+      "description": "Increase capital investment demand for renewable generation equipment and grid infrastructure",
+      "mario_parameter": "Final demand (Y)",
+      "shock_type": "Capacity addition"
+    },
+    {
+      "description": "Reduce coal/gas/oil input per unit of electricity produced in fossil sectors being phased down",
+      "mario_parameter": "A matrix (energy rows)",
+      "shock_type": "Fuel use intensity"
+    }
+  ],
+  "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
+  "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+}

@@ -1,6 +1,56 @@
 calliope_location,power_pool,mario_region,notes
-AGO,CAPP,Central_Africa,example row
-EGY,EAPP,East_Africa,example row
-DZA,NAPP,North_Africa,example row
-ZAF,SAPP,Southern_Africa,example row
-NGA_CNW,WAPP,West_Africa,Nigeria subregion example
+AGO,CAPP,Central_Africa,auto: Calliope location constraints
+BDI,CAPP,Central_Africa,auto: Calliope location constraints
+BEN,WAPP,West_Africa,auto: Calliope location constraints
+BFA,WAPP,West_Africa,auto: Calliope location constraints
+BWA,SAPP,Southern_Africa,auto: Calliope location constraints
+CAF,CAPP,Central_Africa,auto: Calliope location constraints
+CIV,WAPP,West_Africa,auto: Calliope location constraints
+CMR,CAPP,Central_Africa,auto: Calliope location constraints
+COD,CAPP,Central_Africa,auto: Calliope location constraints
+COG,CAPP,Central_Africa,auto: Calliope location constraints
+DJI,EAPP,East_Africa,auto: Calliope location constraints
+DZA,NAPP,North_Africa,auto: Calliope location constraints
+EGY,EAPP,East_Africa,auto: Calliope location constraints
+ERI,EAPP,East_Africa,auto: Calliope location constraints
+ETH,EAPP,East_Africa,auto: Calliope location constraints
+GAB,CAPP,Central_Africa,auto: Calliope location constraints
+GHA,WAPP,West_Africa,auto: Calliope location constraints
+GIN,WAPP,West_Africa,auto: Calliope location constraints
+GMB,WAPP,West_Africa,auto: Calliope location constraints
+GNB,WAPP,West_Africa,auto: Calliope location constraints
+GNQ,CAPP,Central_Africa,auto: Calliope location constraints
+KEN_CSTR,EAPP,East_Africa,auto: Calliope location constraints
+KEN_MTKR,EAPP,East_Africa,auto: Calliope location constraints
+KEN_NBOR,EAPP,East_Africa,auto: Calliope location constraints
+KEN_WSTR,EAPP,East_Africa,auto: Calliope location constraints
+LBR,WAPP,West_Africa,auto: Calliope location constraints
+LBY,NAPP,North_Africa,auto: Calliope location constraints
+LSO,SAPP,Southern_Africa,auto: Calliope location constraints
+MAR,NAPP,North_Africa,auto: Calliope location constraints
+MLI,WAPP,West_Africa,auto: Calliope location constraints
+MOZ_NC,SAPP,Southern_Africa,auto: Calliope location constraints
+MOZ_S,SAPP,Southern_Africa,auto: Calliope location constraints
+MRT,NAPP,North_Africa,auto: Calliope location constraints
+MWI,SAPP,Southern_Africa,auto: Calliope location constraints
+NAM,SAPP,Southern_Africa,auto: Calliope location constraints
+NER,WAPP,West_Africa,auto: Calliope location constraints
+NGA_CNW,WAPP,West_Africa,auto: Calliope location constraints
+NGA_E,WAPP,West_Africa,auto: Calliope location constraints
+NGA_S,WAPP,West_Africa,auto: Calliope location constraints
+NGA_W,WAPP,West_Africa,auto: Calliope location constraints
+RWA,EAPP,East_Africa,auto: Calliope location constraints
+SDN,EAPP,East_Africa,auto: Calliope location constraints
+SEN,WAPP,West_Africa,auto: Calliope location constraints
+SLE,WAPP,West_Africa,auto: Calliope location constraints
+SOM,EAPP,East_Africa,auto: Calliope location constraints
+SSD,EAPP,East_Africa,auto: Calliope location constraints
+SWZ,SAPP,Southern_Africa,auto: Calliope location constraints
+TCD,CAPP,Central_Africa,auto: Calliope location constraints
+TGO,WAPP,West_Africa,auto: Calliope location constraints
+TUN,NAPP,North_Africa,auto: Calliope location constraints
+TZA,EAPP,East_Africa,auto: Calliope location constraints
+UGA,EAPP,East_Africa,auto: Calliope location constraints
+ZAF,SAPP,Southern_Africa,auto: Calliope location constraints
+ZMB,SAPP,Southern_Africa,auto: Calliope location constraints
+ZWE,SAPP,Southern_Africa,auto: Calliope location constraints

@@ -5,15 +5,17 @@ import logging
 import mimetypes
 import os
 import re
+import shutil
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from .ai_query import plan_scenario_query
 from .integrated import build_integrated_results, validate_integrated_results
-from .scenarios import build_scenario_list
+from .scenarios import build_integrated_catalog
 from .settings import get_settings
 from .jobs import JobManager, JobQueueFullError
 from .runner import build_environment_setup_report
@@ -26,6 +28,7 @@ from .schemas import (
 
 logger = logging.getLogger(__name__)
 RUN_ID_PATTERN = re.compile(r"^[a-f0-9]{8}$")
+INPUT_DATASET_ID_PATTERN = re.compile(r"^[a-z0-9_]+$")
 
 app = FastAPI(title="EDIM Calliope-Africa API", version="0.1.0")
 settings = get_settings()
@@ -45,6 +48,8 @@ def _discover_frontend_dir() -> Path | None:
         path = Path(env_dir).expanduser().resolve()
         if path.exists() and path.is_dir():
             return path
+    if settings.frontend_dir and settings.frontend_dir.exists() and settings.frontend_dir.is_dir():
+        return settings.frontend_dir
 
     candidates = [
         Path("/app/frontend"),  # Docker runtime mount
@@ -91,6 +96,136 @@ def _require_calliope_model_yaml() -> None:
             detail=f"Missing Calliope-Africa model.yaml at {model_path}",
         )
 
+
+def _input_dataset_catalog():
+    repo_root = settings.config_dir.resolve().parent
+    rows = [
+        {
+            "id": "scenario_metadata",
+            "label": "Energy scenario metadata",
+            "layer": "scenario",
+            "role": "Maps Calliope override keys into scenario labels and user-facing descriptions.",
+            "path": settings.config_dir / "scenario_metadata.csv",
+        },
+        {
+            "id": "scenario_report",
+            "label": "Energy Modelling Scenario Report",
+            "layer": "scenario",
+            "role": "Source report parsed into integrated target pathways and MRIO-direct assumptions.",
+            "path": repo_root / "Energy Modelling Scenario Report.docx",
+        },
+        {
+            "id": "africa_placeholder_scenarios",
+            "label": "Africa national placeholder target scenarios",
+            "layer": "scenario",
+            "role": "National S1/S2 placeholder targets for African countries not explicitly defined in the report.",
+            "path": settings.config_dir / "generated" / "africa_national_mrio_placeholder_scenarios.json",
+        },
+        {
+            "id": "scenario_geography_mapping",
+            "label": "Scenario geography mapping",
+            "layer": "scenario",
+            "role": "Maps MRIO geographies to Calliope countries and subnational locations.",
+            "path": settings.config_dir / "scenario_geography_mapping.csv",
+        },
+        {
+            "id": "calliope_model",
+            "label": "Calliope model definition",
+            "layer": "calliope",
+            "role": "Primary Calliope-Africa model YAML.",
+            "path": settings.calliope_root / "model.yaml",
+        },
+        {
+            "id": "calliope_overrides",
+            "label": "Calliope scenario overrides",
+            "layer": "calliope",
+            "role": "Calliope override definitions used by the energy scenario selector.",
+            "path": settings.calliope_root / "overrides.yaml",
+        },
+        {
+            "id": "lever_mappings",
+            "label": "Policy lever mappings",
+            "layer": "calliope",
+            "role": "Maps UI policy levers to model-side parameter adjustments.",
+            "path": settings.config_dir / "lever_mappings.csv",
+        },
+        {
+            "id": "development_model",
+            "label": "Development model configuration",
+            "layer": "mrio",
+            "role": "Development/MRIO runtime configuration and model controls.",
+            "path": settings.config_dir / "development_model.csv",
+        },
+        {
+            "id": "employment_intensity",
+            "label": "Employment intensity",
+            "layer": "mrio",
+            "role": "Jobs per monetary shock by MRIO region and supplier sector.",
+            "path": settings.config_dir / "mario_inputs" / "employment_intensity.csv",
+        },
+        {
+            "id": "value_added_intensity",
+            "label": "Value-added intensity",
+            "layer": "mrio",
+            "role": "Gross value added per monetary shock by MRIO region and supplier sector.",
+            "path": settings.config_dir / "mario_inputs" / "value_added_intensity.csv",
+        },
+        {
+            "id": "development_indicator_mapping",
+            "label": "Development indicator mapping",
+            "layer": "mrio",
+            "role": "Maps MRIO impacts into development indicators shown in the dashboard.",
+            "path": settings.config_dir / "mario_inputs" / "development_indicator_mapping.csv",
+        },
+        {
+            "id": "scenario_assumptions",
+            "label": "MRIO scenario assumptions",
+            "layer": "mrio",
+            "role": "Assumptions used by direct MRIO shock preparation.",
+            "path": settings.config_dir / "mario_inputs" / "scenario_assumptions.csv",
+        },
+        {
+            "id": "country_to_pool",
+            "label": "Country to power-pool mapping",
+            "layer": "mrio",
+            "role": "Country and region mapping used for spatial aggregation and MRIO alignment.",
+            "path": settings.config_dir / "mario_inputs" / "country_to_pool.csv",
+        },
+        {
+            "id": "capex_sector_split",
+            "label": "CAPEX sector split",
+            "layer": "bridge",
+            "role": "Splits Calliope capital expenditure shocks into MRIO supplier sectors.",
+            "path": settings.config_dir / "mario_inputs" / "capex_sector_split.csv",
+        },
+        {
+            "id": "opex_sector_split",
+            "label": "OPEX sector split",
+            "layer": "bridge",
+            "role": "Splits operating and fuel shocks into MRIO supplier sectors.",
+            "path": settings.config_dir / "mario_inputs" / "opex_sector_split.csv",
+        },
+        {
+            "id": "calliope_tech_to_mario_sector",
+            "label": "Calliope technology to MRIO sector",
+            "layer": "bridge",
+            "role": "Maps solved energy technologies to MRIO sector accounts.",
+            "path": settings.config_dir / "mario_inputs" / "calliope_tech_to_mario_sector.csv",
+        },
+    ]
+    return rows
+
+
+def _resolve_input_dataset(dataset_id: str) -> dict:
+    dataset_id = dataset_id.strip()
+    if not INPUT_DATASET_ID_PATTERN.fullmatch(dataset_id):
+        raise HTTPException(status_code=400, detail="Invalid dataset id.")
+    datasets = {row["id"]: row for row in _input_dataset_catalog()}
+    dataset = datasets.get(dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Input dataset not found.")
+    return dataset
+
 @app.get("/", include_in_schema=False)
 def root():
     if FRONTEND_DIR is not None:
@@ -107,28 +242,119 @@ def list_scenarios():
     metadata_path = settings.config_dir / "scenario_metadata.csv"
     if not overrides_path.exists():
         raise HTTPException(status_code=400, detail=f"Missing Calliope-Africa overrides.yaml at {overrides_path}")
-    scenarios = build_scenario_list(overrides_path, metadata_path)
-    return {"scenarios": [s.model_dump() for s in scenarios]}
+    return build_integrated_catalog(overrides_path, metadata_path, settings.config_dir, settings.calliope_root)
 
 
 @app.get("/api/environment-setup")
-def get_environment_setup(scenario: str = "", run_profile: str = "dev"):
+def get_environment_setup(
+    energy_scenario_key: str = "",
+    mrio_scenario_id: str = "",
+    target_year: int = 2030,
+    run_profile: str = "dev",
+    strict_validation: bool | None = None,
+    allow_placeholder_data: bool = False,
+):
     queue_stats = job_manager.runtime_stats()
     return build_environment_setup_report(
         settings=settings,
         queue_stats=queue_stats,
-        scenario=scenario,
+        energy_scenario_key=energy_scenario_key,
+        mrio_scenario_id=mrio_scenario_id,
+        target_year=target_year,
         run_profile=run_profile,
+        strict_validation=strict_validation,
+        allow_placeholder_data=allow_placeholder_data,
     )
 
 
+@app.get("/api/input-datasets")
+def list_input_datasets():
+    datasets = []
+    for row in _input_dataset_catalog():
+        path = Path(row["path"])
+        stat = path.stat() if path.exists() else None
+        datasets.append(
+            {
+                "id": row["id"],
+                "label": row["label"],
+                "layer": row["layer"],
+                "role": row["role"],
+                "filename": path.name,
+                "exists": path.exists(),
+                "size_bytes": stat.st_size if stat else None,
+                "download_url": f"/api/input-datasets/{row['id']}/download",
+            }
+        )
+    return {"datasets": datasets}
+
+
+@app.post("/api/ai/scenario-query")
+def plan_ai_scenario_query(payload: dict):
+    return plan_scenario_query(payload, settings=settings)
+
+
+@app.get("/api/input-datasets/{dataset_id}/download")
+def download_input_dataset(dataset_id: str):
+    dataset = _resolve_input_dataset(dataset_id)
+    path = Path(dataset["path"])
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Input dataset file not found.")
+    media_type, _ = mimetypes.guess_type(path.name)
+    return FileResponse(
+        path=str(path),
+        filename=path.name,
+        media_type=media_type or "application/octet-stream",
+    )
+
+
+@app.post("/api/input-datasets/{dataset_id}/upload")
+async def upload_input_dataset(dataset_id: str, file: UploadFile = File(...)):
+    dataset = _resolve_input_dataset(dataset_id)
+    path = Path(dataset["path"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        backup = path.with_name(f"{path.name}.bak")
+        shutil.copy2(path, backup)
+    with path.open("wb") as out:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            out.write(chunk)
+    return {
+        "ok": True,
+        "dataset_id": dataset_id,
+        "filename": path.name,
+        "size_bytes": path.stat().st_size,
+    }
+
+
 @app.get("/api/preflight", include_in_schema=False)
-def get_preflight_compat(scenario: str = "", run_profile: str = "dev"):
-    return get_environment_setup(scenario=scenario, run_profile=run_profile)
+def get_preflight_compat(
+    energy_scenario_key: str = "",
+    mrio_scenario_id: str = "",
+    target_year: int = 2030,
+    run_profile: str = "dev",
+    strict_validation: bool | None = None,
+    allow_placeholder_data: bool = False,
+):
+    return get_environment_setup(
+        energy_scenario_key=energy_scenario_key,
+        mrio_scenario_id=mrio_scenario_id,
+        target_year=target_year,
+        run_profile=run_profile,
+        strict_validation=strict_validation,
+        allow_placeholder_data=allow_placeholder_data,
+    )
 
 
 @app.post("/api/jobs", response_model=JobSubmitResponse)
 def submit_job(req: RunRequest):
+    if req.energy_model_engine != "calliope":
+        raise HTTPException(
+            status_code=501,
+            detail="OSeMOSYS is selectable for scenario design/provenance, but the executable runtime adapter is not implemented yet. Use energy_model_engine='calliope' to run now.",
+        )
     _require_calliope_model_yaml()
     try:
         job = job_manager.submit(req)
@@ -191,7 +417,7 @@ def get_integrated_results(run_id: str):
         raise HTTPException(status_code=404, detail="Integrated results not found")
     summary = _read_summary_json(summary_path)
     coupling_manifest = summary.get("coupling_manifest") or {}
-    return build_integrated_results(summary, coupling_manifest=coupling_manifest)
+    return build_integrated_results(summary, coupling_manifest=coupling_manifest, config_dir=settings.config_dir)
 
 
 @app.get("/api/run/{run_id}/download/exchange/{file_path:path}")
@@ -208,6 +434,23 @@ def download_exchange_file(run_id: str, file_path: str):
         filename=candidate.name,
         media_type=media_type or "application/octet-stream",
     )
+
+
+@app.get("/api/run/{run_id}/download/artifact/{file_path:path}")
+def download_run_artifact(run_id: str, file_path: str):
+    normalized = file_path.strip().lstrip("/")
+    if not normalized or ".." in normalized:
+        raise HTTPException(status_code=400, detail="Invalid artifact path")
+    candidate = _resolve_run_file_path(run_id, normalized)
+    if not candidate.exists() or not candidate.is_file():
+        raise HTTPException(status_code=404, detail="Run artifact not found")
+    media_type, _ = mimetypes.guess_type(candidate.name)
+    return FileResponse(
+        path=str(candidate),
+        filename=candidate.name,
+        media_type=media_type or "application/octet-stream",
+    )
+
 
 @app.get("/api/run/{run_id}/download/csv")
 def download_results_csv(run_id: str):

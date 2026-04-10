@@ -9,10 +9,10 @@ from pathlib import Path
 from unittest.mock import patch
 from zipfile import ZipFile
 
+import pandas as pd
 from fastapi import HTTPException
 
 from api_service.integrated import (
-    build_baseline_comparison,
     build_integrated_results,
     build_run_report_markdown,
     create_exchange_bundle_zip,
@@ -22,6 +22,14 @@ from api_service.jobs import JobManager, JobQueueFullError
 from api_service.levers import load_lever_mappings
 from api_service.main import _read_summary_json
 from api_service.mario_runtime import mario_inputs_health, run_mario_io_runtime
+from api_service.scenario_package import (
+    build_integrated_scenario_catalog,
+    build_geography_alignment,
+    build_mrio_direct_inputs,
+    build_scenario_package,
+    write_scenario_artifacts,
+)
+from api_service.scenario_report import load_or_parse_scenario_report
 from api_service.runner import (
     RunCancelledError,
     _build_development_outputs,
@@ -33,6 +41,7 @@ from api_service.runner import (
 from api_service.scenarios import load_scenario_metadata
 from api_service.schemas import LeverValues, RunRequest
 from api_service.settings import Settings
+from api_service.summarize import build_summary_diagnostics
 
 
 def _build_settings(base: Path, *, dedupe_enabled: bool = True, queue_capacity: int = 200) -> Settings:
@@ -102,7 +111,10 @@ def _wait_terminal(manager: JobManager, job_id: str, timeout_seconds: float = 8.
 def _summary_template(run_id: str) -> dict:
     return {
         "run_id": run_id,
-        "scenario": "new_links",
+        "energy_scenario_key": "new_links",
+        "mrio_scenario_id": "S2",
+        "target_year": 2030,
+        "run_profile": "dev",
         "system_cost": {"records": [{"costs": "monetary", "value": 100.0}]},
         "summary_diagnostics": {
             "physical_emissions": {"total_emissions": 50.0},
@@ -118,6 +130,53 @@ def _summary_template(run_id: str) -> dict:
     }
 
 
+def _run_request() -> RunRequest:
+    return RunRequest(
+        energy_scenario_key="new_links",
+        mrio_scenario_id="S2",
+        target_year=2030,
+        run_profile="dev",
+        strict_validation=False,
+        allow_placeholder_data=True,
+        levers=LeverValues(),
+    )
+
+
+def _scenario_package() -> dict:
+    return {
+        "schema_version": "integrated_scenario_package_v1",
+        "energy_scenario_key": "new_links",
+        "mrio_scenario_id": "S2",
+        "target_year": 2030,
+        "run_profile": "dev",
+        "levers": {},
+        "energy": {"adapter": "calliope_v1", "model": "calliope", "scenario_key": "new_links"},
+        "mrio_direct": {
+            "adapter": "mrio_direct_heuristic_v1",
+            "scenario": {
+                "scenario_id": "ZA-S2",
+                "geography_code": "ZA",
+                "geography": {"name": "South Africa", "type": "Country"},
+                "summary": {
+                    "fossil_delta_2030_numeric": -0.15,
+                    "renewable_share_2030_numeric": 0.22,
+                },
+                "shock_categories": {
+                    "A/Z": [
+                        {"parameter": "Coal A-matrix coefficient", "target_2030": "Reduce by ~15% by 2030", "target_2050": "Reduce to 0 by 2050"},
+                        {"parameter": "Renewable electricity share", "target_2030": "22% by 2030", "target_2050": "100% by 2050"},
+                    ],
+                    "E": [{"parameter": "CO2 emission intensity", "target_2030": "Reduce by ~15%", "target_2050": "0"}],
+                    "Y": [{"parameter": "Solar/Wind addition", "target_2030": "+10%", "target_2050": "+full capacity"}],
+                },
+            },
+            "report_source": {"source_file": "test.docx", "source_sha256": "test"},
+        },
+        "geography_alignment": {"status": "aligned", "calliope_locations": ["ZAF"]},
+        "provenance": {"source": "test"},
+    }
+
+
 def _seed_mario_inputs(config_dir: Path) -> Path:
     mario_dir = config_dir / "mario_inputs"
     mario_dir.mkdir(parents=True, exist_ok=True)
@@ -130,7 +189,7 @@ def _seed_mario_inputs(config_dir: Path) -> Path:
         encoding="utf-8",
     )
     (mario_dir / "opex_sector_split.csv").write_text(
-        "calliope_tech,mario_region,mario_sector,opex_type,share\nCCGT_pp,East_Africa,Gas_supply_chain,fuel,0.7\nCCGT_pp,East_Africa,Maintenance_services,om,0.3\n",
+        "calliope_tech,mario_region,mario_sector,opex_type,share\nCCGT_pp,East_Africa,Gas_supply_chain,fuel,1.0\nCCGT_pp,East_Africa,Maintenance_services,om,1.0\n",
         encoding="utf-8",
     )
     (mario_dir / "calliope_cost_to_mario_account.csv").write_text(
@@ -149,6 +208,14 @@ def _seed_mario_inputs(config_dir: Path) -> Path:
         "mario_region,mario_sector,gva_per_musd_output,household_income_per_musd_output\nEast_Africa,Gas_supply_chain,0.35,0.15\nEast_Africa,Maintenance_services,0.4,0.22\nEast_Africa,Electrical_equipment,0.3,0.12\n",
         encoding="utf-8",
     )
+    (mario_dir / "scenario_assumptions.csv").write_text(
+        "assumption_key,scenario_key,value,unit,effective_year,source,notes\ncarbon_price,baseline,25,usd_per_tco2,2019,expert,calibrated baseline carbon proxy\n",
+        encoding="utf-8",
+    )
+    (mario_dir / "development_indicator_mapping.csv").write_text(
+        "indicator_id,indicator_name,driver_metric,aggregation_rule,unit,lag_years,notes\njobs_total,Total employment impact,jobs_per_musd_total,sum,jobs,0,from MARIO + intensity tables\ngva_total,Gross value added impact,gva_per_musd_output,sum,musd_2019,0,from MARIO output\nco2_cost_burden,Carbon cost burden,co2_cost_proxy,sum,musd_2019,0,proxy based on physical emissions and carbon price\n",
+        encoding="utf-8",
+    )
     (mario_dir / "exchange_output_schema.csv").write_text(
         "file_name,column_name,required,dtype,description\nenergy_service_balance.csv,run_id,yes,string,x\n",
         encoding="utf-8",
@@ -158,9 +225,124 @@ def _seed_mario_inputs(config_dir: Path) -> Path:
 
 class SchemaTests(unittest.TestCase):
     def test_run_request_profile_normalization(self):
-        req = RunRequest(scenario="new_links", run_profile="analysis", fast_dev_mode=False)
+        req = RunRequest(
+            energy_scenario_key="new_links",
+            mrio_scenario_id="S2",
+            target_year=2030,
+            run_profile="analysis",
+            strict_validation=False,
+            allow_placeholder_data=True,
+        )
         self.assertEqual(req.run_profile, "analysis")
-        self.assertTrue(req.fast_dev_mode)
+        self.assertEqual(req.energy_scenario_key, "new_links")
+        self.assertEqual(req.mrio_scenario_id, "S2")
+        self.assertTrue(req.strict_validation)
+
+    def test_run_request_rejects_legacy_scenario_shape(self):
+        with self.assertRaises(Exception):
+            RunRequest(
+                scenario="new_links",
+                fast_dev_mode=True,
+                energy_scenario_key="new_links",
+                mrio_scenario_id="S2",
+                target_year=2030,
+                run_profile="dev",
+                strict_validation=False,
+                allow_placeholder_data=True,
+            )
+
+
+class ScenarioReportTests(unittest.TestCase):
+    def test_root_report_parser_recovers_expected_scenarios(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        report = load_or_parse_scenario_report(repo_root / "inputs")
+        expected = {"ZA-S1", "ZA-S2", "IN-S1", "IN-S2", "BR-S1", "BR-S2", "WF-S1", "WF-S2", "WM-S1", "WM-S2"}
+        self.assertEqual(set(report["scenario_ids"]), expected)
+        za = report["scenarios"]["ZA-S2"]
+        self.assertEqual(za["geography_code"], "ZA")
+        self.assertTrue(za["shock_categories"]["A/Z"])
+        self.assertIn(2030, za["target_years"])
+
+    def test_scenario_package_and_direct_inputs_are_complete(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        package = build_scenario_package(
+            config_dir=repo_root / "inputs",
+            calliope_root=repo_root / "Calliope-Africa-main",
+            energy_scenario_key="new_links",
+            mrio_scenario_id="S2",
+            target_year=2030,
+            run_profile="dev",
+            levers={},
+            strict_validation=False,
+            allow_placeholder_data=True,
+        )
+        self.assertEqual(package["mrio_scenario_id"], "S2")
+        self.assertEqual(package["target_scenario"]["scenario_id"], "S2")
+        self.assertEqual(package["mrio_direct"]["shock_mapping"]["mapping_id"], "mrio_direct_heuristic_v1")
+        self.assertEqual(package["mrio_direct"]["scenario"]["scenario_id"], "S2")
+        self.assertGreater(package["mrio_direct"]["scenario"]["national_record_count"], 1)
+        self.assertEqual(package["geography_alignment"]["alignment_level"], "africa_national_placeholder_to_calliope_locations")
+        self.assertEqual(package["geography_alignment"]["status"], "aligned")
+        direct = build_mrio_direct_inputs(
+            scenario_package=package,
+            bridge_total_shock_musd=100.0,
+            direct_config={"structural_reallocation_bridge_scale": 0.25, "max_direct_to_bridge_ratio": 1.0},
+        )
+        self.assertEqual(direct["method"], "mrio_direct_heuristic_v1")
+        self.assertEqual(direct["scenario_id"], "S2")
+        self.assertTrue(direct["diagnostics"]["national_placeholder_dataset"])
+        self.assertGreater(len(direct["shock_rows"]), 0)
+        direct_regions = {str(row.get("mario_region", "")) for row in direct["shock_rows"]}
+        source_ids = {str(row.get("source_report_scenario_id", "")) for row in direct["shock_rows"]}
+        self.assertIn("ZAF", direct_regions)
+        self.assertTrue(any(region and region != "ZAF" for region in direct_regions))
+        self.assertIn("ZA-S2", source_ids)
+        self.assertIn("WF-S2", source_ids)
+        with tempfile.TemporaryDirectory() as tmp:
+            artifacts = write_scenario_artifacts(Path(tmp), package, direct)
+            self.assertIn("scenario_package_json", artifacts)
+            self.assertTrue((Path(tmp) / "scenario_package.json").exists())
+            self.assertTrue((Path(tmp) / "scenario" / "mrio_direct_inputs.json").exists())
+            self.assertTrue((Path(tmp) / "scenario" / "mrio_direct_shocks.csv").exists())
+
+    def test_integrated_catalog_splits_targets_from_mrio_shock_mapping(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        catalog = build_integrated_scenario_catalog(
+            repo_root / "inputs",
+            repo_root / "Calliope-Africa-main",
+            energy_scenarios=[{"key": "new_links", "title": "New links"}],
+        )
+        self.assertEqual([row["scenario_id"] for row in catalog["target_scenarios"]], ["S1", "S2"])
+        self.assertEqual(catalog["defaults"]["mrio_scenario_id"], "S2")
+        self.assertEqual(catalog["defaults"]["target_scenario_id"], "S2")
+        self.assertEqual(catalog["defaults"]["mrio_shock_mapping_id"], "mrio_direct_heuristic_v1")
+        self.assertEqual(catalog["mrio_shock_mappings"][0]["mapping_id"], "mrio_direct_heuristic_v1")
+        self.assertIn("target_profiles", catalog["target_scenarios"][1])
+        self.assertGreater(catalog["report"]["africa_national_country_count"], 50)
+        self.assertTrue((repo_root / "inputs" / "generated" / "africa_national_mrio_placeholder_scenarios.json").exists())
+
+    def test_geography_alignment_fans_out_national_and_regional_scenarios(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        report = load_or_parse_scenario_report(repo_root / "inputs")
+        za_alignment = build_geography_alignment(
+            config_dir=repo_root / "inputs",
+            calliope_root=repo_root / "Calliope-Africa-main",
+            mrio_scenario=report["scenarios"]["ZA-S2"],
+        )
+        wf_alignment = build_geography_alignment(
+            config_dir=repo_root / "inputs",
+            calliope_root=repo_root / "Calliope-Africa-main",
+            mrio_scenario=report["scenarios"]["WF-S2"],
+        )
+        br_alignment = build_geography_alignment(
+            config_dir=repo_root / "inputs",
+            calliope_root=repo_root / "Calliope-Africa-main",
+            mrio_scenario=report["scenarios"]["BR-S2"],
+        )
+        self.assertIn("ZAF", za_alignment["calliope_locations"])
+        self.assertGreater(wf_alignment["calliope_location_count"], 1)
+        self.assertFalse(wf_alignment["blocking_mismatch"])
+        self.assertEqual(br_alignment["status"], "mrio_only")
 
     def test_lever_mappings_csv_loader(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -234,6 +416,35 @@ class IntegratedResultsTests(unittest.TestCase):
         self.assertTrue(payload["integrated_overview"]["metrics"])
         self.assertIn("development_drivers", payload)
         self.assertIn("development_uncertainty", payload)
+        self.assertIn("scenario_provenance", payload)
+        self.assertIn("source_channels", payload)
+
+    def test_build_integrated_results_uses_selected_totals_and_exposes_channels(self):
+        summary = _summary_template("run1")
+        summary["development_impacts"]["bridge"] = {"totals": {"jobs_total": 120.0, "gva_total_musd": 20.0}}
+        summary["development_impacts"]["mrio_direct"] = {
+            "method": "mrio_direct_heuristic_v1",
+            "totals": {"jobs_total": 30.0, "gva_total_musd": 5.0},
+        }
+        summary["development_impacts"]["selected_totals"] = {"jobs_total": 120.0, "gva_total_musd": 20.0}
+        summary["development_impacts"]["combined_totals"] = {"jobs_total": 150.0, "gva_total_musd": 25.0}
+        summary["development_impacts"]["overlap_diagnostics"] = {
+            "overlap_exists": True,
+            "selected_totals_source": "bridge",
+            "temporary_merge_logic": True,
+        }
+        payload = build_integrated_results(
+            summary,
+            coupling_manifest={
+                "mrio_direct_heuristic": True,
+                "selected_totals_source": "bridge",
+                "temporary_overlap_policy": "bridge_authoritative_for_headline_totals",
+            },
+        )
+        self.assertEqual(payload["source_channels"]["selected_totals"]["jobs_total"], 120.0)
+        self.assertEqual(payload["source_channels"]["combined_totals"]["jobs_total"], 150.0)
+        self.assertEqual(payload["development_confidence"]["selected_totals_source"], "bridge")
+        self.assertIn(payload["model_quality"]["status"], {"analyst_review", "exploratory_only"})
 
     def test_validate_integrated_results_rejects_missing_metric(self):
         payload = build_integrated_results(_summary_template("run1"))
@@ -243,20 +454,120 @@ class IntegratedResultsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_integrated_results(payload)
 
-    def test_build_baseline_comparison_returns_deltas(self):
-        current = build_integrated_results(_summary_template("run-current"))
-        baseline_summary = _summary_template("run-base")
-        baseline_summary["system_cost"]["records"][0]["value"] = 120.0
-        baseline = build_integrated_results(baseline_summary)
+    def test_build_integrated_results_loads_assumptions_and_indicators(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_dir = Path(tmp) / "config"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            _seed_mario_inputs(config_dir)
+            payload = build_integrated_results(
+                _summary_template("run1"),
+                config_dir=config_dir,
+                lever_values={"carbon_price_usd_per_tco2": 10.0},
+            )
+            self.assertTrue(payload["scenario_assumptions"]["records"])
+            self.assertGreaterEqual(payload["development_indicators"]["available_count"], 1)
 
-        comparison = build_baseline_comparison(
-            current_integrated=current,
-            baseline_integrated=baseline,
-            baseline_scenario="2040_STEPS",
-            baseline_run_id="run-base",
+    def test_build_integrated_results_exposes_model_quality_and_resolution(self):
+        summary = _summary_template("run1")
+        summary["summary_diagnostics"]["physical_emissions"] = {
+            "method": "cost_class_co2_direct",
+            "factor_coverage_share": 0.25,
+            "factor_method_gap_share": 0.0,
+            "total_emissions": 50.0,
+        }
+        summary["summary_diagnostics"]["energy_balance"] = {
+            "max_abs_balance_gap_share": 0.0,
+        }
+        payload = build_integrated_results(
+            summary,
+            coupling_manifest={
+                "development_engine_mode": "mario",
+                "mapping_coverage_share": 1.0,
+                "fallback_mapping_share": 0.0,
+                "placeholder_input_row_count": 0,
+                "allow_placeholder_data": False,
+            },
         )
-        self.assertEqual(comparison["status"], "found")
-        self.assertTrue(comparison["metrics"]["records"])
+        self.assertEqual(payload["model_quality"]["status"], "production_ready")
+        self.assertTrue(payload["metric_resolution"]["records"])
+
+
+class SummaryDiagnosticsTests(unittest.TestCase):
+    class _FakeDA:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def to_dataframe(self, name="value"):
+            return pd.DataFrame(self._rows)
+
+    class _FakeResults(dict):
+        def __init__(self, *args, **kwargs):
+            attrs = kwargs.pop("attrs", None) or {}
+            super().__init__(*args, **kwargs)
+            self.attrs = attrs
+            self.data_vars = self
+
+    class _FakeModel:
+        def __init__(self, results):
+            self.results = results
+
+    def test_build_summary_diagnostics_prefers_direct_co2_and_builds_balance(self):
+        results = self._FakeResults(
+            {
+                "carrier_prod": self._FakeDA(
+                    [
+                        {"locs": "EGY", "techs": "CCGT_pp", "value": 100.0},
+                        {"locs": "EGY", "techs": "PV1", "value": 50.0},
+                    ]
+                ),
+                "carrier_con": self._FakeDA(
+                    [
+                        {"locs": "EGY", "techs": "Demand_power", "value": -150.0},
+                    ]
+                ),
+                "unmet_demand": self._FakeDA(
+                    [
+                        {"locs": "EGY", "timesteps": "2019-01-01 00:00:00", "value": 0.0},
+                    ]
+                ),
+                "cost": self._FakeDA(
+                    [
+                        {"locs": "EGY", "techs": "CCGT_pp", "costs": "co2", "value": 90.0},
+                        {"locs": "EGY", "techs": "CCGT_pp", "costs": "monetary", "value": 10.0},
+                    ]
+                ),
+                "energy_cap": self._FakeDA(
+                    [
+                        {"techs": "CCGT_pp", "value": 20.0},
+                        {"techs": "PV1", "value": 30.0},
+                    ]
+                ),
+            },
+            attrs={
+                "termination_condition": "optimal",
+                "solution_time": 1.0,
+                "objective_function_value": 2.0,
+            },
+        )
+        model = self._FakeModel(results)
+        diagnostics = build_summary_diagnostics(
+            model=model,
+            run_id="run1",
+            scenario="new_links",
+            calliope_root=None,
+            tech_library={
+                "techs": {
+                    "CCGT_pp": {"costs": {"co2": {"om_prod": 0.9}}},
+                    "PV1": {"costs": {"co2": {"om_prod": 0.0}}},
+                }
+            },
+            max_rows=20,
+            warnings=[],
+        )
+        self.assertEqual(diagnostics["physical_emissions"]["method"], "cost_class_co2_direct")
+        self.assertAlmostEqual(diagnostics["physical_emissions"]["total_emissions"], 90.0)
+        self.assertAlmostEqual(diagnostics["energy_balance"]["max_abs_balance_gap_share"], 0.0)
+        self.assertGreater(diagnostics["system_structure"]["renewable_generation_share"], 0.0)
 
 
 class MainAndArtifactTests(unittest.TestCase):
@@ -292,8 +603,10 @@ class MainAndArtifactTests(unittest.TestCase):
     def test_report_markdown_contains_key_sections(self):
         summary = {
             "run_id": "abc12345",
-            "scenario": "new_links",
-            "fast_dev_mode": True,
+            "energy_scenario_key": "new_links",
+            "mrio_scenario_id": "ZA-S2",
+            "target_year": 2030,
+            "run_profile": "dev",
             "warnings": ["example warning"],
             "summary_diagnostics": {
                 "run_metadata": {
@@ -331,6 +644,8 @@ class MainAndArtifactTests(unittest.TestCase):
         }
         report = build_run_report_markdown(summary=summary, integrated=integrated)
         self.assertIn("# EDIM Run Report", report)
+        self.assertIn("energy_scenario_key", report)
+        self.assertIn("mrio_scenario_id", report)
         self.assertIn("## Integrated Metrics", report)
         self.assertIn("example warning", report)
 
@@ -348,13 +663,15 @@ class JobManagerTests(unittest.TestCase):
                 (settings.runs_dir / run_id).mkdir(parents=True, exist_ok=True)
                 summary = {
                     "run_id": run_id,
-                    "scenario": req.scenario,
-                    "fast_dev_mode": req.fast_dev_mode,
+                    "energy_scenario_key": req.energy_scenario_key,
+                    "mrio_scenario_id": req.mrio_scenario_id,
+                    "target_year": req.target_year,
+                    "run_profile": req.run_profile,
                     "warnings": [],
                 }
                 return run_id, summary, [], settings.runs_dir
 
-            req = RunRequest(scenario="new_links", fast_dev_mode=True, levers=LeverValues())
+            req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
             with patch("api_service.jobs.run_calliope_synchronously", side_effect=_fake_run):
                 manager = JobManager(settings)
                 first = manager.submit(req)
@@ -380,13 +697,15 @@ class JobManagerTests(unittest.TestCase):
                 (settings.runs_dir / run_id).mkdir(parents=True, exist_ok=True)
                 summary = {
                     "run_id": run_id,
-                    "scenario": req.scenario,
-                    "fast_dev_mode": req.fast_dev_mode,
+                    "energy_scenario_key": req.energy_scenario_key,
+                    "mrio_scenario_id": req.mrio_scenario_id,
+                    "target_year": req.target_year,
+                    "run_profile": req.run_profile,
                     "warnings": [],
                 }
                 return run_id, summary, [], settings.runs_dir
 
-            req = RunRequest(scenario="new_links", fast_dev_mode=True, levers=LeverValues())
+            req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
             with patch("api_service.jobs.run_calliope_synchronously", side_effect=_fake_run):
                 manager = JobManager(settings)
                 job = manager.submit(req)
@@ -409,13 +728,15 @@ class JobManagerTests(unittest.TestCase):
                 (settings.runs_dir / run_id).mkdir(parents=True, exist_ok=True)
                 summary = {
                     "run_id": run_id,
-                    "scenario": req.scenario,
-                    "fast_dev_mode": req.fast_dev_mode,
+                    "energy_scenario_key": req.energy_scenario_key,
+                    "mrio_scenario_id": req.mrio_scenario_id,
+                    "target_year": req.target_year,
+                    "run_profile": req.run_profile,
                     "warnings": [],
                 }
                 return run_id, summary, [], settings.runs_dir
 
-            req = RunRequest(scenario="new_links", fast_dev_mode=True, levers=LeverValues())
+            req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
             with patch("api_service.jobs.run_calliope_synchronously", side_effect=_fake_run):
                 manager = JobManager(settings)
                 first = manager.submit(req)
@@ -439,13 +760,15 @@ class JobManagerTests(unittest.TestCase):
                 (settings.runs_dir / run_id).mkdir(parents=True, exist_ok=True)
                 summary = {
                     "run_id": run_id,
-                    "scenario": req.scenario,
-                    "fast_dev_mode": req.fast_dev_mode,
+                    "energy_scenario_key": req.energy_scenario_key,
+                    "mrio_scenario_id": req.mrio_scenario_id,
+                    "target_year": req.target_year,
+                    "run_profile": req.run_profile,
                     "warnings": [],
                 }
                 return run_id, summary, [], settings.runs_dir
 
-            req = RunRequest(scenario="new_links", fast_dev_mode=True, levers=LeverValues())
+            req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
             with patch("api_service.jobs.run_calliope_synchronously", side_effect=_fake_run):
                 manager = JobManager(settings, use_subprocess=True)
                 job = manager.submit(req)
@@ -466,9 +789,9 @@ class MetadataTests(unittest.TestCase):
             path.write_text(
                 "\n".join(
                     [
-                        "key,title,description,tags,policy_question,baseline_scenario,expected_tradeoff,user_label,demand_multiplier,renewables_capex_multiplier,fossil_fuel_price_multiplier,carbon_price_usd_per_tco2",
-                        "s1,Scenario 1,,policy,,,,,1.0,1.0,1.0,40",
-                        "s2,Scenario 2,,ndc|2040,,,,,1.0,1.0,1.0,",
+                        "key,title,description,tags,policy_question,expected_tradeoff,user_label,demand_multiplier,renewables_capex_multiplier,fossil_fuel_price_multiplier,carbon_price_usd_per_tco2",
+                        "s1,Scenario 1,,policy,,,,1.0,1.0,1.0,40",
+                        "s2,Scenario 2,,ndc|2040,,,,1.0,1.0,1.0,",
                     ]
                 ),
                 encoding="utf-8",
@@ -486,7 +809,7 @@ class EnvironmentSetupTests(unittest.TestCase):
             report = build_environment_setup_report(
                 settings=settings,
                 queue_stats={"capacity": 3, "active_jobs": 1},
-                scenario="",
+                energy_scenario_key="",
                 run_profile="dev",
             )
             self.assertTrue(report["ok"])
@@ -499,7 +822,7 @@ class EnvironmentSetupTests(unittest.TestCase):
             report = build_environment_setup_report(
                 settings=settings,
                 queue_stats={"capacity": 1, "active_jobs": 1},
-                scenario="",
+                energy_scenario_key="",
                 run_profile="dev",
             )
             self.assertFalse(report["ok"])
@@ -514,12 +837,53 @@ class EnvironmentSetupTests(unittest.TestCase):
             report = build_environment_setup_report(
                 settings=settings,
                 queue_stats={"capacity": 2, "active_jobs": 0},
-                scenario="",
+                energy_scenario_key="",
                 run_profile="dev",
             )
             self.assertFalse(report["ok"])
             statuses = {(row["name"], row["status"]) for row in report.get("checks", [])}
             self.assertIn(("mario_inputs", "error"), statuses)
+
+    def test_environment_setup_strict_mode_rejects_placeholder_inputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            settings = replace(_build_settings(base), development_engine="mario")
+            _seed_mario_inputs(settings.config_dir)
+            (settings.config_dir / "mario_inputs" / "employment_intensity.csv").write_text(
+                "mario_region,mario_sector,jobs_per_musd_direct,jobs_per_musd_total,reference_year,source,notes\nEast_Africa,Gas_supply_chain,4.0,7.0,2019,placeholder,replace with calibrated estimate\n",
+                encoding="utf-8",
+            )
+            report = build_environment_setup_report(
+                settings=settings,
+                queue_stats={"capacity": 2, "active_jobs": 0},
+                energy_scenario_key="new_links",
+                run_profile="dev",
+                strict_validation=True,
+            )
+            self.assertFalse(report["ok"])
+            statuses = {(row["name"], row["status"]) for row in report.get("checks", [])}
+            self.assertIn(("mario_placeholder_inputs", "error"), statuses)
+
+    def test_environment_setup_can_allow_placeholder_inputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            settings = replace(_build_settings(base), development_engine="mario")
+            _seed_mario_inputs(settings.config_dir)
+            (settings.config_dir / "mario_inputs" / "employment_intensity.csv").write_text(
+                "mario_region,mario_sector,jobs_per_musd_direct,jobs_per_musd_total,reference_year,source,notes\nEast_Africa,Gas_supply_chain,4.0,7.0,2019,seeded_placeholder_v1,seeded placeholder estimate\n",
+                encoding="utf-8",
+            )
+            report = build_environment_setup_report(
+                settings=settings,
+                queue_stats={"capacity": 2, "active_jobs": 0},
+                energy_scenario_key="new_links",
+                run_profile="dev",
+                strict_validation=True,
+                allow_placeholder_data=True,
+            )
+            self.assertTrue(report["ok"])
+            statuses = {(row["name"], row["status"]) for row in report.get("checks", [])}
+            self.assertIn(("mario_placeholder_inputs", "warn"), statuses)
 
 
 class MarioRuntimeTests(unittest.TestCase):
@@ -532,6 +896,19 @@ class MarioRuntimeTests(unittest.TestCase):
             _seed_mario_inputs(config_dir)
             health_present = mario_inputs_health(config_dir)
             self.assertTrue(health_present["ok"])
+            self.assertTrue(health_present["expert_inputs_ready"])
+
+    def test_mario_inputs_health_detects_seeded_placeholder_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_dir = Path(tmp) / "config"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            _seed_mario_inputs(config_dir)
+            (config_dir / "mario_inputs" / "scenario_assumptions.csv").write_text(
+                "assumption_key,scenario_key,value,unit,effective_year,source,notes\ncarbon_price,new_links,10,usd_per_tco2,2019,seeded_placeholder_v1,seeded placeholder carbon path\n",
+                encoding="utf-8",
+            )
+            health = mario_inputs_health(config_dir)
+            self.assertIn("scenario_assumptions.csv", health["placeholder_files"])
 
     def test_run_mario_io_runtime_produces_development_payload(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -607,7 +984,7 @@ class MarioRuntimeTests(unittest.TestCase):
             _seed_mario_inputs(settings.config_dir)
             run_dir = settings.runs_dir / "abcd1234"
             run_dir.mkdir(parents=True, exist_ok=True)
-            req = RunRequest(scenario="new_links", fast_dev_mode=True, levers=LeverValues())
+            req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
 
             class _NoCostModel:
                 results = {}
@@ -641,7 +1018,7 @@ class MarioRuntimeTests(unittest.TestCase):
             _seed_mario_inputs(settings.config_dir)
             run_dir = settings.runs_dir / "efgh5678"
             run_dir.mkdir(parents=True, exist_ok=True)
-            req = RunRequest(scenario="new_links", fast_dev_mode=True, levers=LeverValues())
+            req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
 
             import pandas as pd
 
@@ -711,7 +1088,7 @@ class MarioRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             settings = _build_settings(Path(tmp))
             settings = replace(settings, development_engine="auto", mario_fail_on_error=False)
-            req = RunRequest(scenario="new_links", fast_dev_mode=True, levers=LeverValues())
+            req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
             summary = {"summary_diagnostics": {}, "warnings": []}
             expected = (
                 {"method": "surrogate_test"},
@@ -730,6 +1107,7 @@ class MarioRuntimeTests(unittest.TestCase):
                         run_dir=Path(tmp),
                         development_model_config={},
                         mapping_quality={},
+                        scenario_package=_scenario_package(),
                     )
                     self.assertEqual(out[0]["method"], "surrogate_test")
                     self.assertTrue(patched.called)

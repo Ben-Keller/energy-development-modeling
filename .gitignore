@@ -18,3 +18,4 @@ outputs/runs/
 
 # Local environment files
 .env
+.env.txt

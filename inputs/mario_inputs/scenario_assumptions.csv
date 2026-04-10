@@ -1,6 +1,73 @@
 assumption_key,scenario_key,value,unit,effective_year,source,notes
-usd_local_fx,baseline,1.00,index,2019,placeholder,replace with country/region FX paths
-gdp_deflator,baseline,1.00,index,2019,placeholder,replace with calibrated deflator series
-fuel_price_shock,high_fuel,1.25,multiplier,2040,placeholder,stress-test assumption
-carbon_price,net_zero_push,75,usd_per_tco2,2040,placeholder,policy package assumption
-demand_growth_adjustment,high_growth,1.10,multiplier,2040,placeholder,macro-demand stress case
+usd_local_fx,baseline,1.0,index,2019,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,baseline,1.0,index,2019,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,baseline,1.0,multiplier,2019,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,baseline,15.0,usd_per_tco2,2019,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,baseline,1.0,multiplier,2019,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,baseline,1800,usd_per_mwh,2019,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.
+usd_local_fx,new_links,1.0,index,2019,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,new_links,1.0,index,2019,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,new_links,1.0,multiplier,2019,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,new_links,10.0,usd_per_tco2,2019,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,new_links,1.0,multiplier,2019,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,new_links,1800,usd_per_mwh,2019,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.
+usd_local_fx,2040_STEPS_old_gen_old_links,1.05,index,2040,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,2040_STEPS_old_gen_old_links,1.6,index,2040,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,2040_STEPS_old_gen_old_links,1.08,multiplier,2040,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,2040_STEPS_old_gen_old_links,20.0,usd_per_tco2,2040,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,2040_STEPS_old_gen_old_links,1.1,multiplier,2040,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,2040_STEPS_old_gen_old_links,2400,usd_per_mwh,2040,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.
+usd_local_fx,2040_AC_old_gen_old_links,1.08,index,2040,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,2040_AC_old_gen_old_links,1.66,index,2040,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,2040_AC_old_gen_old_links,1.06,multiplier,2040,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,2040_AC_old_gen_old_links,25.0,usd_per_tco2,2040,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,2040_AC_old_gen_old_links,1.16,multiplier,2040,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,2040_AC_old_gen_old_links,2600,usd_per_mwh,2040,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.
+usd_local_fx,2040_STEPS_old_links,1.05,index,2040,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,2040_STEPS_old_links,1.6,index,2040,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,2040_STEPS_old_links,1.05,multiplier,2040,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,2040_STEPS_old_links,22.0,usd_per_tco2,2040,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,2040_STEPS_old_links,1.1,multiplier,2040,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,2040_STEPS_old_links,2450,usd_per_mwh,2040,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.
+usd_local_fx,2040_AC_old_links,1.08,index,2040,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,2040_AC_old_links,1.66,index,2040,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,2040_AC_old_links,1.03,multiplier,2040,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,2040_AC_old_links,30.0,usd_per_tco2,2040,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,2040_AC_old_links,1.16,multiplier,2040,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,2040_AC_old_links,2700,usd_per_mwh,2040,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.
+usd_local_fx,2040_STEPS_old_gen,1.05,index,2040,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,2040_STEPS_old_gen,1.6,index,2040,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,2040_STEPS_old_gen,1.06,multiplier,2040,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,2040_STEPS_old_gen,24.0,usd_per_tco2,2040,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,2040_STEPS_old_gen,1.1,multiplier,2040,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,2040_STEPS_old_gen,2500,usd_per_mwh,2040,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.
+usd_local_fx,2040_AC_old_gen,1.08,index,2040,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,2040_AC_old_gen,1.66,index,2040,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,2040_AC_old_gen,1.04,multiplier,2040,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,2040_AC_old_gen,32.0,usd_per_tco2,2040,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,2040_AC_old_gen,1.16,multiplier,2040,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,2040_AC_old_gen,2750,usd_per_mwh,2040,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.
+usd_local_fx,2040_STEPS,1.05,index,2040,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,2040_STEPS,1.6,index,2040,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,2040_STEPS,1.02,multiplier,2040,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,2040_STEPS,28.0,usd_per_tco2,2040,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,2040_STEPS,1.1,multiplier,2040,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,2040_STEPS,2600,usd_per_mwh,2040,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.
+usd_local_fx,2040_AC,1.08,index,2040,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,2040_AC,1.66,index,2040,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,2040_AC,1.0,multiplier,2040,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,2040_AC,38.0,usd_per_tco2,2040,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,2040_AC,1.16,multiplier,2040,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,2040_AC,2850,usd_per_mwh,2040,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.
+usd_local_fx,2040_STEPS_policy,1.05,index,2040,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,2040_STEPS_policy,1.62,index,2040,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,2040_STEPS_policy,0.98,multiplier,2040,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,2040_STEPS_policy,75.0,usd_per_tco2,2040,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,2040_STEPS_policy,1.12,multiplier,2040,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,2040_STEPS_policy,3000,usd_per_mwh,2040,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.
+usd_local_fx,2040_AC_policy,1.08,index,2040,seeded_placeholder_v1,Seeded placeholder FX index for converting local cost evidence into the 2019 USD modeling basis.
+gdp_deflator,2040_AC_policy,1.68,index,2040,seeded_placeholder_v1,Seeded placeholder GDP deflator path for expressing 2040 scenario values in the model basis.
+fuel_price_shock,2040_AC_policy,0.95,multiplier,2040,seeded_placeholder_v1,Seeded placeholder fossil-fuel price stress consistent with the scenario narrative.
+carbon_price,2040_AC_policy,90.0,usd_per_tco2,2040,seeded_placeholder_v1,Seeded placeholder carbon-price path aligned with scenario ambition and policy stringency.
+demand_growth_adjustment,2040_AC_policy,1.18,multiplier,2040,seeded_placeholder_v1,Seeded placeholder macro-demand adjustment consistent with the scenario demand pathway.
+value_of_lost_load,2040_AC_policy,3200,usd_per_mwh,2040,seeded_placeholder_v1,Seeded placeholder reliability valuation used for contextual indicator reporting.

@@ -1,5 +1,51 @@
 mario_region,mario_sector,jobs_per_musd_direct,jobs_per_musd_total,reference_year,source,notes
-East_Africa,Construction,8.5,14.2,2019,placeholder,replace with calibrated estimate
-West_Africa,Gas_supply_chain,3.1,6.4,2019,placeholder,replace with calibrated estimate
-Southern_Africa,Electrical_equipment,4.2,9.8,2019,placeholder,replace with calibrated estimate
-North_Africa,Transmission_and_distribution,3.7,7.1,2019,placeholder,replace with calibrated estimate
+Central_Africa,Construction,6.05,10.78,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Central_Africa,Construction_of_power_assets,6.38,11.22,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Central_Africa,Electrical_equipment,4.51,8.14,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Central_Africa,Transmission_and_distribution,4.40,7.70,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Central_Africa,Electricity_and_heat,2.97,5.39,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Central_Africa,Coal_supply_chain,3.52,6.38,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Central_Africa,Gas_supply_chain,2.64,4.73,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Central_Africa,Oil_supply_chain,2.42,4.40,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Central_Africa,Bioenergy_supply_chain,7.26,12.98,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Central_Africa,Fuel_supply_chain,3.08,5.50,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+East_Africa,Construction,6.32,11.27,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+East_Africa,Construction_of_power_assets,6.67,11.73,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+East_Africa,Electrical_equipment,4.71,8.51,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+East_Africa,Transmission_and_distribution,4.60,8.05,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+East_Africa,Electricity_and_heat,3.10,5.63,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+East_Africa,Coal_supply_chain,3.68,6.67,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+East_Africa,Gas_supply_chain,2.76,4.94,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+East_Africa,Oil_supply_chain,2.53,4.60,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+East_Africa,Bioenergy_supply_chain,7.59,13.57,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+East_Africa,Fuel_supply_chain,3.22,5.75,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+West_Africa,Construction,5.94,10.58,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+West_Africa,Construction_of_power_assets,6.26,11.02,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+West_Africa,Electrical_equipment,4.43,7.99,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+West_Africa,Transmission_and_distribution,4.32,7.56,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+West_Africa,Electricity_and_heat,2.92,5.29,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+West_Africa,Coal_supply_chain,3.46,6.26,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+West_Africa,Gas_supply_chain,2.59,4.64,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+West_Africa,Oil_supply_chain,2.38,4.32,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+West_Africa,Bioenergy_supply_chain,7.13,12.74,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+West_Africa,Fuel_supply_chain,3.02,5.40,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Southern_Africa,Construction,4.95,8.82,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Southern_Africa,Construction_of_power_assets,5.22,9.18,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Southern_Africa,Electrical_equipment,3.69,6.66,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Southern_Africa,Transmission_and_distribution,3.60,6.30,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Southern_Africa,Electricity_and_heat,2.43,4.41,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Southern_Africa,Coal_supply_chain,2.88,5.22,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Southern_Africa,Gas_supply_chain,2.16,3.87,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Southern_Africa,Oil_supply_chain,1.98,3.60,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Southern_Africa,Bioenergy_supply_chain,5.94,10.62,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+Southern_Africa,Fuel_supply_chain,2.52,4.50,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+North_Africa,Construction,5.22,9.31,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+North_Africa,Construction_of_power_assets,5.51,9.69,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+North_Africa,Electrical_equipment,3.89,7.03,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+North_Africa,Transmission_and_distribution,3.80,6.65,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+North_Africa,Electricity_and_heat,2.56,4.66,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+North_Africa,Coal_supply_chain,3.04,5.51,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+North_Africa,Gas_supply_chain,2.28,4.08,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+North_Africa,Oil_supply_chain,2.09,3.80,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+North_Africa,Bioenergy_supply_chain,6.27,11.21,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.
+North_Africa,Fuel_supply_chain,2.66,4.75,2019,seeded_placeholder_v1,Seeded placeholder estimate using African power-sector labor and IO ranges; replace with project-calibrated evidence.

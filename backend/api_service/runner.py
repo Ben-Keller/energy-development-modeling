@@ -20,9 +20,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-# Imported here for backward-compatible access from existing imports/tests.
 from .integrated import (
-    build_baseline_comparison,
     build_integrated_results,
     build_run_report_markdown,
     create_exchange_bundle_zip,
@@ -30,13 +28,19 @@ from .integrated import (
 )
 from .levers import build_lever_override_patch, load_lever_mappings
 from .mario_runtime import (
+    load_development_indicator_mapping,
+    load_scenario_assumptions,
     mario_inputs_health,
     run_mario_io_runtime,
     write_exchange_schema_validation,
     write_runtime_log,
 )
-# Imported here for backward-compatible access from existing imports/tests.
-from .scenarios import build_scenario_list, load_scenario_metadata, load_scenarios_from_overrides
+from .scenario_package import (
+    build_mrio_direct_inputs,
+    build_scenario_package,
+    write_scenario_artifacts,
+)
+from .scenarios import load_scenario_metadata, load_scenarios_from_overrides
 from .schemas import RunRequest
 from .settings import Settings
 from .summarize import build_summary_core, build_summary_diagnostics
@@ -77,6 +81,10 @@ DEVELOPMENT_MODEL_DEFAULTS: Dict[str, Any] = {
             "gva_total_musd": 0.12,
             "household_income_proxy_musd": 0.12,
         }
+    },
+    "mario_direct": {
+        "structural_reallocation_bridge_scale": 0.25,
+        "max_direct_to_bridge_ratio": 1.0,
     },
 }
 
@@ -468,7 +476,7 @@ def _resolve_run_profile(req: RunRequest) -> str:
     profile = str(getattr(req, "run_profile", "") or "").strip().lower()
     if profile in {"dev", "analysis", "full"}:
         return profile
-    return "dev" if bool(getattr(req, "fast_dev_mode", True)) else "full"
+    return "dev"
 
 
 def _normalize_profile_label(run_profile: str | None) -> str:
@@ -478,6 +486,16 @@ def _normalize_profile_label(run_profile: str | None) -> str:
     return "dev"
 
 
+def _resolve_strict_validation(
+    run_profile: str | None,
+    strict_validation: bool | None = None,
+) -> bool:
+    profile = _normalize_profile_label(run_profile)
+    if profile in {"analysis", "full"}:
+        return True
+    return bool(strict_validation)
+
+
 def _normalize_development_engine_label(engine: str | None) -> str:
     mode = str(engine or "").strip().lower()
     if mode in {"mario", "surrogate", "auto"}:
@@ -485,15 +503,72 @@ def _normalize_development_engine_label(engine: str | None) -> str:
     return "auto"
 
 
+def _strict_validation_issues(
+    *,
+    settings: Settings,
+    energy_scenario_key: str,
+    run_profile: str | None,
+    strict_validation: bool | None,
+    allow_placeholder_data: bool = False,
+    mapping_quality: Dict[str, Any] | None = None,
+) -> List[str]:
+    issues: List[str] = []
+    if not _resolve_strict_validation(run_profile, strict_validation):
+        return issues
+
+    development_engine = _normalize_development_engine_label(settings.development_engine)
+    mario_health = mario_inputs_health(settings.config_dir)
+    if development_engine in {"mario", "auto"}:
+        blocking_files = mario_health.get("blocking_placeholder_files") or []
+        if blocking_files and not allow_placeholder_data:
+            issues.append(
+                "Strict validation failed: expert-owned MARIO inputs still contain placeholder rows "
+                f"({', '.join(sorted(blocking_files))})."
+            )
+
+        if mapping_quality:
+            fallback_mapping_count = int(_safe_float(mapping_quality.get("fallback_mapping_count"), 0.0))
+            capex_bad = int(_safe_float(mapping_quality.get("capex_split_bad_groups"), 0.0))
+            opex_bad = int(_safe_float(mapping_quality.get("opex_split_bad_groups"), 0.0))
+            if fallback_mapping_count > 0:
+                issues.append(
+                    "Strict validation failed: MARIO tech-sector mapping does not cover all required "
+                    f"technologies ({fallback_mapping_count} missing)."
+                )
+            if capex_bad > 0:
+                issues.append(
+                    "Strict validation failed: CAPEX split table has groups that do not sum to 1 "
+                    f"({capex_bad} invalid groups)."
+                )
+            if opex_bad > 0:
+                issues.append(
+                    "Strict validation failed: OPEX split table has groups that do not sum to 1 "
+                    f"({opex_bad} invalid groups)."
+                )
+
+    assumptions = load_scenario_assumptions(settings.config_dir, scenario_key=energy_scenario_key)
+    if (not allow_placeholder_data) and int(assumptions.get("selected_placeholder_row_count") or 0) > 0:
+        issues.append(
+            "Strict validation failed: selected scenario assumptions still use placeholder rows in "
+            "scenario_assumptions.csv."
+        )
+    return issues
+
+
 def build_environment_setup_report(
     settings: Settings,
     queue_stats: Dict[str, Any] | None = None,
-    scenario: str = "",
+    energy_scenario_key: str = "",
+    mrio_scenario_id: str = "",
+    target_year: int = 2030,
     run_profile: str | None = None,
+    strict_validation: bool | None = None,
+    allow_placeholder_data: bool = False,
 ) -> Dict[str, Any]:
     checks: List[Dict[str, str]] = []
     warnings: List[str] = []
     errors: List[str] = []
+    tech_library: Dict[str, Any] = {}
 
     def _record(status: str, name: str, message: str, label: str = "", category: str = "runtime") -> None:
         checks.append(
@@ -559,32 +634,67 @@ def build_environment_setup_report(
             category="calliope",
         )
 
-    requested_scenario = str(scenario or "").strip()
-    if requested_scenario:
+    requested_energy_scenario = str(energy_scenario_key or "").strip()
+    requested_mrio_scenario = str(mrio_scenario_id or "").strip()
+    if requested_energy_scenario:
         if scenario_options:
-            if requested_scenario in scenario_options:
+            if requested_energy_scenario in scenario_options:
                 _record(
                     "ok",
-                    "scenario_selection",
-                    f"Scenario '{requested_scenario}' is available.",
-                    label="Requested Scenario Valid",
+                    "energy_scenario_selection",
+                    f"Energy scenario '{requested_energy_scenario}' is available.",
+                    label="Energy Scenario Valid",
                     category="calliope",
                 )
             else:
                 _record(
                     "error",
-                    "scenario_selection",
-                    f"Scenario '{requested_scenario}' is not in overrides.yaml.",
-                    label="Requested Scenario Valid",
+                    "energy_scenario_selection",
+                    f"Energy scenario '{requested_energy_scenario}' is not in overrides.yaml.",
+                    label="Energy Scenario Valid",
                     category="calliope",
                 )
         else:
             _record(
                 "warn",
-                "scenario_selection",
+                "energy_scenario_selection",
                 "Scenario list unavailable; cannot validate selection.",
-                label="Requested Scenario Valid",
+                label="Energy Scenario Valid",
                 category="calliope",
+            )
+
+    if requested_mrio_scenario:
+        try:
+            scenario_package = build_scenario_package(
+                config_dir=settings.config_dir,
+                calliope_root=settings.calliope_root,
+                energy_scenario_key=requested_energy_scenario,
+                mrio_scenario_id=requested_mrio_scenario,
+                target_year=int(target_year),
+                run_profile=_normalize_profile_label(run_profile),
+                levers={},
+                strict_validation=bool(strict_validation),
+                allow_placeholder_data=bool(allow_placeholder_data),
+            )
+            alignment = scenario_package.get("geography_alignment") or {}
+            level = "warn" if str(alignment.get("status")) == "mrio_only" else "ok"
+            _record(
+                level,
+                "mrio_report_scenario",
+                (
+                    f"Loaded MRIO-direct scenario '{requested_mrio_scenario}' for target year {int(target_year)}. "
+                    f"Geography alignment status: {alignment.get('status', '')}."
+                ),
+                label="MRIO Report Scenario Valid",
+                category="mario",
+            )
+        except Exception as exc:
+            _record(
+                "error",
+                "mrio_report_scenario",
+                str(exc),
+                label="MRIO Report Scenario Valid",
+                category="mario",
             )
 
     if model_path.exists():
@@ -730,6 +840,7 @@ def build_environment_setup_report(
         )
 
     profile = _normalize_profile_label(run_profile)
+    strict_effective = _resolve_strict_validation(profile, strict_validation)
     if profile == "full" and (not settings.allow_full_year):
         _record(
             "error",
@@ -740,6 +851,28 @@ def build_environment_setup_report(
         )
     else:
         _record("ok", "run_profile", f"Run profile '{profile}' is allowed.", label="Run Profile Allowed", category="runtime")
+    _record(
+        "ok",
+        "strict_validation",
+        (
+            "Strict validation is enabled."
+            if strict_effective
+            else "Strict validation is disabled; dev runs may continue with placeholder or fallback diagnostics."
+        ),
+        label="Validation Mode",
+        category="runtime",
+    )
+    _record(
+        "ok",
+        "placeholder_data_mode",
+        (
+            "Placeholder expert datasets are allowed for this run."
+            if allow_placeholder_data
+            else "Placeholder expert datasets are not allowed."
+        ),
+        label="Placeholder Data Mode",
+        category="runtime",
+    )
 
     if profile == "dev":
         _record(
@@ -850,6 +983,112 @@ def build_environment_setup_report(
                     category="mario",
                 )
 
+        placeholder_details = mario_health.get("placeholder_details") or []
+        if placeholder_details:
+            total_placeholder_rows = sum(
+                int((row or {}).get("placeholder_row_count") or 0) for row in placeholder_details
+            )
+            file_names = sorted(
+                str((row or {}).get("file_name", "")).strip()
+                for row in placeholder_details
+                if str((row or {}).get("file_name", "")).strip()
+            )
+            _record(
+                "error"
+                if strict_effective and (mario_health.get("blocking_placeholder_files") or []) and not allow_placeholder_data
+                else "warn",
+                "mario_placeholder_inputs",
+                (
+                    "Expert-owned MARIO datasets still contain placeholder rows "
+                    f"({total_placeholder_rows} rows across {len(file_names)} files). "
+                    f"Files: {', '.join(file_names)}"
+                ),
+                label="Expert Data Calibration",
+                category="mario",
+            )
+        else:
+            _record(
+                "ok",
+                "mario_placeholder_inputs",
+                "Expert-owned MARIO datasets do not contain placeholder rows.",
+                label="Expert Data Calibration",
+                category="mario",
+            )
+
+        indicator_mapping = load_development_indicator_mapping(settings.config_dir)
+        if indicator_mapping.get("exists"):
+            _record(
+                "ok",
+                "development_indicator_mapping",
+                f"Loaded development indicator mapping ({int(indicator_mapping.get('record_count') or 0)} rows).",
+                label="Development Indicator Mapping",
+                category="mario",
+            )
+        else:
+            _record(
+                "warn",
+                "development_indicator_mapping",
+                "development_indicator_mapping.csv is missing; integrated indicator reporting will be limited.",
+                label="Development Indicator Mapping",
+                category="mario",
+            )
+
+        assumptions = load_scenario_assumptions(settings.config_dir, scenario_key=requested_energy_scenario)
+        selected_placeholder_count = int(assumptions.get("selected_placeholder_row_count") or 0)
+        selected_count = int(assumptions.get("selected_count") or 0)
+        if assumptions.get("exists"):
+            if selected_placeholder_count > 0:
+                _record(
+                    "error" if strict_effective and not allow_placeholder_data else "warn",
+                    "scenario_assumptions",
+                    f"Selected scenario assumptions still contain placeholder rows ({selected_placeholder_count} matched rows).",
+                    label="Scenario Assumptions Loaded",
+                    category="mario",
+                )
+            elif selected_count > 0:
+                _record(
+                    "ok",
+                    "scenario_assumptions",
+                    f"Loaded {selected_count} matched scenario assumptions for integrated indicators.",
+                    label="Scenario Assumptions Loaded",
+                    category="mario",
+                )
+            else:
+                _record(
+                    "warn",
+                    "scenario_assumptions",
+                    "scenario_assumptions.csv exists but no rows matched the selected scenario or baseline.",
+                    label="Scenario Assumptions Loaded",
+                    category="mario",
+                )
+        else:
+            _record(
+                "warn",
+                "scenario_assumptions",
+                "scenario_assumptions.csv is missing; indicator assumptions will fall back to request levers when possible.",
+                label="Scenario Assumptions Loaded",
+                category="mario",
+            )
+
+        if tech_library:
+            mapping_quality, mapping_quality_warnings = _evaluate_mario_mapping_quality(settings.config_dir, tech_library)
+            if mapping_quality_warnings:
+                _record(
+                    "error" if strict_effective else "warn",
+                    "mario_mapping_quality",
+                    " ".join(mapping_quality_warnings),
+                    label="MARIO Mapping Quality",
+                    category="mario",
+                )
+            else:
+                _record(
+                    "ok",
+                    "mario_mapping_quality",
+                    "MARIO mapping coverage and split tables passed validation checks.",
+                    label="MARIO Mapping Quality",
+                    category="mario",
+                )
+
     if settings.mario_db_path:
         db_path = Path(settings.mario_db_path).expanduser()
         if db_path.exists():
@@ -871,8 +1110,12 @@ def build_environment_setup_report(
     return {
         "ok": ready,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "scenario": requested_scenario,
+        "energy_scenario_key": requested_energy_scenario,
+        "mrio_scenario_id": requested_mrio_scenario,
+        "target_year": int(target_year),
         "run_profile": profile,
+        "strict_validation": strict_effective,
+        "allow_placeholder_data": bool(allow_placeholder_data),
         "solver_requested": settings.solver,
         "solver_resolved": resolved_solver,
         "development_engine": development_engine,
@@ -888,14 +1131,22 @@ def build_environment_setup_report(
 def build_preflight_report(
     settings: Settings,
     queue_stats: Dict[str, Any] | None = None,
-    scenario: str = "",
+    energy_scenario_key: str = "",
+    mrio_scenario_id: str = "",
+    target_year: int = 2030,
     run_profile: str | None = None,
+    strict_validation: bool | None = None,
+    allow_placeholder_data: bool = False,
 ) -> Dict[str, Any]:
     return build_environment_setup_report(
         settings=settings,
         queue_stats=queue_stats,
-        scenario=scenario,
+        energy_scenario_key=energy_scenario_key,
+        mrio_scenario_id=mrio_scenario_id,
+        target_year=target_year,
         run_profile=run_profile,
+        strict_validation=strict_validation,
+        allow_placeholder_data=allow_placeholder_data,
     )
 
 
@@ -996,7 +1247,11 @@ def _normalize_pool_rows(summary_diagnostics: Dict[str, Any]) -> List[Dict[str, 
         if not isinstance(rec, dict):
             continue
         cur = _row(str(rec.get("pool", "UNKNOWN")))
-        cur["net_imports"] += _safe_float(rec.get("value"), 0.0)
+        if ("exports" in rec) or ("imports" in rec):
+            cur["net_imports"] += _safe_float(rec.get("imports"), 0.0) - _safe_float(rec.get("exports"), 0.0)
+        else:
+            # Legacy summaries stored net exports in `value`; convert to net imports.
+            cur["net_imports"] -= _safe_float(rec.get("value"), 0.0)
 
     rows = list(pools.values())
     rows.sort(key=lambda r: abs(r["demand"]), reverse=True)
@@ -1123,7 +1378,7 @@ def _write_energy_service_balance_csv(
             net_imports = _safe_float(row["net_imports"], 0.0)
             demand = _safe_float(row["demand"], 0.0)
             unserved = _safe_float(row["unserved"], 0.0)
-            generation = max(demand - unserved + net_imports, 0.0)
+            generation = max(demand - unserved - net_imports, 0.0)
             writer.writerow(
                 {
                     "run_id": run_id,
@@ -1315,7 +1570,19 @@ def _default_region_for_pool(pool: str) -> str:
     return defaults.get(str(pool).strip(), str(pool).strip() or "UNKNOWN")
 
 
+POOL_LOCATION_FILES = {
+    "CAPP": "CAPP/Location_Constraints_CAPP.yaml",
+    "EAPP": "EAPP/Location_Constraints_EAPP.yaml",
+    "NAPP": "NAPP/Location_Constraints_NAPP.yaml",
+    "SAPP": "SAPP/Location_Constraints_SAPP.yaml",
+    "WAPP": "WAPP/Location_Constraints_WAPP.yaml",
+}
+
+
 def _year_from_profile(settings: Settings, req: RunRequest) -> int:
+    target_year = int(getattr(req, "target_year", 0) or 0)
+    if target_year > 1900:
+        return target_year
     profile = _resolve_run_profile(req)
     if profile == "analysis":
         source = settings.analysis_subset_start
@@ -1327,28 +1594,47 @@ def _year_from_profile(settings: Settings, req: RunRequest) -> int:
     return year if year > 1900 else 2019
 
 
-def _load_country_pool_mapping(config_dir: Path) -> Tuple[Dict[str, str], Dict[str, str], Dict[str, str]]:
+def _load_country_pool_mapping(
+    config_dir: Path, calliope_root: Path | None = None
+) -> Tuple[Dict[str, str], Dict[str, str], Dict[str, str]]:
     path = config_dir / "mario_inputs" / "country_to_pool.csv"
     loc_to_region: Dict[str, str] = {}
     loc_to_pool: Dict[str, str] = {}
     pool_to_region: Dict[str, str] = {}
-    if not path.exists():
-        return loc_to_region, loc_to_pool, pool_to_region
-    for row in _read_csv_rows(path):
-        loc = str(row.get("calliope_location", "")).strip()
-        pool = str(row.get("power_pool", "")).strip()
-        region = str(row.get("mario_region", "")).strip()
-        if not loc:
-            continue
-        if pool:
-            loc_to_pool[loc] = pool
-        if region:
-            loc_to_region[loc] = region
-        elif pool:
-            loc_to_region[loc] = _default_region_for_pool(pool)
-        if pool and region:
-            pool_to_region[pool] = region
-        elif pool:
+    if path.exists():
+        for row in _read_csv_rows(path):
+            loc = str(row.get("calliope_location", "")).strip()
+            pool = str(row.get("power_pool", "")).strip()
+            region = str(row.get("mario_region", "")).strip()
+            if not loc:
+                continue
+            if pool:
+                loc_to_pool[loc] = pool
+            if region:
+                loc_to_region[loc] = region
+            elif pool:
+                loc_to_region[loc] = _default_region_for_pool(pool)
+            if pool and region:
+                pool_to_region[pool] = region
+            elif pool:
+                pool_to_region.setdefault(pool, _default_region_for_pool(pool))
+
+    # Fill missing locations from canonical Calliope pool location constraints.
+    if calliope_root is not None:
+        for pool, rel_path in POOL_LOCATION_FILES.items():
+            path = calliope_root / rel_path
+            if not path.exists():
+                continue
+            try:
+                data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            except Exception:
+                continue
+            for loc in (data.get("locations") or {}).keys():
+                key = str(loc).strip()
+                if not key:
+                    continue
+                loc_to_pool.setdefault(key, pool)
+                loc_to_region.setdefault(key, _default_region_for_pool(pool))
             pool_to_region.setdefault(pool, _default_region_for_pool(pool))
     return loc_to_region, loc_to_pool, pool_to_region
 
@@ -1892,7 +2178,7 @@ def _build_region_weight_rows(
         demand = max(_safe_float(row.get("demand"), 0.0), 0.0)
         unserved = max(_safe_float(row.get("unserved"), 0.0), 0.0)
         net_imports = _safe_float(row.get("net_imports"), 0.0)
-        generation = max(demand - unserved + net_imports, 0.0)
+        generation = max(demand - unserved - net_imports, 0.0)
         score = max(demand, generation, abs(net_imports), 0.0)
         if score <= 0:
             continue
@@ -2060,7 +2346,9 @@ def _write_exchange_files_for_mario(
     _ensure_dirs(exchange_dir)
     year = _year_from_profile(settings, req)
 
-    loc_to_region, loc_to_pool, pool_to_region = _load_country_pool_mapping(settings.config_dir)
+    loc_to_region, loc_to_pool, pool_to_region = _load_country_pool_mapping(
+        settings.config_dir, settings.calliope_root
+    )
     for pool in {"CAPP", "EAPP", "NAPP", "SAPP", "WAPP"}:
         pool_to_region.setdefault(pool, _default_region_for_pool(pool))
 
@@ -2072,6 +2360,20 @@ def _write_exchange_files_for_mario(
         base_rows["pool"] = base_rows["location"].map(loc_to_pool).fillna("UNKNOWN")
         base_rows["region"] = base_rows["location"].map(loc_to_region)
         base_rows["region"] = base_rows["region"].fillna(base_rows["pool"].map(pool_to_region)).fillna("UNKNOWN")
+        unknown_mask = base_rows["region"].astype(str).str.strip().eq("UNKNOWN")
+        if bool(unknown_mask.any()):
+            unknown_locs = (
+                base_rows.loc[unknown_mask, "location"]
+                .astype(str)
+                .dropna()
+                .unique()
+                .tolist()
+            )
+            preview = ", ".join(sorted(unknown_locs)[:12])
+            warnings.append(
+                "Location-to-region mapping is incomplete; some exchange rows use UNKNOWN region "
+                f"({len(unknown_locs)} locations). Sample: {preview}"
+            )
 
     tech_map, capex_split, opex_split = _load_mario_mapping_tables(settings.config_dir)
     inv_df, op_df = _build_split_shocks(
@@ -2081,7 +2383,7 @@ def _write_exchange_files_for_mario(
         opex_split=opex_split,
         default_region_by_pool=pool_to_region,
         run_id=run_id,
-        scenario=req.scenario,
+        scenario=req.energy_scenario_key,
         year=year,
         warnings=warnings,
     )
@@ -2089,7 +2391,7 @@ def _write_exchange_files_for_mario(
     if inv_df.empty and op_df.empty:
         fb_inv, fb_op, fallback_meta, fallback_warnings = _build_fallback_exchange_from_summary(
             run_id=run_id,
-            scenario=req.scenario,
+            scenario=req.energy_scenario_key,
             year=year,
             summary=summary,
             summary_diagnostics=summary_diagnostics,
@@ -2123,7 +2425,7 @@ def _write_exchange_files_for_mario(
     else:
         activity_df = base_rows.copy()
         activity_df["run_id"] = run_id
-        activity_df["scenario"] = req.scenario
+        activity_df["scenario"] = req.energy_scenario_key
         activity_df["year"] = int(year)
         for col in activity_cols:
             if col not in activity_df.columns:
@@ -2178,7 +2480,7 @@ def _write_exchange_files_for_mario(
     _write_energy_service_balance_csv(
         path=exchange_dir / "energy_service_balance.csv",
         run_id=run_id,
-        scenario=req.scenario,
+        scenario=req.energy_scenario_key,
         summary_diagnostics=summary_diagnostics,
         year=year,
         pool_to_region=pool_to_region,
@@ -2187,7 +2489,7 @@ def _write_exchange_files_for_mario(
         [
             {
                 "run_id": run_id,
-                "scenario": req.scenario,
+                "scenario": req.energy_scenario_key,
                 "year": int(year),
                 "carbon_price_usd_per_tco2": float(req.levers.carbon_price_usd_per_tco2),
                 "demand_multiplier": float(req.levers.demand_multiplier),
@@ -2207,7 +2509,7 @@ def _write_exchange_files_for_mario(
 
     metadata = {
         "run_id": run_id,
-        "scenario": req.scenario,
+        "scenario": req.energy_scenario_key,
         "year": int(year),
         "development_engine_mode": "mario",
         "bridge_method": "calliope_to_mario_exchange_with_io_runtime",
@@ -2248,73 +2550,6 @@ def _relative_bounds(value: float, rel: float) -> Tuple[float, float]:
     low = max(value * (1.0 - bounded_rel), 0.0)
     high = max(value * (1.0 + bounded_rel), 0.0)
     return low, high
-
-
-def _read_json_file(path: Path) -> Dict[str, Any] | None:
-    if not path.exists():
-        return None
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _find_latest_summary_for_scenario(
-    runs_dir: Path,
-    scenario_key: str,
-    exclude_run_id: str,
-) -> Tuple[str, Dict[str, Any] | None]:
-    for run_dir in reversed(_iter_run_dirs(runs_dir)):
-        if run_dir.name == exclude_run_id:
-            continue
-        summary = _read_json_file(run_dir / "summary.json")
-        if not summary:
-            continue
-        if str(summary.get("scenario", "")).strip() == str(scenario_key).strip():
-            return run_dir.name, summary
-    return "", None
-
-
-def _build_baseline_comparison_payload(
-    settings: Settings,
-    req: RunRequest,
-    run_id: str,
-    integrated: Dict[str, Any],
-) -> Dict[str, Any]:
-    metadata = load_scenario_metadata(settings.config_dir / "scenario_metadata.csv")
-    scenario_info = metadata.get(req.scenario)
-    baseline_scenario = ""
-    if scenario_info is not None:
-        baseline_scenario = str(scenario_info.baseline_scenario or "").strip()
-
-    baseline_run_id = ""
-    baseline_integrated: Dict[str, Any] | None = None
-    if baseline_scenario:
-        baseline_run_id, baseline_summary = _find_latest_summary_for_scenario(
-            runs_dir=settings.runs_dir,
-            scenario_key=baseline_scenario,
-            exclude_run_id=run_id,
-        )
-        if baseline_summary:
-            candidate = baseline_summary.get("integrated_results")
-            if isinstance(candidate, dict) and candidate:
-                baseline_integrated = candidate
-            else:
-                baseline_integrated = build_integrated_results(
-                    baseline_summary,
-                    coupling_manifest=baseline_summary.get("coupling_manifest") or {},
-                )
-
-    comparison = build_baseline_comparison(
-        current_integrated=integrated,
-        baseline_integrated=baseline_integrated,
-        baseline_scenario=baseline_scenario,
-        baseline_run_id=baseline_run_id,
-    )
-    comparison["current_scenario"] = req.scenario
-    comparison["current_run_id"] = run_id
-    return comparison
 
 
 def _build_sector_rows(
@@ -2406,6 +2641,161 @@ def _build_region_rows(
     return rows
 
 
+def _development_total_shock(development: Dict[str, Any]) -> float:
+    inputs = development.get("inputs") or {}
+    total = _safe_float(inputs.get("total_shock_musd"), 0.0)
+    if total > 0:
+        return total
+    return max(_safe_float(inputs.get("investment_shock_total_musd"), 0.0), 0.0) + max(
+        _safe_float(inputs.get("operating_shock_total_musd"), 0.0), 0.0
+    )
+
+
+def _build_direct_development_payload(
+    mrio_direct_inputs: Dict[str, Any],
+    bridge_development: Dict[str, Any],
+) -> Dict[str, Any]:
+    bridge_total_shock = _development_total_shock(bridge_development)
+    bridge_totals = bridge_development.get("totals") or {}
+
+    ratios: Dict[str, float] = {}
+    for key in ("jobs_direct", "jobs_total", "gva_total_musd", "household_income_proxy_musd"):
+        ratios[key] = (_safe_float(bridge_totals.get(key), 0.0) / bridge_total_shock) if bridge_total_shock > 0 else 0.0
+
+    rows: List[Dict[str, Any]] = []
+    for row in mrio_direct_inputs.get("shock_rows") or []:
+        shock = _safe_float(row.get("shock_value_musd"), 0.0)
+        rows.append(
+            {
+                "region": str(row.get("mario_region", "") or "UNKNOWN"),
+                "supplier_sector": str(row.get("mario_sector", "") or "UNKNOWN"),
+                "shock_category": str(row.get("shock_category", "")),
+                "shock_value_musd": shock,
+                "jobs_direct": shock * ratios["jobs_direct"],
+                "jobs_total": shock * ratios["jobs_total"],
+                "gva_total_musd": shock * ratios["gva_total_musd"],
+                "household_income_proxy_musd": shock * ratios["household_income_proxy_musd"],
+                "method": str(row.get("method", "")),
+                "notes": str(row.get("notes", "")),
+            }
+        )
+
+    totals = {
+        "jobs_direct": sum(_safe_float(row.get("jobs_direct"), 0.0) for row in rows),
+        "jobs_total": sum(_safe_float(row.get("jobs_total"), 0.0) for row in rows),
+        "gva_total_musd": sum(_safe_float(row.get("gva_total_musd"), 0.0) for row in rows),
+        "household_income_proxy_musd": sum(
+            _safe_float(row.get("household_income_proxy_musd"), 0.0) for row in rows
+        ),
+    }
+    by_region: Dict[str, Dict[str, Any]] = {}
+    by_sector: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        region = str(row.get("region", "UNKNOWN"))
+        sector = str(row.get("supplier_sector", "UNKNOWN"))
+        by_region.setdefault(region, {"region": region, "shock_value_musd": 0.0, **{k: 0.0 for k in totals}})
+        by_sector.setdefault(sector, {"supplier_sector": sector, "shock_value_musd": 0.0, **{k: 0.0 for k in totals}})
+        for target in (by_region[region], by_sector[sector]):
+            target["shock_value_musd"] += _safe_float(row.get("shock_value_musd"), 0.0)
+            for key in totals:
+                target[key] += _safe_float(row.get(key), 0.0)
+
+    return {
+        "method": str(mrio_direct_inputs.get("method", "mrio_direct_heuristic_v1")),
+        "scenario_id": str(mrio_direct_inputs.get("scenario_id", "")),
+        "target_year": int(_safe_float(mrio_direct_inputs.get("target_year"), 0.0)),
+        "geography_code": str(mrio_direct_inputs.get("geography_code", "")),
+        "inputs": mrio_direct_inputs,
+        "totals": totals,
+        "by_region": {"records": list(by_region.values())},
+        "by_supplier_sector": {"records": list(by_sector.values())},
+        "detail_records": rows,
+        "diagnostics": {
+            **(mrio_direct_inputs.get("diagnostics") or {}),
+            "effect_estimation": "direct_mrio_effects_scaled_by_bridge_output_intensity_ratios",
+            "bridge_total_reference_musd": bridge_total_shock,
+        },
+    }
+
+
+def _attach_mrio_direct_layer(
+    *,
+    development: Dict[str, Any],
+    coupling_manifest: Dict[str, Any],
+    run_dir: Path,
+    scenario_package: Dict[str, Any],
+    development_model_config: Dict[str, Any],
+) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, str], List[str]]:
+    warnings: List[str] = []
+    bridge_payload = {
+        "method": development.get("method", ""),
+        "inputs": development.get("inputs") or {},
+        "totals": development.get("totals") or {},
+        "uncertainty": development.get("uncertainty") or {},
+        "by_region": development.get("by_region") or {"records": []},
+        "by_supplier_sector": development.get("by_supplier_sector") or {"records": []},
+        "by_region_supplier": development.get("by_region_supplier") or {"records": []},
+        "diagnostics": development.get("diagnostics") or {},
+        "metadata": development.get("metadata") or {},
+    }
+    bridge_total = _development_total_shock(development)
+    mrio_direct_inputs = build_mrio_direct_inputs(
+        scenario_package=scenario_package,
+        bridge_total_shock_musd=bridge_total,
+        direct_config=(development_model_config.get("mario_direct") or {}),
+    )
+    mrio_direct = _build_direct_development_payload(mrio_direct_inputs, bridge_payload)
+    selected_totals = dict(bridge_payload.get("totals") or {})
+    combined_totals = dict(selected_totals)
+    for key, value in (mrio_direct.get("totals") or {}).items():
+        combined_totals[key] = _safe_float(combined_totals.get(key), 0.0) + _safe_float(value, 0.0)
+
+    overlap_diagnostics = {
+        "policy": "bridge_authoritative_for_headline_totals",
+        "temporary_merge_logic": True,
+        "message": (
+            "Bridge-derived Calliope outputs and report-derived MRIO-direct heuristic outputs are both retained. "
+            "Headline selected_totals use bridge-derived values when channels overlap; this temporary merge logic "
+            "is flagged for removal when exact MARIO direct shocks replace the heuristic layer."
+        ),
+        "bridge_rows": int(coupling_manifest.get("shock_record_count") or 0),
+        "mrio_direct_rows": int((mrio_direct_inputs.get("diagnostics") or {}).get("shock_row_count") or 0),
+        "overlap_default_source": "bridge",
+    }
+    development["bridge"] = bridge_payload
+    development["mrio_direct"] = mrio_direct
+    development["selected_totals"] = selected_totals
+    development["combined_totals"] = combined_totals
+    development["overlap_diagnostics"] = overlap_diagnostics
+
+    coupling_manifest.update(
+        {
+            "integration_architecture": "bridge_plus_mrio_direct_v1",
+            "energy_scenario_key": scenario_package.get("energy_scenario_key", ""),
+            "mrio_scenario_id": scenario_package.get("mrio_scenario_id", ""),
+            "target_year": int(_safe_float(scenario_package.get("target_year"), 0.0)),
+            "mrio_direct_method": mrio_direct.get("method", ""),
+            "mrio_direct_heuristic": True,
+            "mrio_direct_rows": int(overlap_diagnostics["mrio_direct_rows"]),
+            "mrio_direct_net_shock_musd": _safe_float(
+                ((mrio_direct_inputs.get("totals") or {}).get("net_direct_shock_musd")),
+                0.0,
+            ),
+            "selected_totals_source": "bridge",
+            "temporary_overlap_policy": "bridge_authoritative_for_headline_totals",
+            "report_scenario_provenance": (
+                (scenario_package.get("mrio_direct") or {}).get("report_source") or {}
+            ),
+            "geography_alignment": scenario_package.get("geography_alignment") or {},
+        }
+    )
+    artifacts = write_scenario_artifacts(run_dir, scenario_package, mrio_direct_inputs=mrio_direct_inputs)
+    warnings.append(
+        "MRIO-direct heuristic outputs are retained separately; bridge-derived values remain authoritative for headline totals."
+    )
+    return development, coupling_manifest, artifacts, warnings
+
+
 def _build_surrogate_development_outputs(
     settings: Settings,
     summary: Dict[str, Any],
@@ -2414,6 +2804,8 @@ def _build_surrogate_development_outputs(
     run_dir: Path,
     development_model_config: Dict[str, Any],
     mapping_quality: Dict[str, Any],
+    scenario_package: Dict[str, Any],
+    fallback_context: Dict[str, Any] | None = None,
 ) -> Tuple[Dict[str, Any], Dict[str, str], Dict[str, Any], List[str]]:
     warnings: List[str] = []
 
@@ -2517,7 +2909,7 @@ def _build_surrogate_development_outputs(
 
     development = {
         "run_id": run_id,
-        "scenario": req.scenario,
+        "scenario": req.energy_scenario_key,
         "method": "surrogate_configurable_v2",
         "inputs": {
             "investment_shock_total_musd": capex_effect_musd,
@@ -2558,9 +2950,11 @@ def _build_surrogate_development_outputs(
         "by_supplier_sector": {"records": by_sector_records},
     }
 
+    mario_health = mario_inputs_health(settings.config_dir)
+    fallback_context = fallback_context or {}
     coupling_manifest = {
         "run_id": run_id,
-        "scenario": req.scenario,
+        "scenario": req.energy_scenario_key,
         "development_engine_mode": "surrogate",
         "bridge_method": "summary_surrogate",
         "mapping_coverage_share": _safe_float(mapping_quality.get("mapping_coverage_share"), 0.0),
@@ -2577,18 +2971,29 @@ def _build_surrogate_development_outputs(
         "mario_runtime_error": "",
         "mario_runtime_seconds": 0.0,
         "mario_runner_source": "",
+        "fallback_exchange_used": False,
+        "fallback_exchange_source": "",
+        "surrogate_fallback_used": bool(fallback_context.get("surrogate_fallback_used", False)),
+        "surrogate_fallback_reason": str(fallback_context.get("surrogate_fallback_reason", "")),
+        "strict_validation": bool(getattr(req, "strict_validation", False)),
+        "allow_placeholder_data": bool(getattr(req, "allow_placeholder_data", False)),
+        "placeholder_input_files": mario_health.get("placeholder_files") or [],
+        "placeholder_input_row_counts": mario_health.get("placeholder_row_counts") or {},
+        "placeholder_input_row_count": int(
+            sum(int(v or 0) for v in (mario_health.get("placeholder_row_counts") or {}).values())
+        ),
     }
 
     exchange_dir = run_dir / "exchange"
     _ensure_dirs(exchange_dir)
     year = _year_from_profile(settings, req)
-    _, _, pool_to_region = _load_country_pool_mapping(settings.config_dir)
+    _, _, pool_to_region = _load_country_pool_mapping(settings.config_dir, settings.calliope_root)
     for pool in {"CAPP", "EAPP", "NAPP", "SAPP", "WAPP"}:
         pool_to_region.setdefault(pool, _default_region_for_pool(pool))
     _write_energy_service_balance_csv(
         path=exchange_dir / "energy_service_balance.csv",
         run_id=run_id,
-        scenario=req.scenario,
+        scenario=req.energy_scenario_key,
         summary_diagnostics=summary_diagnostics,
         year=year,
         pool_to_region=pool_to_region,
@@ -2600,6 +3005,15 @@ def _build_surrogate_development_outputs(
         "coupling_manifest_json": f"/api/run/{run_id}/download/exchange/coupling_manifest.json",
         "integrated_results_json": f"/api/run/{run_id}/integrated",
     }
+    development, coupling_manifest, scenario_artifacts, direct_warnings = _attach_mrio_direct_layer(
+        development=development,
+        coupling_manifest=coupling_manifest,
+        run_dir=run_dir,
+        scenario_package=scenario_package,
+        development_model_config=development_model_config,
+    )
+    artifacts.update(scenario_artifacts)
+    warnings.extend(direct_warnings)
     return development, artifacts, coupling_manifest, warnings
 
 
@@ -2612,6 +3026,7 @@ def _build_mario_development_outputs(
     run_dir: Path,
     development_model_config: Dict[str, Any],
     mapping_quality: Dict[str, Any],
+    scenario_package: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Dict[str, str], Dict[str, Any], List[str]]:
     warnings: List[str] = []
     start = time.time()
@@ -2640,7 +3055,7 @@ def _build_mario_development_outputs(
         exchange_dir=exchange_dir,
         config_dir=settings.config_dir,
         run_id=run_id,
-        scenario=req.scenario,
+        scenario=req.energy_scenario_key,
         year=year,
         uncertainty_relative=uncertainty_cfg if isinstance(uncertainty_cfg, dict) else {},
     )
@@ -2649,6 +3064,11 @@ def _build_mario_development_outputs(
     if elapsed > float(settings.mario_timeout_seconds):
         raise TimeoutError(
             f"MARIO runtime exceeded timeout ({elapsed:.2f}s > {settings.mario_timeout_seconds:.2f}s)."
+        )
+    if bool(getattr(req, "strict_validation", False)) and bool(shock_meta.get("fallback_exchange_used")):
+        raise RuntimeError(
+            "Strict validation failed: exchange shocks used summary-based fallback allocation instead of "
+            "tech-level Calliope monetary rows."
         )
 
     # Lightweight side-by-side calibration aid: compare to surrogate outputs on the same summary.
@@ -2661,6 +3081,7 @@ def _build_mario_development_outputs(
             run_dir=run_dir,
             development_model_config=development_model_config,
             mapping_quality=mapping_quality,
+            scenario_package=scenario_package,
         )
         mario_totals = development.get("totals") or {}
         surrogate_totals = surrogate_dev.get("totals") or {}
@@ -2682,9 +3103,10 @@ def _build_mario_development_outputs(
     except Exception:
         warnings.append("MARIO diagnostics: surrogate benchmark comparison failed.")
 
+    mario_health = mario_inputs_health(settings.config_dir)
     coupling_manifest = {
         "run_id": run_id,
-        "scenario": req.scenario,
+        "scenario": req.energy_scenario_key,
         "development_engine_mode": "mario",
         "bridge_method": str(runtime_meta.get("bridge_method", "calliope_to_mario_exchange_with_io_runtime")),
         "mapping_coverage_share": _safe_float(mapping_quality.get("mapping_coverage_share"), 0.0),
@@ -2701,13 +3123,24 @@ def _build_mario_development_outputs(
         "mario_runtime_error": str(runtime_meta.get("mario_runtime_error", "")),
         "mario_runtime_seconds": float(elapsed),
         "mario_runner_source": str(runtime_meta.get("mario_runner_source", "")),
+        "fallback_exchange_used": bool(shock_meta.get("fallback_exchange_used", False)),
+        "fallback_exchange_source": str(shock_meta.get("fallback_exchange_source", "")),
+        "surrogate_fallback_used": False,
+        "surrogate_fallback_reason": "",
+        "strict_validation": bool(getattr(req, "strict_validation", False)),
+        "allow_placeholder_data": bool(getattr(req, "allow_placeholder_data", False)),
+        "placeholder_input_files": mario_health.get("placeholder_files") or [],
+        "placeholder_input_row_counts": mario_health.get("placeholder_row_counts") or {},
+        "placeholder_input_row_count": int(
+            sum(int(v or 0) for v in (mario_health.get("placeholder_row_counts") or {}).values())
+        ),
     }
 
     write_runtime_log(
         exchange_dir / "mario_runner.log",
         {
             "run_id": run_id,
-            "scenario": req.scenario,
+            "scenario": req.energy_scenario_key,
             "elapsed_seconds": elapsed,
             "development_engine_mode": "mario",
             "runner_source": coupling_manifest["mario_runner_source"],
@@ -2723,6 +3156,15 @@ def _build_mario_development_outputs(
         "coupling_manifest_json": f"/api/run/{run_id}/download/exchange/coupling_manifest.json",
         "integrated_results_json": f"/api/run/{run_id}/integrated",
     }
+    development, coupling_manifest, scenario_artifacts, direct_warnings = _attach_mrio_direct_layer(
+        development=development,
+        coupling_manifest=coupling_manifest,
+        run_dir=run_dir,
+        scenario_package=scenario_package,
+        development_model_config=development_model_config,
+    )
+    artifacts.update(scenario_artifacts)
+    warnings.extend(direct_warnings)
     return development, artifacts, coupling_manifest, warnings
 
 
@@ -2735,8 +3177,10 @@ def _build_development_outputs(
     run_dir: Path,
     development_model_config: Dict[str, Any],
     mapping_quality: Dict[str, Any],
+    scenario_package: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Dict[str, str], Dict[str, Any], List[str]]:
     mode = _normalize_development_engine_label(settings.development_engine)
+    surrogate_fallback_reason = ""
     if mode in {"mario", "auto"}:
         try:
             return _build_mario_development_outputs(
@@ -2748,13 +3192,14 @@ def _build_development_outputs(
                 run_dir=run_dir,
                 development_model_config=development_model_config,
                 mapping_quality=mapping_quality,
+                scenario_package=scenario_package,
             )
         except Exception as exc:
-            if mode == "mario" or settings.mario_fail_on_error:
+            if mode == "mario" or settings.mario_fail_on_error or bool(getattr(req, "strict_validation", False)):
                 raise
-            fallback_msg = f"MARIO runtime failed in auto mode; using surrogate fallback. Error: {exc}"
-            logger.info(fallback_msg)
-            summary.setdefault("warnings", []).append(fallback_msg)
+            surrogate_fallback_reason = f"MARIO runtime failed in auto mode; using surrogate fallback. Error: {exc}"
+            logger.info(surrogate_fallback_reason)
+            summary.setdefault("warnings", []).append(surrogate_fallback_reason)
 
     return _build_surrogate_development_outputs(
         settings=settings,
@@ -2764,6 +3209,11 @@ def _build_development_outputs(
         run_dir=run_dir,
         development_model_config=development_model_config,
         mapping_quality=mapping_quality,
+        scenario_package=scenario_package,
+        fallback_context={
+            "surrogate_fallback_used": bool(surrogate_fallback_reason),
+            "surrogate_fallback_reason": surrogate_fallback_reason,
+        },
     )
 
 
@@ -2793,11 +3243,37 @@ def run_calliope_synchronously(
     run_id, run_dir = _create_run_dir(settings.runs_dir)
     model_yaml = _resolve_model_yaml(settings)
 
-    _emit_progress(progress_callback, "prepare_inputs", 0.08, "Resolving model tech library and lever mappings")
+    _emit_progress(progress_callback, "scenario_prepare", 0.06, "Building integrated scenario package")
+    scenario_package = build_scenario_package(
+        config_dir=settings.config_dir,
+        calliope_root=settings.calliope_root,
+        energy_model_engine=req.energy_model_engine,
+        energy_scenario_key=req.energy_scenario_key,
+        mrio_scenario_id=req.mrio_scenario_id,
+        target_year=req.target_year,
+        run_profile=run_profile,
+        levers=req.levers.model_dump(),
+        strict_validation=bool(req.strict_validation),
+        allow_placeholder_data=bool(req.allow_placeholder_data),
+    )
+    scenario_artifacts = write_scenario_artifacts(run_dir, scenario_package)
+    _check_cancel(cancel_requested)
+
+    _emit_progress(progress_callback, "energy_input_prepare", 0.08, "Resolving model tech library and lever mappings")
     lever_mappings = load_lever_mappings(settings.config_dir)
     tech_lib = _resolve_tech_library(settings)
     development_model_config = _load_development_model_config(settings.config_dir)
     mapping_quality, mapping_warnings = _evaluate_mario_mapping_quality(settings.config_dir, tech_lib)
+    strict_issues = _strict_validation_issues(
+        settings=settings,
+        energy_scenario_key=req.energy_scenario_key,
+        run_profile=run_profile,
+        strict_validation=getattr(req, "strict_validation", None),
+        allow_placeholder_data=bool(getattr(req, "allow_placeholder_data", False)),
+        mapping_quality=mapping_quality,
+    )
+    if strict_issues:
+        raise ValueError(strict_issues[0])
     lever_patch, lever_warnings = build_lever_override_patch(req.levers, lever_mappings, tech_lib)
     _check_cancel(cancel_requested)
 
@@ -2819,7 +3295,7 @@ def run_calliope_synchronously(
     warnings = list(lever_warnings) + list(solver_warnings) + list(mapping_warnings)
 
     with _pushd(settings.calliope_root):
-        model = _build_model_with_overrides(calliope.Model, model_yaml, req.scenario, override_patch)
+        model = _build_model_with_overrides(calliope.Model, model_yaml, req.energy_scenario_key, override_patch)
         _apply_demand_multiplier(model, req.levers.demand_multiplier, warnings)
         _check_cancel(cancel_requested)
         _emit_progress(progress_callback, "solve_energy", 0.55, "Solving energy optimization problem")
@@ -2851,7 +3327,7 @@ def run_calliope_synchronously(
     summary = build_summary_core(
         model,
         run_id=run_id,
-        scenario=req.scenario,
+        scenario=req.energy_scenario_key,
         fast_dev_mode=run_profile != "full",
         run_profile=run_profile,
         warnings=warnings,
@@ -2859,10 +3335,17 @@ def run_calliope_synchronously(
         max_generation_timesteps=settings.summary_max_generation_timesteps,
         max_category_rows=settings.summary_max_category_rows,
     )
+    summary.pop("scenario", None)
+    summary.pop("fast_dev_mode", None)
+    summary["energy_scenario_key"] = req.energy_scenario_key
+    summary["mrio_scenario_id"] = req.mrio_scenario_id
+    summary["target_year"] = int(req.target_year)
+    summary["run_profile"] = run_profile
+    summary["scenario_package"] = scenario_package
     summary["summary_diagnostics"] = build_summary_diagnostics(
         model=model,
         run_id=run_id,
-        scenario=req.scenario,
+        scenario=req.energy_scenario_key,
         calliope_root=settings.calliope_root,
         tech_library=tech_lib,
         max_rows=settings.summary_diagnostics_max_rows,
@@ -2870,7 +3353,9 @@ def run_calliope_synchronously(
     )
     _check_cancel(cancel_requested)
 
-    _emit_progress(progress_callback, "development", 0.92, "Building development outputs")
+    _emit_progress(progress_callback, "bridge_prepare", 0.90, "Preparing Calliope-to-MRIO bridge outputs")
+    _emit_progress(progress_callback, "mrio_direct_prepare", 0.92, "Preparing report-derived MRIO-direct inputs")
+    _emit_progress(progress_callback, "development", 0.94, "Running integrated development layer")
     development_impacts, exchange_artifacts, coupling_manifest, development_warnings = _build_development_outputs(
         settings=settings,
         model=model,
@@ -2880,6 +3365,7 @@ def run_calliope_synchronously(
         run_dir=run_dir,
         development_model_config=development_model_config,
         mapping_quality=mapping_quality,
+        scenario_package=scenario_package,
     )
     summary["development_impacts"] = development_impacts
     summary["coupling_manifest"] = coupling_manifest
@@ -2888,17 +3374,20 @@ def run_calliope_synchronously(
 
     _emit_progress(progress_callback, "build_integrated", 0.96, "Assembling integrated result package")
     _check_cancel(cancel_requested)
-    integrated = build_integrated_results(summary, coupling_manifest=coupling_manifest)
-    integrated["baseline_comparison"] = _build_baseline_comparison_payload(
-        settings=settings,
-        req=req,
-        run_id=run_id,
-        integrated=integrated,
+    integrated = build_integrated_results(
+        summary,
+        coupling_manifest=coupling_manifest,
+        config_dir=settings.config_dir,
+        lever_values=req.levers.model_dump(),
+        run_year=_year_from_profile(settings, req),
     )
+    summary["scenario_assumptions"] = integrated.get("scenario_assumptions") or {}
+    summary["development_indicators"] = integrated.get("development_indicators") or {}
     summary["integrated_results"] = integrated
 
     summary.setdefault("exchange_artifacts", {})
     summary["exchange_artifacts"].update(exchange_artifacts)
+    summary["exchange_artifacts"].update(scenario_artifacts)
     summary["exchange_artifacts"]["results_csv"] = f"/api/run/{run_id}/download/csv"
     summary["exchange_artifacts"]["report_markdown"] = f"/api/run/{run_id}/download/report"
     summary["exchange_artifacts"]["exchange_bundle_zip"] = f"/api/run/{run_id}/download/exchange_bundle"

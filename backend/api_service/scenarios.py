@@ -7,6 +7,7 @@ from typing import Dict, List
 import yaml
 
 from .schemas import ScenarioInfo
+from .scenario_package import build_integrated_scenario_catalog
 
 
 def _load_yaml(path: Path) -> dict:
@@ -76,7 +77,6 @@ def load_scenario_metadata(metadata_path: Path) -> Dict[str, ScenarioInfo]:
             description=str(row.get("description", "")).strip(),
             tags=_parse_tags(row.get("tags", "")),
             policy_question=str(row.get("policy_question", "")).strip(),
-            baseline_scenario=str(row.get("baseline_scenario", "")).strip(),
             expected_tradeoff=str(row.get("expected_tradeoff", "")).strip(),
             user_label=str(row.get("user_label", "")).strip(),
             preset_levers=preset_levers,
@@ -95,3 +95,13 @@ def build_scenario_list(overrides_path: Path, metadata_path: Path) -> List[Scena
         else:
             out.append(ScenarioInfo(key=key, title=key, description="", tags=[]))
     return out
+
+
+def build_integrated_catalog(overrides_path: Path, metadata_path: Path, config_dir: Path, calliope_root: Path) -> Dict[str, object]:
+    """Build the unified energy + MRIO scenario catalog for the UI/API."""
+    energy_scenarios = [s.model_dump() for s in build_scenario_list(overrides_path, metadata_path)]
+    return build_integrated_scenario_catalog(
+        config_dir=config_dir,
+        calliope_root=calliope_root,
+        energy_scenarios=energy_scenarios,
+    )

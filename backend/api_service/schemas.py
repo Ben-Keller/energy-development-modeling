@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 RunProfile = Literal["dev", "analysis", "full"]
+EnergyModelEngine = Literal["calliope", "osemosys"]
 
 
 class ScenarioInfo(BaseModel):
@@ -15,7 +16,6 @@ class ScenarioInfo(BaseModel):
     description: str = ""
     tags: List[str] = Field(default_factory=list)
     policy_question: str = ""
-    baseline_scenario: str = ""
     expected_tradeoff: str = ""
     user_label: str = ""
     preset_levers: Dict[str, float] = Field(default_factory=dict)
@@ -33,16 +33,19 @@ class LeverValues(BaseModel):
 class RunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    scenario: str = Field(..., min_length=1, max_length=200, description="Scenario key from overrides.yaml")
+    energy_model_engine: EnergyModelEngine = Field(default="calliope", description="Energy-model runtime engine. Calliope is executable now; OSeMOSYS is a selectable adapter target pending runtime implementation.")
+    energy_scenario_key: str = Field(..., min_length=1, max_length=200, description="Energy scenario key from the energy model catalog")
+    mrio_scenario_id: str = Field(..., min_length=1, max_length=50, description="Integrated target scenario id, currently S1 for full decarbonization or S2 for national policy target; MRIO shock mapping is fixed to the report A/Z/E/Y adapter for now")
+    target_year: int = Field(..., ge=1900, le=2200, description="Scenario target year used by the integrated package")
     levers: LeverValues = Field(default_factory=LeverValues)
-    fast_dev_mode: bool = True
-    run_profile: RunProfile | None = None
+    run_profile: RunProfile
+    strict_validation: bool
+    allow_placeholder_data: bool
 
     @model_validator(mode="after")
     def _normalize_profile(self) -> "RunRequest":
-        profile = self.run_profile or ("dev" if self.fast_dev_mode else "full")
-        self.run_profile = profile
-        self.fast_dev_mode = profile != "full"
+        if self.run_profile in {"analysis", "full"}:
+            self.strict_validation = True
         return self
 
 
@@ -58,11 +61,13 @@ class RunSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_id: str
-    scenario: str
-    fast_dev_mode: bool
-    run_profile: RunProfile | None = None
+    energy_scenario_key: str
+    mrio_scenario_id: str
+    target_year: int
+    run_profile: RunProfile
     warnings: List[str] = Field(default_factory=list)
 
+    scenario_package: Dict[str, Any] = Field(default_factory=dict)
     generation_by_tech: Dict[str, Any] = Field(default_factory=dict)
     capacity_by_tech: Dict[str, Any] = Field(default_factory=dict)
     new_capacity_by_tech: Dict[str, Any] = Field(default_factory=dict)
@@ -73,6 +78,8 @@ class RunSummary(BaseModel):
     exchange_artifacts: Dict[str, Any] = Field(default_factory=dict)
     integrated_results: Dict[str, Any] = Field(default_factory=dict)
     coupling_manifest: Dict[str, Any] = Field(default_factory=dict)
+    scenario_assumptions: Dict[str, Any] = Field(default_factory=dict)
+    development_indicators: Dict[str, Any] = Field(default_factory=dict)
 
 
 class JobInfo(BaseModel):

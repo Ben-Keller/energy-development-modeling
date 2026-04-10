@@ -1,0 +1,1080 @@
+{
+  "schemaVersion": "edim_architecture_design_spec_v2",
+  "updatedAt": "2026-04-10",
+  "title": "Unified EDIM Model Architecture",
+  "subtitle": "Separate user parameters and scenario data -> unified adapter layer -> Calliope + MRIO runtime -> integrated results",
+  "status": "implementation-handoff",
+  "description": "Current EDIM architecture view showing separate user-defined parameters and scenario input datasets feeding a unified adapter layer. The adapter routes energy runtime inputs directly to Calliope and MRIO-direct scenario payloads directly to the MRIO runtime. The MRIO runtime receives three explicit input streams: bridge artifacts, adapter-derived MRIO scenario payloads, and general MRIO input datasets. Calliope also feeds integrated results directly for energy-side headline metrics.",
+  "owners": {
+    "product": "Energy-development modeling workbench owner",
+    "frontend": "Dashboard and interaction team",
+    "backend": "FastAPI/orchestration team",
+    "modeling": "Energy + MRIO modeling experts",
+    "design": "UX and visual systems team",
+    "data": "MRIO, geospatial, and expert coefficient data team"
+  },
+  "audiences": [
+    "Frontend engineers building the dashboard and interaction model",
+    "Backend engineers maintaining scenario packages, orchestration, APIs, and artifacts",
+    "Designers refining the dashboard and architecture explanation",
+    "Energy modelers maintaining Calliope and future OSeMOSYS adapters",
+    "MRIO/development modelers replacing heuristic MRIO-direct logic with exact matrix shocks",
+    "Data/GIS teams replacing placeholder datasets and geometry assets"
+  ],
+  "rendering": {
+    "width": 1680,
+    "height": 1270,
+    "fitPaddingRatio": 0.965,
+    "zoomExtent": [
+      0.08,
+      4
+    ],
+    "nodeCornerRadius": 18,
+    "layerCornerRadius": 22,
+    "edgeLabelWidth": 156,
+    "edgeLabelHeight": 20,
+    "defaultNodePadding": 22,
+    "fontFamily": "IBM Plex Sans, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "supportsDrag": true,
+    "supportsZoom": true,
+    "tooltipMaxWidth": 430,
+    "legend": {
+      "x": 46,
+      "y": 24,
+      "w": 520,
+      "h": 36,
+      "title": "Diagram type"
+    },
+    "showEdgeLabels": false,
+    "collisionPadding": 42
+  },
+  "theme": {
+    "background": "#02040a",
+    "ink": "#ffffff",
+    "muted": "rgba(255,255,255,0.70)",
+    "grid": "rgba(255,255,255,0.045)",
+    "layer": "rgba(255,255,255,0.045)",
+    "stroke": "rgba(255,255,255,0.16)",
+    "tones": {
+      "dataInput": "#f59e0b",
+      "model": "#38bdf8",
+      "output": "#34d399",
+      "quality": "#38bdf8",
+      "scenario": "#f59e0b",
+      "energy": "#38bdf8",
+      "bridge": "#38bdf8",
+      "mrio": "#38bdf8",
+      "impact": "#38bdf8",
+      "frontend": "#34d399",
+      "data": "#f59e0b"
+    },
+    "semanticToneUse": {
+      "dataInput": "External/manual/static inputs that feed the scenario package, Calliope, or frontend GIS context",
+      "model": "Adapters, solvers, bridge transformations, MRIO/development runtime, and processing layers",
+      "output": "Generated artifacts, dashboard contracts, and user-facing result surfaces",
+      "quality": "Alias of model for validation, placeholder, geography, model-quality, and overlap-policy gates",
+      "scenario": "Alias of data input for integrated run configuration",
+      "energy": "Alias of model for energy model adapters and solved energy outputs",
+      "bridge": "Alias of model for Calliope-to-MRIO exchange transformations",
+      "mrio": "Alias of model for report-derived MRIO-direct transformations",
+      "impact": "Alias of model for development impact runtime",
+      "frontend": "Alias of output for dashboard interpretation layer",
+      "data": "Alias of data input for expert-owned source data and caches"
+    }
+  },
+  "layers": [
+    {
+      "id": "l1",
+      "title": "Input streams",
+      "y": 92,
+      "h": 210,
+      "purpose": "User-defined run parameters, scenario source datasets, and static model input datasets enter the model as separate streams."
+    },
+    {
+      "id": "l2",
+      "title": "Unified adapter layer",
+      "y": 340,
+      "h": 150,
+      "purpose": "One adapter layer resolves scenario selections into model-specific runtime inputs for Calliope and MRIO."
+    },
+    {
+      "id": "l3",
+      "title": "Energy model and bridge preparation",
+      "y": 540,
+      "h": 360,
+      "purpose": "Calliope solves the energy model using adapter patches plus static model data; the bridge converts solved energy outputs into MRIO-compatible exchange artifacts."
+    },
+    {
+      "id": "l4",
+      "title": "MRIO development runtime",
+      "y": 920,
+      "h": 150,
+      "purpose": "MRIO runtime consumes bridge artifacts, adapter-derived MRIO scenario inputs, and general MRIO input datasets."
+    },
+    {
+      "id": "l5",
+      "title": "Integrated results",
+      "y": 1100,
+      "h": 135,
+      "purpose": "Integrated result artifacts combine direct Calliope outputs, selected MRIO/development totals, provenance, diagnostics, and dashboard contracts."
+    }
+  ],
+  "nodes": [
+    {
+      "id": "userParams",
+      "x": 570,
+      "y": 128,
+      "w": 430,
+      "h": 138,
+      "tone": "dataInput",
+      "light": false,
+      "title": "User-Defined Run Parameters",
+      "subtitle": "Data input",
+      "body": [
+        "Energy pathway, MRIO scenario choice, target year, profile, levers",
+        "Validation outcome and placeholder diagnostics are recorded, not separate toggle inputs",
+        "Persisted into scenario_package.json for audit and rerun traceability"
+      ],
+      "chips": [
+        "Run request",
+        "Levers",
+        "Target year"
+      ],
+      "details": {
+        "purpose": "Captures what the user chooses at run time without treating those choices as the scenario source dataset itself.",
+        "owner": "Frontend setup UI + backend run contract",
+        "sourceOfTruth": "frontend/app.jsx and backend/api_service/schemas.py",
+        "inputs": [
+          "Energy pathway selector",
+          "MRIO report scenario selector",
+          "Target year",
+          "Run profile",
+          "Policy levers"
+        ],
+        "outputs": [
+          "Run request fields",
+          "User-parameter slice of scenario_package.json",
+          "Adapter-layer runtime context"
+        ],
+        "artifacts": [
+          "scenario_package.json"
+        ],
+        "acceptanceCriteria": [
+          "User choices remain inspectable separately from scenario source data",
+          "Request payload maps cleanly into the unified adapter layer"
+        ]
+      }
+    },
+    {
+      "id": "scenarioData",
+      "x": 1070,
+      "y": 116,
+      "w": 520,
+      "h": 160,
+      "tone": "dataInput",
+      "light": false,
+      "title": "Scenario Input Data",
+      "subtitle": "Data input",
+      "body": [
+        "Energy scenario metadata and Calliope override references",
+        "Parsed report scenarios with A/Z, E, Y guidance and target-year assumptions",
+        "Geography mapping and provenance records used by the adapter"
+      ],
+      "chips": [
+        "Energy metadata",
+        "Report scenarios",
+        "Mappings"
+      ],
+      "details": {
+        "purpose": "Provides scenario source records as data inputs to the adapter layer rather than routing them through a separate visible scenario-package node.",
+        "owner": "Backend scenario catalog + modeling/data teams",
+        "sourceOfTruth": "backend/api_service/scenarios.py, backend/api_service/scenario_report.py, inputs/generated/scenario_report_scenarios.json",
+        "inputs": [
+          "Calliope-Africa-main/overrides.yaml",
+          "inputs/scenario_metadata.csv",
+          "Energy Modelling Scenario Report.docx",
+          "inputs/generated/scenario_report_scenarios.json",
+          "inputs/scenario_geography_mapping.csv"
+        ],
+        "outputs": [
+          "Energy scenario records",
+          "MRIO report scenario records",
+          "Target-year assumptions",
+          "Geography/provenance metadata"
+        ],
+        "apiContract": {
+          "endpoint": "GET /api/scenarios",
+          "schemaVersion": "integrated_scenario_catalog_v1"
+        },
+        "acceptanceCriteria": [
+          "Scenario source data stays distinct from user-defined parameters",
+          "All report scenarios remain inspectable through the catalog and run artifacts"
+        ]
+      }
+    },
+    {
+      "id": "calliopeStaticData",
+      "x": 70,
+      "y": 110,
+      "w": 430,
+      "h": 178,
+      "tone": "dataInput",
+      "light": false,
+      "title": "Calliope Static Model Inputs",
+      "subtitle": "Data input",
+      "body": [
+        "model.yaml imports: technology, demand, transmission, and location files",
+        "Power-pool topology for CAPP/EAPP/NAPP/SAPP/WAPP",
+        "Demand and renewable resource time series used during optimization"
+      ],
+      "chips": [
+        "model.yaml",
+        "Tech YAML",
+        "Timeseries"
+      ],
+      "details": {
+        "purpose": "Makes explicit that Calliope is fed by static model input files in addition to adapter-provided scenario patches.",
+        "owner": "Energy modeling + energy data/GIS teams",
+        "sourceOfTruth": "Calliope-Africa-main/model.yaml import list and Calliope-Africa-main/Timeseries/*.csv",
+        "inputs": [
+          "Calliope-Africa-main/model.yaml",
+          "Calliope-Africa-main/Technologies/*.yaml",
+          "Calliope-Africa-main/*/Location_Constraints_*.yaml",
+          "Calliope-Africa-main/*/Transmission_links_*.yaml",
+          "Calliope-Africa-main/Timeseries/*.csv"
+        ],
+        "outputs": [
+          "Static model structure used by Calliope",
+          "Technology and carrier definitions",
+          "Location and transmission topology",
+          "Resource and demand profiles"
+        ],
+        "acceptanceCriteria": [
+          "Static Calliope inputs are documented separately from the adapter layer",
+          "Technology and location names stay synchronized with lever, bridge, and map mappings"
+        ]
+      }
+    },
+    {
+      "id": "adapter",
+      "x": 520,
+      "y": 358,
+      "w": 760,
+      "h": 116,
+      "tone": "model",
+      "light": false,
+      "title": "Unified Scenario Adapter Layer",
+      "subtitle": "Parameters + scenario data -> model inputs",
+      "body": [
+        "Single adapter layer resolves user parameters against scenario source data",
+        "Outputs Calliope runtime patch / energy input manifest directly to Calliope",
+        "Outputs MRIO-direct A/Z, E, Y scenario payload directly to the MRIO runtime"
+      ],
+      "chips": [
+        "Energy adapter",
+        "MRIO adapter",
+        "scenario_package.json"
+      ],
+      "details": {
+        "purpose": "Replaces separate visible energy and MRIO-direct adapter boxes with one responsibility boundary: translate user parameters plus scenario source data into model-specific runtime inputs.",
+        "owner": "Backend scenario/adapters + modeling teams",
+        "sourceOfTruth": "backend/api_service/scenario_package.py and backend/api_service/runner.py",
+        "inputs": [
+          "User-defined run parameters",
+          "Energy scenario metadata",
+          "Parsed MRIO report scenario data",
+          "Levers and run profile",
+          "Geography/provenance records"
+        ],
+        "outputs": [
+          "Calliope runtime override patch",
+          "scenario/energy_input_manifest.json",
+          "MRIO-direct scenario payload rows",
+          "scenario/mrio_direct_inputs.json",
+          "scenario/mrio_direct_shocks.csv",
+          "scenario_package.json"
+        ],
+        "qualityPolicy": "MRIO-direct numeric rows remain mrio_direct_heuristic_v1 until exact MARIO A/Z/E/Y matrix shock execution replaces them.",
+        "acceptanceCriteria": [
+          "One adapter layer is visible in the architecture diagram",
+          "Adapter outputs go directly to Calliope and MRIO runtime models",
+          "Scenario package is preserved as an artifact, not shown as a separate data-routing cell"
+        ]
+      }
+    },
+    {
+      "id": "energyModel",
+      "x": 70,
+      "y": 570,
+      "w": 430,
+      "h": 140,
+      "tone": "model",
+      "light": false,
+      "title": "Calliope Energy Model",
+      "subtitle": "Energy runtime model",
+      "body": [
+        "Solves the selected Calliope scenario with adapter runtime patch",
+        "Consumes static Calliope model inputs in parallel",
+        "Produces energy, cost, emissions, reliability, and spatial outputs"
+      ],
+      "chips": [
+        "Generation",
+        "Capacity",
+        "Cost",
+        "Emissions"
+      ],
+      "details": {
+        "purpose": "Solves energy-system outcomes under the selected scenario and runtime profile.",
+        "owner": "Energy modeling + backend runtime",
+        "sourceOfTruth": "Calliope-Africa-main/ and backend/api_service/runner.py",
+        "inputs": [
+          "Adapter-provided runtime patch",
+          "Calliope static model inputs",
+          "Solver/profile settings"
+        ],
+        "outputs": [
+          "results.csv",
+          "summary energy metrics",
+          "system cost",
+          "physical emissions",
+          "reliability diagnostics",
+          "generation/capacity by technology and geography"
+        ],
+        "artifacts": [
+          "results.csv",
+          "summary.json"
+        ],
+        "acceptanceCriteria": [
+          "Calliope has a direct arrow to integrated results for energy-side metrics",
+          "Solved outputs also feed the bridge layer for MRIO exchange artifacts"
+        ]
+      }
+    },
+    {
+      "id": "bridge",
+      "x": 430,
+      "y": 760,
+      "w": 430,
+      "h": 120,
+      "tone": "model",
+      "light": false,
+      "title": "Calliope-to-MRIO Bridge Layer",
+      "subtitle": "Solved energy -> exchange artifacts",
+      "body": [
+        "Maps solved energy CAPEX/OPEX/fuel shocks into MRIO sectors and regions",
+        "Creates service-balance and price/tax diagnostics",
+        "Bridge channel remains authoritative on overlaps for now"
+      ],
+      "chips": [
+        "investment_shocks",
+        "operating_shocks",
+        "service balance"
+      ],
+      "details": {
+        "purpose": "Converts solved Calliope outputs into MRIO-compatible exchange artifacts.",
+        "owner": "Backend + MRIO bridge modeling",
+        "sourceOfTruth": "backend/api_service/runner.py and inputs/mario_inputs/*.csv",
+        "inputs": [
+          "Calliope solved energy outputs",
+          "calliope_tech_to_mario_sector.csv",
+          "capex_sector_split.csv",
+          "opex_sector_split.csv",
+          "country_to_pool.csv"
+        ],
+        "outputs": [
+          "exchange/investment_shocks.csv",
+          "exchange/operating_shocks.csv",
+          "exchange/energy_service_balance.csv",
+          "exchange/prices_and_taxes.csv"
+        ],
+        "qualityPolicy": "UNKNOWN regions and fallback exchange paths must remain visible in warnings and coupling diagnostics."
+      }
+    },
+    {
+      "id": "mrioInputs",
+      "x": 1120,
+      "y": 610,
+      "w": 480,
+      "h": 160,
+      "tone": "dataInput",
+      "light": false,
+      "title": "MRIO Input Datasets",
+      "subtitle": "General MRIO data input",
+      "body": [
+        "Employment, value-added, development-model, uncertainty, and supplier-sector coefficients",
+        "Expert-owned coefficient tables and placeholder inventory",
+        "Used by MRIO runtime in addition to bridge and adapter scenario payloads"
+      ],
+      "chips": [
+        "employment",
+        "GVA",
+        "coefficients"
+      ],
+      "details": {
+        "purpose": "Represents the general MRIO/development input data required by the runtime, distinct from bridge artifacts and adapter-derived scenario payloads.",
+        "owner": "MRIO/development modeling + data team",
+        "sourceOfTruth": "inputs/mario_inputs/*.csv and development coefficient inputs",
+        "inputs": [
+          "employment_intensity.csv",
+          "value_added_intensity.csv",
+          "development_model.csv",
+          "uncertainty inputs",
+          "supplier-sector coefficient tables"
+        ],
+        "outputs": [
+          "MRIO coefficients and development intensities consumed by the runtime"
+        ],
+        "acceptanceCriteria": [
+          "MRIO runtime visibly has three input streams: bridge artifacts, adapter MRIO scenario payload, and general MRIO input datasets"
+        ]
+      }
+    },
+    {
+      "id": "mario",
+      "x": 560,
+      "y": 930,
+      "w": 800,
+      "h": 120,
+      "tone": "model",
+      "light": false,
+      "title": "MRIO Impact Model / Development Runtime",
+      "subtitle": "Three input streams",
+      "body": [
+        "Consumes bridge artifacts, adapter-derived MRIO scenario payload, and general MRIO input datasets",
+        "Keeps bridge and MRIO-direct source channels inspectable",
+        "Outputs selected_totals, combined diagnostics, overlap warnings, jobs, GVA, and income proxy"
+      ],
+      "chips": [
+        "Bridge input",
+        "Adapter input",
+        "MRIO datasets",
+        "Selected totals"
+      ],
+      "details": {
+        "purpose": "Runs the development-impact model using three explicit input streams and keeps channel provenance visible.",
+        "owner": "MRIO modeling + backend runtime",
+        "sourceOfTruth": "backend/api_service/runner.py and mario_runtime.py",
+        "inputs": [
+          "Bridge exchange artifacts from the Calliope-to-MRIO bridge",
+          "MRIO-direct scenario payload from unified adapter layer",
+          "General MRIO input datasets and coefficients"
+        ],
+        "outputs": [
+          "development_impacts.json",
+          "bridge",
+          "mrio_direct",
+          "selected_totals",
+          "combined_totals",
+          "overlap_diagnostics"
+        ],
+        "artifacts": [
+          "development_impacts.json",
+          "exchange/development_impacts.json",
+          "coupling_manifest.json"
+        ],
+        "qualityPolicy": "Headline development totals currently default to bridge-derived Calliope values on overlap; combined_totals are diagnostic only."
+      }
+    },
+    {
+      "id": "outputs",
+      "x": 70,
+      "y": 1120,
+      "w": 620,
+      "h": 104,
+      "tone": "output",
+      "light": false,
+      "title": "Integrated Results + Dashboard Contract",
+      "subtitle": "Output / UI",
+      "body": [
+        "Direct Calliope energy metrics plus selected MRIO/development impacts",
+        "Scenario provenance, source-channel comparison, uncertainty, metric resolution, map/chart payloads",
+        "Dashboard separates global results from regional/country/subcountry scoped outputs"
+      ],
+      "chips": [
+        "integrated_results.json",
+        "quality",
+        "dashboard"
+      ],
+      "details": {
+        "purpose": "Synthesises energy and development outputs into decision-ready payloads and the dashboard-facing contract.",
+        "owner": "Backend + frontend",
+        "sourceOfTruth": "backend/api_service/integrated.py",
+        "inputs": [
+          "Direct Calliope energy outputs",
+          "Development impacts from MRIO runtime",
+          "Scenario package artifact",
+          "Coupling diagnostics",
+          "GeoJSON assets and baseline metadata"
+        ],
+        "outputs": [
+          "integrated_results.json",
+          "run_report.md",
+          "Dashboard overview, energy, development, and method panels",
+          "Map filtering contract and source-channel comparison",
+          "scenario_provenance and development_confidence"
+        ],
+        "artifacts": [
+          "integrated_results.json",
+          "run_report.md",
+          "coupling_manifest.json"
+        ],
+        "acceptanceCriteria": [
+          "Calliope has a direct path to integrated energy metrics",
+          "source_channels expose bridge and MRIO-direct side by side",
+          "Map filters compatible outputs while global metrics remain separated"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "paramsToAdapter",
+      "from": "userParams",
+      "to": "adapter",
+      "tone": "dataInput",
+      "label": "User parameters",
+      "details": {
+        "summary": "Run-time choices flow directly into the unified adapter layer.",
+        "payload": [
+          "energy_scenario_key",
+          "mrio_scenario_id",
+          "target_year",
+          "run_profile",
+          "levers"
+        ]
+      }
+    },
+    {
+      "id": "scenarioDataToAdapter",
+      "from": "scenarioData",
+      "to": "adapter",
+      "tone": "dataInput",
+      "label": "Scenario source data",
+      "details": {
+        "summary": "Scenario source records flow directly into the unified adapter layer.",
+        "payload": [
+          "energy metadata",
+          "parsed report scenario records",
+          "A/Z E Y guidance",
+          "geography/provenance metadata"
+        ]
+      }
+    },
+    {
+      "id": "adapterToCalliope",
+      "from": "adapter",
+      "to": "energyModel",
+      "tone": "model",
+      "label": "Calliope runtime inputs",
+      "details": {
+        "summary": "Unified adapter emits the energy runtime patch and energy input manifest directly to Calliope."
+      }
+    },
+    {
+      "id": "calliopeDataToModel",
+      "from": "calliopeStaticData",
+      "to": "energyModel",
+      "tone": "dataInput",
+      "label": "Static model data",
+      "details": {
+        "summary": "Calliope consumes static model imports in addition to adapter-produced runtime inputs.",
+        "payload": [
+          "model.yaml imports",
+          "technology YAML libraries",
+          "location constraints",
+          "transmission links",
+          "demand/resource time series"
+        ]
+      }
+    },
+    {
+      "id": "calliopeToBridge",
+      "from": "energyModel",
+      "to": "bridge",
+      "tone": "model",
+      "label": "Solved energy outputs",
+      "details": {
+        "summary": "Solved energy outputs feed bridge exchange artifact generation."
+      }
+    },
+    {
+      "id": "bridgeToMrio",
+      "from": "bridge",
+      "to": "mario",
+      "tone": "model",
+      "label": "Bridge artifacts",
+      "details": {
+        "summary": "Investment shocks, operating shocks, service balance, and price/tax artifacts are the bridge input stream to MRIO."
+      }
+    },
+    {
+      "id": "adapterToMrio",
+      "from": "adapter",
+      "to": "mario",
+      "tone": "model",
+      "label": "MRIO scenario payload",
+      "details": {
+        "summary": "Unified adapter emits report-derived MRIO-direct A/Z, E, Y scenario payloads directly to the MRIO runtime."
+      }
+    },
+    {
+      "id": "mrioInputsToMrio",
+      "from": "mrioInputs",
+      "to": "mario",
+      "tone": "dataInput",
+      "label": "MRIO input datasets",
+      "details": {
+        "summary": "General MRIO/development datasets and coefficients feed the MRIO runtime as a third input stream.",
+        "payload": [
+          "employment intensity",
+          "value-added intensity",
+          "development model coefficients",
+          "uncertainty inputs"
+        ]
+      }
+    },
+    {
+      "id": "calliopeToOutputs",
+      "from": "energyModel",
+      "to": "outputs",
+      "tone": "model",
+      "label": "Direct energy metrics",
+      "details": {
+        "summary": "Calliope energy outputs feed integrated results directly for energy-side headline metrics, charts, and spatial diagnostics."
+      }
+    },
+    {
+      "id": "mrioToOutputs",
+      "from": "mario",
+      "to": "outputs",
+      "tone": "model",
+      "label": "Development results",
+      "details": {
+        "summary": "MRIO runtime outputs feed integrated results for jobs, GVA, income proxy, source channels, uncertainty, and overlap diagnostics.",
+        "payload": [
+          "selected_totals",
+          "bridge channel",
+          "MRIO-direct channel",
+          "combined diagnostics",
+          "overlap warnings"
+        ]
+      }
+    }
+  ],
+  "annotations": [
+    {
+      "id": "a1",
+      "x": 780,
+      "y": 318,
+      "text": "User parameters and scenario source data stay separate until the unified adapter layer.",
+      "tone": "dataInput"
+    },
+    {
+      "id": "a2",
+      "x": 900,
+      "y": 520,
+      "text": "One adapter layer branches directly to Calliope and to the MRIO runtime.",
+      "tone": "model"
+    },
+    {
+      "id": "a3",
+      "x": 1020,
+      "y": 900,
+      "text": "MRIO runtime has three inputs: bridge artifacts, adapter scenario payload, and general MRIO datasets.",
+      "tone": "model"
+    },
+    {
+      "id": "a4",
+      "x": 445,
+      "y": 1090,
+      "text": "Integrated results combine direct Calliope energy metrics with selected MRIO/development outputs.",
+      "tone": "output"
+    }
+  ],
+  "legend": [
+    {
+      "tone": "dataInput",
+      "label": "Data input",
+      "description": "User-defined parameters, scenario source datasets, Calliope static files, and MRIO coefficient/input datasets"
+    },
+    {
+      "tone": "model",
+      "label": "Model / processing",
+      "description": "Unified adapter layer, Calliope solve, bridge transformation, and MRIO/development runtime"
+    },
+    {
+      "tone": "output",
+      "label": "Output / UI",
+      "description": "Integrated result artifacts, dashboard contracts, source-channel diagnostics, and user-facing interpretation layers"
+    }
+  ],
+  "runtimeStages": [
+    {
+      "stage": "scenario_prepare",
+      "outputs": [
+        "scenario_package.json",
+        "scenario/energy_input_manifest.json",
+        "scenario/report_scenario_reference.json",
+        "scenario/geography_alignment.json"
+      ]
+    },
+    {
+      "stage": "energy_input_prepare",
+      "outputs": [
+        "ui_override_patch.yaml",
+        "runtime override patch",
+        "validation diagnostics"
+      ]
+    },
+    {
+      "stage": "build_model",
+      "outputs": [
+        "in-memory Calliope model"
+      ]
+    },
+    {
+      "stage": "solve_energy",
+      "outputs": [
+        "in-memory solved Calliope results"
+      ]
+    },
+    {
+      "stage": "write_artifacts",
+      "outputs": [
+        "results.csv"
+      ]
+    },
+    {
+      "stage": "build_summary",
+      "outputs": [
+        "summary diagnostics",
+        "summary fields"
+      ]
+    },
+    {
+      "stage": "bridge_prepare",
+      "outputs": [
+        "exchange/investment_shocks.csv",
+        "exchange/operating_shocks.csv",
+        "exchange/energy_service_balance.csv",
+        "exchange/prices_and_taxes.csv"
+      ]
+    },
+    {
+      "stage": "mrio_direct_prepare",
+      "outputs": [
+        "scenario/mrio_direct_inputs.json",
+        "scenario/mrio_direct_shocks.csv"
+      ]
+    },
+    {
+      "stage": "development",
+      "outputs": [
+        "development_impacts.json",
+        "coupling_manifest.json"
+      ]
+    },
+    {
+      "stage": "build_integrated",
+      "outputs": [
+        "integrated_results.json",
+        "run_report.md",
+        "summary.json"
+      ]
+    }
+  ],
+  "frontendRequirements": {
+    "setupFlow": [
+      "Energy pathway selector",
+      "MRIO report scenario selector",
+      "Target year selector",
+      "Geography alignment status",
+      "Run profile",
+      "Validation diagnostics summary",
+      "Placeholder data diagnostics",
+      "Levers"
+    ],
+    "resultsPanels": [
+      "Scenario provenance",
+      "Bridge input panel",
+      "MRIO scenario payload / assumptions panel",
+      "MRIO input dataset diagnostics",
+      "Overlap warning",
+      "Source-channel comparison",
+      "Model quality",
+      "Metric resolution"
+    ],
+    "mapRules": [
+      "Map legend colors must match rendered layer colors",
+      "Selected country/subregion is primary highlight",
+      "Parent/region context may be secondary highlight",
+      "Only spatially compatible charts respond to geography selection",
+      "Global or non-filterable metrics are grouped separately"
+    ],
+    "trustMessaging": [
+      "Show placeholder data status",
+      "Show heuristic MRIO-direct status",
+      "Show selected_totals_source",
+      "Show temporary overlap policy",
+      "Show geography alignment status"
+    ],
+    "artifactPanels": [
+      "scenario_package.json viewer or summary",
+      "scenario/mrio_direct_inputs.json summary table",
+      "coupling_manifest.json quality diagnostics",
+      "development_impacts.json source-channel summary",
+      "MRIO input dataset placeholder/provenance summary"
+    ],
+    "accessibility": [
+      "Architecture diagram has an aria-label and status text",
+      "Critical warnings must not depend on color alone",
+      "Controls in the production dashboard must remain keyboard accessible",
+      "Tooltips should supplement, not replace, visible text for critical interpretation"
+    ]
+  },
+  "backendRequirements": {
+    "requestShape": [
+      "energy_scenario_key",
+      "mrio_scenario_id",
+      "target_year",
+      "run_profile",
+      "levers",
+      "strict_validation",
+      "allow_placeholder_data"
+    ],
+    "artifactContract": [
+      "scenario_package.json",
+      "scenario/geography_alignment.json",
+      "scenario/mrio_direct_inputs.json",
+      "scenario/mrio_direct_shocks.csv",
+      "development_impacts.json",
+      "coupling_manifest.json",
+      "integrated_results.json"
+    ],
+    "qualityRules": [
+      "Analysis/full profiles force strict validation",
+      "Placeholders block strict runs unless explicitly allowed",
+      "Heuristic MRIO-direct caps quality at analyst_review or below",
+      "Bridge selected totals are authoritative on overlap for now"
+    ],
+    "futureAdapters": [
+      "OSeMOSYS energy adapter",
+      "Exact MARIO A/Z/E/Y matrix shock adapter"
+    ],
+    "apiEndpoints": [
+      {
+        "path": "/api/scenarios",
+        "method": "GET",
+        "contract": "integrated catalog"
+      },
+      {
+        "path": "/api/environment-setup",
+        "method": "GET",
+        "contract": "readiness checks for integrated scenario params"
+      },
+      {
+        "path": "/api/jobs",
+        "method": "POST",
+        "contract": "integrated RunRequest only"
+      },
+      {
+        "path": "/api/run/{run_id}/integrated",
+        "method": "GET",
+        "contract": "integrated results with source_channels and scenario_provenance"
+      },
+      {
+        "path": "/api/run/{run_id}/development",
+        "method": "GET",
+        "contract": "development_impacts with bridge/mrio_direct/selected_totals/combined_totals/overlap_diagnostics"
+      }
+    ]
+  },
+  "dataRequirements": {
+    "placeholderReplacement": [
+      "employment_intensity.csv",
+      "value_added_intensity.csv",
+      "scenario_assumptions.csv",
+      "development_indicator_mapping.csv",
+      "country_to_pool.csv",
+      "real GeoJSON geometries",
+      "Calliope technology assumption provenance",
+      "Calliope location/transmission topology provenance",
+      "Calliope demand and resource time-series source metadata"
+    ],
+    "geographyAlignment": [
+      "National MRIO applies to all same-country Calliope subnational locations",
+      "Regional MRIO applies to mapped Calliope locations",
+      "MRIO-only is allowed when no energy geography exists",
+      "Subnational-to-subnational mismatch without mapping is blocking"
+    ],
+    "provenance": [
+      "Report source SHA256",
+      "Coefficient source citations",
+      "Reference year",
+      "Placeholder flags",
+      "Geometry source/license"
+    ],
+    "expertReviewFields": [
+      "source",
+      "reference_year",
+      "notes",
+      "method",
+      "unit",
+      "region",
+      "sector",
+      "placeholder flag or placeholder-derived provenance"
+    ],
+    "calliopeStaticModelInputs": [
+      "model.yaml imports Technologies/Technologies_Generation.yaml and Technologies/Technologies_Transmission_and_Demand.yaml",
+      "model.yaml imports power-pool Location_Constraints_*.yaml files for CAPP, EAPP, NAPP, SAPP, and WAPP",
+      "model.yaml imports power-pool Transmission_links_*.yaml files for CAPP, EAPP, NAPP, SAPP, and WAPP",
+      "Timeseries/Demand_*.csv provides demand profiles and scenario variants, including 2040 AC and 2040 STEPS demand files",
+      "Timeseries/Solar_*.csv, Wind_*.csv, Hydro_*.csv, PV_New.csv, CSP_New.csv provide resource availability profiles",
+      "Technology/location names must stay synchronized with lever_mappings.csv, scenario_geography_mapping.csv, country_to_pool.csv, and Calliope-to-MARIO bridge mappings"
+    ]
+  },
+  "openRisks": [
+    {
+      "id": "risk_mrio_heuristic",
+      "severity": "high",
+      "description": "MRIO-direct heuristic v1 is not exact MARIO matrix shock execution.",
+      "mitigation": "Implement exact A/Z/E/Y matrix shock adapter and retire temporary merge policy."
+    },
+    {
+      "id": "risk_placeholders",
+      "severity": "high",
+      "description": "Seeded expert datasets are placeholders and not production evidence.",
+      "mitigation": "Replace with expert-calibrated datasets and provenance."
+    },
+    {
+      "id": "risk_spatial_mismatch",
+      "severity": "medium",
+      "description": "Spatial filtering can mislead if chart granularity does not match selected geography.",
+      "mitigation": "Expose metric resolution and only filter compatible outputs."
+    },
+    {
+      "id": "risk_no_build_frontend",
+      "severity": "medium",
+      "description": "Current frontend uses browser Babel/CDNs and lacks build-time checks.",
+      "mitigation": "Add Vite/package.json, linting, smoke tests, and pinned dependencies."
+    }
+  ],
+  "definitionOfDone": [
+    "All user-facing run setup uses one integrated scenario definition",
+    "Every result panel exposes source-channel and quality context where relevant",
+    "Every runtime artifact needed for debugging is persisted and linked",
+    "Backend tests cover parser, package, geography alignment, request schema, source channels, and integrated results",
+    "Design docs and implementation docs are updated when the spec changes",
+    "Diagram shows user-defined parameters and scenario source data as separate streams into the unified adapter layer",
+    "Diagram shows one adapter layer outputting directly to both Calliope and MRIO runtime",
+    "Diagram shows MRIO runtime receiving bridge artifacts, adapter scenario payload, and general MRIO input datasets",
+    "Diagram shows Calliope feeding integrated results directly"
+  ],
+  "designSpecAnalysis": {
+    "originalState": {
+      "format": "Inline JavaScript object embedded directly in architecture.html",
+      "strengths": [
+        "Clear high-level dual-channel architecture",
+        "D3 renderer already supported zoom, drag, tooltips, layer bands, and node/edge semantics",
+        "Original node layout captured scenario package, separate adapters, energy model, bridge, MRIO-direct, MARIO, and outputs"
+      ],
+      "gapsIdentified": [
+        "Spec was not valid standalone JSON and could not be versioned or validated separately",
+        "Spec lacked ownership, audiences, acceptance criteria, API contracts, artifact contracts, data requirements, risks, and testing requirements",
+        "Trust, placeholder, and spatial resolution concepts needed clear supporting requirements without overloading the visible graph.",
+        "Frontend dashboard interpretation rules and map filtering rules were not represented as explicit requirements",
+        "MRIO-direct heuristic status and bridge-authoritative overlap policy needed stronger labeling",
+        "Scenario source datasets and user-defined run parameters needed to be represented as separate input streams rather than a single scenario package box.",
+        "Separate energy and MRIO-direct adapter nodes overstated the conceptual split; the visible architecture needed one unified adapter layer."
+      ]
+    },
+    "refinementsApplied": [
+      "Converted the embedded spec into standalone strict JSON with schemaVersion edim_architecture_design_spec_v2",
+      "Added owners, audiences, rendering configuration, theme semantics, runtime stages, frontend requirements, backend requirements, data requirements, open risks, and definition of done",
+      "Separated user-defined parameters from scenario source datasets as visible data-input streams into one unified adapter layer.",
+      "Merged the previous Energy Scenario Adapter and MRIO-Direct Adapter nodes into a single Unified Scenario Adapter Layer.",
+      "Removed the separate MRIO Direct Inputs processing node from the visible graph; the adapter now sends the MRIO scenario payload directly to MRIO runtime.",
+      "Added MRIO Input Datasets as a general data-input node feeding the MRIO runtime alongside bridge artifacts and adapter payloads.",
+      "Added a direct Calliope Energy Model to Integrated Results arrow for energy-side metrics.",
+      "Expanded every major node with owner, sourceOfTruth, inputs, outputs, artifacts, or acceptance criteria where applicable.",
+      "Expanded edge details from strings into structured objects with summary and payload metadata",
+      "Added legend entries and semantic tone usage to make the design system self-describing",
+      "Added explicit source-channel and selected_totals policy so frontend and backend teams do not accidentally treat combined totals as headline values",
+      "Added risk register entries for MRIO heuristic, placeholders, spatial mismatch, and no-build frontend",
+      "Recolored node fills and primary flow colors by broad diagram type: data input, model/processing, and output/UI",
+      "Added a rendered D3 legend driven by architecture.spec.json legend entries"
+    ],
+    "implementationImplications": {
+      "frontend": [
+        "Renderer should treat architecture.spec.json as source of truth and avoid hard-coding diagram content in JS",
+        "Dashboard implementation should mirror the spec requirements for provenance, source channels, placeholder warnings, and spatial filtering",
+        "If the spec is expanded with new detail fields, tooltips should gracefully ignore unsupported fields rather than failing"
+      ],
+      "backend": [
+        "Runtime stage names in the spec should stay aligned with runner progress stages",
+        "Artifact names in the spec should stay aligned with run output contracts",
+        "Request shape in the spec should stay aligned with RunRequest extra=forbid schema"
+      ],
+      "design": [
+        "Quality, provenance, and source-channel messaging should be treated as primary UI content, not a secondary technical footnote",
+        "Map filtering must visually distinguish selected country/subcountry from parent region context",
+        "Global/non-filterable outputs need a separate visual region from selected geography outputs"
+      ],
+      "modeling": [
+        "MRIO-direct heuristic v1 should remain visibly provisional until exact MARIO matrix shocks are implemented",
+        "Geography alignment is a model interpretation requirement, not just a data join",
+        "Placeholder expert datasets must be replaced before production-grade claims"
+      ]
+    },
+    "validationChecklist": [
+      "architecture.spec.json is valid JSON",
+      "Every edge references existing node ids",
+      "Every node has id, x, y, w, h, tone, title, body, and details.purpose",
+      "Every tone used by nodes and edges is represented in theme.tones",
+      "Runtime stages include scenario_prepare, energy_input_prepare, solve_energy, bridge_prepare, mrio_direct_prepare, development, and build_integrated",
+      "Spec includes frontend, backend, and data requirements",
+      "Spec includes open risks and a definition of done",
+      "User-defined parameters and scenario source data are represented as separate data inputs into the unified adapter layer",
+      "Unified adapter layer outputs directly to Calliope and MRIO runtime",
+      "MRIO runtime receives bridge artifacts, adapter scenario payload, and general MRIO input datasets",
+      "Calliope static model inputs are represented as a data input node connected to the Calliope energy model",
+      "Calliope energy model has a direct edge to integrated results",
+      "Legend includes data input, model/processing, and output/UI categories"
+    ],
+    "refinementHistory": [
+      "Simplified architecture UI by removing report parser cache, geography alignment, validation/quality gates, and standalone dashboard UX nodes from the visible graph.",
+      "Clarified that user-defined parameters and scenario source data are separate streams into the adapter layer, while scenario_package.json remains an artifact rather than a visible routing box.",
+      "Updated the graph so MRIO runtime has three visible inputs: bridge artifacts, adapter-derived MRIO scenario payload, and general MRIO input datasets.",
+      "Updated the graph so Calliope feeds integrated results directly in addition to feeding the bridge layer."
+    ],
+    "openDesignRisks": [
+      "Dashboard responsiveness depends on available viewport width, iframe sizing, and map container resize handling."
+    ],
+    "latestDiagramUpdate": [
+      "Separated user-defined parameters from scenario source datasets as distinct visible data-input streams.",
+      "Merged Energy Scenario Adapter and MRIO-Direct Adapter into a single Unified Scenario Adapter Layer.",
+      "Removed the separate MRIO Direct Inputs processing node; MRIO-direct scenario payload now flows from adapter directly to MRIO runtime.",
+      "Added general MRIO Input Datasets as a separate data input to MRIO runtime.",
+      "Added a direct Calliope Energy Model to Integrated Results arrow for energy-side headline metrics."
+    ]
+  },
+  "testingRequirements": {
+    "jsonSpec": [
+      "JSON parses successfully",
+      "No missing edge node references",
+      "All node tones exist in theme.tones"
+    ],
+    "renderer": [
+      "architecture.js passes syntax check",
+      "HTML references architecture.js and no longer embeds const spec",
+      "Renderer gracefully reports JSON load failures",
+      "Renderer displays spec.legend entries without hard-coding legend labels",
+      "Renderer supports the dataInput and model tones used by Calliope static input flows"
+    ],
+    "product": [
+      "Spec communicates bridge-authoritative overlap policy",
+      "Spec communicates MRIO-direct heuristic limitation",
+      "Spec communicates placeholder and geospatial replacement requirements"
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+mrio_geography_code,calliope_country_code,calliope_location,alignment_level,notes
+ZA,ZAF,ZAF,national_to_national,South Africa MRIO scenario applies to the ZAF Calliope national location.
+WF,AGO,AGO,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,BDI,BDI,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,BEN,BEN,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,BFA,BFA,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,BWA,BWA,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,CAF,CAF,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,CIV,CIV,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,CMR,CMR,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,COD,COD,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,COG,COG,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,DJI,DJI,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,DZA,DZA,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,EGY,EGY,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,ERI,ERI,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,ETH,ETH,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,GAB,GAB,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,GHA,GHA,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,GIN,GIN,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,GMB,GMB,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,GNB,GNB,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,GNQ,GNQ,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,KEN,KEN_CSTR,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,KEN,KEN_MTKR,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,KEN,KEN_NBOR,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,KEN,KEN_WSTR,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,LBR,LBR,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,LBY,LBY,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,LSO,LSO,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,MAR,MAR,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,MLI,MLI,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,MOZ,MOZ_NC,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,MOZ,MOZ_S,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,MRT,MRT,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,MWI,MWI,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,NAM,NAM,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,NER,NER,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,NGA,NGA_CNW,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,NGA,NGA_E,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,NGA,NGA_S,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,NGA,NGA_W,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,RWA,RWA,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,SDN,SDN,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,SEN,SEN,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,SLE,SLE,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,SOM,SOM,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,SSD,SSD,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,SWZ,SWZ,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,TCD,TCD,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,TGO,TGO,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,TUN,TUN,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,TZA,TZA,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,UGA,UGA,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,ZMB,ZMB,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+WF,ZWE,ZWE,regional_to_location,Rest of Africa MRIO scenario fans out to mapped non-ZAF Calliope locations.
+IN,IND,,mrio_only,India is parsed from the report but current Calliope-Africa has no matching location; treated as MRIO-only.
+BR,BRA,,mrio_only,Brazil is parsed from the report but current Calliope-Africa has no matching location; treated as MRIO-only.
+WM,WM,,mrio_only,Rest of Middle East is parsed from the report but current Calliope-Africa has no matching location; treated as MRIO-only.

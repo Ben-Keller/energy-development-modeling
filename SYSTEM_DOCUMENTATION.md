@@ -139,7 +139,7 @@ Core orchestrator:
 - Results CSV export (`results.csv`).
 - Summary + diagnostics build.
 - Development outputs via MARIO or surrogate.
-- Integrated payload construction and baseline comparison.
+- Integrated payload construction.
 - Artifact writing (`summary.json`, report, exchange bundle zip, etc.).
 
 ### `summarize.py`
@@ -166,7 +166,6 @@ Built-in MARIO-style runtime:
 
 - Validates integrated payload schema.
 - Builds integrated metrics and confidence metadata.
-- Builds baseline comparison deltas vs latest baseline scenario run.
 - Generates report markdown and exchange bundle zip.
 
 ### `levers.py`
@@ -206,7 +205,7 @@ Pydantic models for request/response contracts:
 ### Scenario and Environment
 
 - `GET /api/scenarios`
-- `GET /api/environment-setup?scenario=<key>&run_profile=<dev|analysis|full>`
+- `GET /api/environment-setup?energy_scenario_key=<key>&mrio_scenario_id=<id>&target_year=<year>&run_profile=<dev|analysis|full>`
 - `GET /api/preflight` (compat alias to environment setup)
 
 ### Jobs
@@ -303,7 +302,7 @@ This resolves to one concrete scenario key in `overrides.yaml`.
 Columns include:
 
 - `key`, `title`, `description`, `tags`
-- `policy_question`, `baseline_scenario`, `expected_tradeoff`, `user_label`
+- `policy_question`, `expected_tradeoff`, `user_label`
 - optional preset levers:
   - `demand_multiplier`
   - `renewables_capex_multiplier`
@@ -391,6 +390,18 @@ Diagnostics in `summary_diagnostics` include:
 
 ## 12) Calliope -> MARIO Bridge Design
 
+EDIM now prepares one integrated scenario package before model execution:
+
+`IntegratedScenarioPackage -> energy adapter -> Calliope -> bridge exchange CSVs`
+
+and in parallel:
+
+`IntegratedScenarioPackage -> MRIO-direct adapter -> report-derived A/Z, E, and Y inputs`
+
+The two channels are intentionally kept separate in v1. Bridge-derived Calliope results remain authoritative for
+headline development totals when bridge and MRIO-direct effects overlap. MRIO-direct effects are emitted as
+`mrio_direct_heuristic_v1` diagnostics until exact MARIO matrix shock execution replaces the heuristic layer.
+
 The bridge writes exchange artifacts in `outputs/runs/<run_id>/exchange/`.
 
 Primary extraction order:
@@ -429,6 +440,11 @@ Fallback bridge behavior:
 
 - `method`: currently `mario_io_runtime_v1` when MARIO path runs
 - `inputs`: investment/operating/total shocks
+- `bridge`: bridge-derived Calliope-to-MARIO development payload
+- `mrio_direct`: report-derived MRIO-direct heuristic payload
+- `selected_totals`: headline totals, currently defaulting to bridge-derived values on overlap
+- `combined_totals`: diagnostic bridge + MRIO-direct sum, not the default headline value
+- `overlap_diagnostics`: temporary source-precedence and overlap notes
 - `totals`:
   - `jobs_direct`
   - `jobs_total`
@@ -458,6 +474,10 @@ Surrogate equations and uncertainties are controlled through `inputs/development
 
 `integrated_results.json` includes:
 
+- `energy_scenario_key`
+- `mrio_scenario_id` (current request-field name for the integrated target pathway, for example `S1` or `S2`)
+- `target_year`
+- `scenario_package`
 - `integrated_overview.metrics`
   - system cost
   - physical emissions
@@ -473,12 +493,17 @@ Surrogate equations and uncertainties are controlled through `inputs/development
   - warning count
   - MARIO runtime diagnostics
 - `development_uncertainty`
-- `baseline_comparison`
+- `source_channels`
+  - `bridge`
+  - `mrio_direct`
+  - `selected_totals`
+  - `combined_totals`
+  - `overlap_diagnostics`
+- `scenario_provenance`
 
-Baseline comparison source:
-
-- Baseline scenario key from `scenario_metadata.csv` (`baseline_scenario` column).
-- Uses latest historical run for that baseline scenario when available.
+The root report parser reads `Energy Modelling Scenario Report.docx` and caches normalized scenarios at
+`inputs/generated/scenario_report_scenarios.json`. Geography fan-out is controlled by
+`inputs/scenario_geography_mapping.csv`.
 
 ## 16) Job System Details
 
