@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
-from api_service.mario_runtime import (
+REPO_ROOT = Path(__file__).resolve().parents[2]
+for _candidate in (REPO_ROOT, REPO_ROOT / "backend", REPO_ROOT / "model_runtime"):
+    _path = str(_candidate)
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+from model_runtime.edim_model.core.mario_runtime import (
     load_development_indicator_mapping,
     load_scenario_assumptions,
     mario_inputs_health,
@@ -43,9 +50,9 @@ def _geo_placeholder_summary(repo_root: Path) -> Dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Audit EDIM data readiness and fallback diagnostics.")
+    parser = argparse.ArgumentParser(description="Audit EDIM data readiness and data-readiness diagnostics.")
     parser.add_argument("--scenario", default="baseline", help="Scenario key used for assumption matching.")
-    parser.add_argument("--run-id", default="", help="Optional run_id to inspect coupling fallback flags.")
+    parser.add_argument("--run-id", default="", help="Optional run_id to inspect coupling diagnostics.")
     args = parser.parse_args()
 
     settings = get_settings()
@@ -74,12 +81,11 @@ def main() -> int:
 
     run_id = str(args.run_id or "").strip()
     if run_id:
-        coupling_manifest = _read_json(settings.runs_dir / run_id / "coupling_manifest.json")
+        run_dir = settings.runs_dir / run_id
+        coupling_manifest = _read_json(run_dir / "artifacts" / "final" / "coupling_manifest.json") or _read_json(run_dir / "coupling_manifest.json")
         payload["run_artifact_diagnostics"] = {
             "run_id": run_id,
             "coupling_manifest_found": bool(coupling_manifest),
-            "fallback_exchange_used": bool(coupling_manifest.get("fallback_exchange_used", False)),
-            "surrogate_fallback_used": bool(coupling_manifest.get("surrogate_fallback_used", False)),
             "placeholder_input_row_count": int(coupling_manifest.get("placeholder_input_row_count", 0) or 0),
             "strict_validation": bool(coupling_manifest.get("strict_validation", False)),
         }

@@ -1,0 +1,11 @@
+pandas==1.5.3
+numpy==1.23.5
+pydantic==2.10.6
+xarray==2022.3.0
+netCDF4==1.7.4
+calliope==0.6.10
+pyomo==6.4.4
+highspy>=1.7.2,<2.0
+python-dotenv>=1.0.1,<2.0.0
+orjson>=3.10.0
+PyYAML>=6.0.0

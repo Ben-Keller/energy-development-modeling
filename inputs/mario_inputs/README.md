@@ -33,6 +33,9 @@ Core principle:
   - Maps model outputs to development indicators (SDG-style or custom).
 - `scenario_assumptions.csv`
   - Exogenous assumptions used by coupling runs (price/fx/deflator/etc.).
+- `scenario_report_scenarios.csv`
+  - Analyst-readable structured scenario target table used by MRIO-direct scenario preparation.
+  - This replaces any runtime dependency on narrative scenario documents.
 
 ## Seeded placeholder files that still require expert calibration
 
@@ -85,6 +88,21 @@ They are still not optional if you want policy-grade development outputs.
 4. `development_indicator_mapping.csv`
    - Current repo state: seeded mapping file whose rows are all supported by the current runtime.
    - It still needs expert ownership to decide whether these are the right public-facing indicators.
+
+5. `scenario_report_scenarios.csv`
+   - Current repo state: structured extraction of the scenario target assumptions used by the MRIO-direct pathway.
+   - Keep this synchronized with `inputs/generated/scenario_report_scenarios.json`.
+   - Required columns include:
+     - `scenario_id`
+     - `geography_code`
+     - `scenario_code`
+     - `scenario_type`
+     - `target_years`
+     - `shock_category`
+     - `parameter`
+     - `target_2030`
+     - `target_2050`
+   - Update this table directly when scenario assumptions change; do not add narrative source documents as runtime inputs.
 
 ## Recommended expert workflow
 

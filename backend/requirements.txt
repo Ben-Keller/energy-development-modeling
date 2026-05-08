@@ -1,16 +1,6 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-pydantic==2.8.2
-PyYAML==6.0.2
-python-multipart==0.0.9
-numpy==1.23.5
-pandas==1.5.3
-xarray==2022.3.0
-netCDF4==1.7.4
-orjson==3.10.7
-openai>=1.40.0,<3.0.0
-
-# Calliope stack
-calliope==0.6.10
-pyomo==6.4.4
-highspy>=1.7.2,<2.0
+fastapi==0.115.8
+uvicorn[standard]==0.34.0
+pydantic==2.10.6
+python-multipart==0.0.20
+python-dotenv>=1.0.1,<2.0.0
+orjson>=3.10.0

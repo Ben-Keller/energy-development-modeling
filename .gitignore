@@ -5,17 +5,49 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
 .venv/
+venv/
+env/
 backend/.venv/
 
 # Node / frontend build
 node_modules/
 frontend/node_modules/
 frontend/dist/
+frontend/runtime-config.local.js
+/build/
+/dist/
+/static/
+
+# Superseded generated frontend GIS shards
+frontend/geo/countries_topojson/
+frontend/geo/countries_manifest.json
 
 # Runtime artifacts
 outputs/runs/
+outputs/platform/
+outputs/dataset_uploads/
+outputs/figures/
 
 # Local environment files
 .env
-.env.txt
+.env.*
+!.env.example
+
+# Local logs/databases
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Editor / Office temporary files
+~$*
+*.swp
+*.swo

@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import json
+import io
+import os
+import queue
+import subprocess
+import sys
 import tempfile
+import threading
 import time
 import unittest
-import multiprocessing as mp
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
@@ -11,41 +17,69 @@ from zipfile import ZipFile
 
 import pandas as pd
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
-from api_service.integrated import (
+from model_runtime.edim_model.core.integrated import (
     build_integrated_results,
     build_run_report_markdown,
     create_exchange_bundle_zip,
     validate_integrated_results,
 )
 from api_service.jobs import JobManager, JobQueueFullError
-from api_service.levers import load_lever_mappings
-from api_service.main import _read_summary_json
-from api_service.mario_runtime import mario_inputs_health, run_mario_io_runtime
-from api_service.scenario_package import (
+from model_runtime.edim_model.core.levers import load_lever_mappings
+from api_service.main import create_app
+from model_runtime.edim_model.core.mario_runtime import mario_inputs_health, run_mario_io_runtime
+from api_service.runtime import (
+    ArtifactRegistry,
+    ExecutionAttemptRecord,
+    ExecutionQueueMessage,
+    LocalExecutionQueue,
+    ModelExecutionContext,
+    ModelExecutionRequest,
+    ModelExecutionResult,
+    ModelRuntimeManifest,
+    RuntimeEventLog,
+    build_model_run_bundle,
+    load_artifact_manifest,
+    load_model_runtime_manifest,
+    validate_request_against_manifest,
+)
+from api_service.adapters import SubprocessModelRuntime
+from model_runtime.edim_model.modules import get_energy_model_module, model_module_catalog, module_scenario_catalog
+from model_runtime.edim_model.modules.base import ModelModuleError
+from model_runtime.edim_model.core.orchestration import ModelStage, StageOrchestrator
+from model_runtime.edim_model.core.scenario_package import (
     build_integrated_scenario_catalog,
     build_geography_alignment,
     build_mrio_direct_inputs,
     build_scenario_package,
     write_scenario_artifacts,
 )
-from api_service.scenario_report import load_or_parse_scenario_report
-from api_service.runner import (
-    RunCancelledError,
+from model_runtime.edim_model.core.scenario_report import load_or_parse_scenario_report
+from model_runtime.edim_model.core.runner import (
     _build_development_outputs,
     _results_health,
     _write_exchange_files_for_mario,
     _load_development_model_config,
     build_environment_setup_report,
 )
-from api_service.scenarios import load_scenario_metadata
+from api_service.services.artifact_storage import LocalArtifactStorageService
+from api_service.services.dataset_repository import LocalDatasetRepository
+from api_service.services.artifact_storage import read_summary_json
+from api_service.services.platform_repository import create_platform_repository
+from model_runtime.edim_model.core.scenarios import load_scenario_metadata
 from api_service.schemas import LeverValues, RunRequest
 from api_service.settings import Settings
-from api_service.summarize import build_summary_diagnostics
+from model_runtime.edim_model.core.summarize import build_summary_diagnostics
+from tools import backend_handoff_smoke
+
+
+def _repo_calliope_root(repo_root: Path) -> Path:
+    return repo_root / "model_runtime" / "model_modules" / "calliope" / "Calliope-Africa-main"
 
 
 def _build_settings(base: Path, *, dedupe_enabled: bool = True, queue_capacity: int = 200) -> Settings:
-    calliope_root = base / "Calliope-Africa-main"
+    calliope_root = base / "model_runtime" / "model_modules" / "calliope" / "Calliope-Africa-main"
     calliope_root.mkdir(parents=True, exist_ok=True)
     (calliope_root / "model.yaml").write_text("model: {}", encoding="utf-8")
     (calliope_root / "overrides.yaml").write_text("{}", encoding="utf-8")
@@ -68,6 +102,21 @@ def _build_settings(base: Path, *, dedupe_enabled: bool = True, queue_capacity: 
         ),
         encoding="utf-8",
     )
+    (config_dir / "development_model.csv").write_text(
+        "\n".join(
+            [
+                "parameter,value",
+                "mario.uncertainty_relative_bounds.jobs_direct,0.12",
+                "mario.uncertainty_relative_bounds.jobs_total,0.12",
+                "mario.uncertainty_relative_bounds.gva_total_musd,0.12",
+                "mario.uncertainty_relative_bounds.household_income_proxy_musd,0.12",
+                "mario_direct.structural_reallocation_bridge_scale,0.25",
+                "mario_direct.max_direct_to_bridge_ratio,1.0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    repo_root = Path(__file__).resolve().parents[2]
 
     return Settings(
         calliope_root=calliope_root,
@@ -91,21 +140,26 @@ def _build_settings(base: Path, *, dedupe_enabled: bool = True, queue_capacity: 
         job_history_limit=200,
         job_dedupe_enabled=dedupe_enabled,
         job_queue_capacity=queue_capacity,
-        development_engine="auto",
+        job_execution_max_attempts=1,
+        development_engine="mario",
         mario_db_path="",
         mario_timeout_seconds=120.0,
         mario_fail_on_error=False,
+        model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+        dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+        platform_store_backend="sqlite",
+        platform_sqlite_path=base / "platform" / "platform.sqlite3",
     )
 
 
-def _wait_terminal(manager: JobManager, job_id: str, timeout_seconds: float = 8.0):
+def _wait_terminal(manager: JobManager, execution_id: str, timeout_seconds: float = 8.0):
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
-        info = manager.get(job_id)
+        info = manager.get(execution_id)
         if str(info.status).lower() in {"succeeded", "failed", "cancelled"}:
             return info
         time.sleep(0.02)
-    raise AssertionError(f"Job did not reach terminal status: {job_id}")
+    raise AssertionError(f"Job did not reach terminal status: {execution_id}")
 
 
 def _summary_template(run_id: str) -> dict:
@@ -142,6 +196,46 @@ def _run_request() -> RunRequest:
     )
 
 
+def _public_run_payload(run_name: str = "") -> dict:
+    req = _run_request()
+    return {
+        "run_name": run_name,
+        "model_architecture_id": req.model_architecture_id,
+        "energy_model_engine": req.energy_model_engine,
+        "scenario": {
+            "energy_scenario_key": req.energy_scenario_key,
+            "target_scenario_id": req.mrio_scenario_id,
+            "target_year": req.target_year,
+        },
+        "run_profile": req.run_profile,
+        "levers": req.levers.model_dump(mode="json"),
+    }
+
+
+class _FakeRuntime:
+    def __init__(self, execute_fn):
+        self.execute_fn = execute_fn
+
+    def execute(self, execution_request, execution_context, *, progress_callback=None, cancel_requested=None):
+        return self.execute_fn(execution_request, execution_context, progress_callback, cancel_requested)
+
+
+def _successful_fake_runtime():
+    def _fake_run(execution_request, execution_context, progress_callback=None, cancel_requested=None):
+        if progress_callback:
+            progress_callback("complete", 1.0, "Fake runtime completed")
+        summary = _summary_template(execution_context.run_id)
+        final_run_dir = execution_context.run_dir.parents[1] / execution_context.run_id
+        registry = ArtifactRegistry(execution_context.run_id, final_run_dir, execution_request.artifact_policy)
+        summary["artifact_catalog"] = []
+        registry.write_json("summary_json", summary, dumps=lambda payload: json.dumps(payload, indent=2, sort_keys=True))
+        summary["artifact_catalog"] = registry.exposed_descriptors()
+        registry.write_json("summary_json", summary, dumps=lambda payload: json.dumps(payload, indent=2, sort_keys=True))
+        return ModelExecutionResult(run_id=execution_context.run_id, summary=summary, warnings=[])
+
+    return _FakeRuntime(_fake_run)
+
+
 def _scenario_package() -> dict:
     return {
         "schema_version": "integrated_scenario_package_v1",
@@ -152,7 +246,7 @@ def _scenario_package() -> dict:
         "levers": {},
         "energy": {"adapter": "calliope_v1", "model": "calliope", "scenario_key": "new_links"},
         "mrio_direct": {
-            "adapter": "mrio_direct_heuristic_v1",
+            "adapter": "mrio_direct_heuristic",
             "scenario": {
                 "scenario_id": "ZA-S2",
                 "geography_code": "ZA",
@@ -170,7 +264,7 @@ def _scenario_package() -> dict:
                     "Y": [{"parameter": "Solar/Wind addition", "target_2030": "+10%", "target_2050": "+full capacity"}],
                 },
             },
-            "report_source": {"source_file": "test.docx", "source_sha256": "test"},
+            "report_source": {"source_file": "inputs/mario_inputs/scenario_report_scenarios.csv", "source_sha256": "test"},
         },
         "geography_alignment": {"status": "aligned", "calliope_locations": ["ZAF"]},
         "provenance": {"source": "test"},
@@ -210,6 +304,44 @@ def _seed_mario_inputs(config_dir: Path) -> Path:
     )
     (mario_dir / "scenario_assumptions.csv").write_text(
         "assumption_key,scenario_key,value,unit,effective_year,source,notes\ncarbon_price,baseline,25,usd_per_tco2,2019,expert,calibrated baseline carbon proxy\n",
+        encoding="utf-8",
+    )
+    (mario_dir / "scenario_report_scenarios.csv").write_text(
+        "scenario_id,geography_code,geography_name,geography_type,scenario_code,scenario_type,label,description,target_years,renewable_share_2030,renewable_share_2030_numeric,renewable_share_2050,renewable_share_2050_numeric,fossil_delta_2030,fossil_delta_2030_numeric,net_zero_year,net_zero_year_numeric,shock_type,shock_category,parameter,target_2030,target_2050,implementation_notes,policy_sources,source_dataset\n"
+        "ZA-S2,ZA,South Africa,Country,S2,policy_target,National Policy Target,Test structured scenario,2030|2050,22%,0.22,100%,1.0,-15%,-0.15,2050,2050,Policy,A/Z,Coal A-matrix coefficient,Reduce by 15%,Reduce to 0,,,inputs/mario_inputs/scenario_report_scenarios.csv\n",
+        encoding="utf-8",
+    )
+    generated_dir = config_dir / "generated"
+    generated_dir.mkdir(parents=True, exist_ok=True)
+    (generated_dir / "scenario_report_scenarios.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "scenario_report_v1",
+                "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+                "source_sha256": "test",
+                "scenario_ids": ["ZA-S2"],
+                "scenarios": {
+                    "ZA-S2": {
+                        "scenario_id": "ZA-S2",
+                        "geography_code": "ZA",
+                        "geography": {"name": "South Africa", "type": "Country"},
+                        "scenario_code": "S2",
+                        "scenario_type": "policy_target",
+                        "label": "National Policy Target",
+                        "description": "Test structured scenario",
+                        "target_years": [2030, 2050],
+                        "summary": {
+                            "scenario_id": "ZA-S2",
+                            "renewable_share_2030_numeric": 0.22,
+                            "fossil_delta_2030_numeric": -0.15,
+                        },
+                        "targets": [],
+                        "shock_categories": {"A/Z": [], "E": [], "Y": []},
+                    }
+                },
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
     (mario_dir / "development_indicator_mapping.csv").write_text(
@@ -267,7 +399,7 @@ class ScenarioReportTests(unittest.TestCase):
         repo_root = Path(__file__).resolve().parents[2]
         package = build_scenario_package(
             config_dir=repo_root / "inputs",
-            calliope_root=repo_root / "Calliope-Africa-main",
+            calliope_root=_repo_calliope_root(repo_root),
             energy_scenario_key="new_links",
             mrio_scenario_id="S2",
             target_year=2030,
@@ -278,7 +410,7 @@ class ScenarioReportTests(unittest.TestCase):
         )
         self.assertEqual(package["mrio_scenario_id"], "S2")
         self.assertEqual(package["target_scenario"]["scenario_id"], "S2")
-        self.assertEqual(package["mrio_direct"]["shock_mapping"]["mapping_id"], "mrio_direct_heuristic_v1")
+        self.assertEqual(package["mrio_direct"]["shock_mapping"]["mapping_id"], "mrio_direct_heuristic")
         self.assertEqual(package["mrio_direct"]["scenario"]["scenario_id"], "S2")
         self.assertGreater(package["mrio_direct"]["scenario"]["national_record_count"], 1)
         self.assertEqual(package["geography_alignment"]["alignment_level"], "africa_national_placeholder_to_calliope_locations")
@@ -288,7 +420,7 @@ class ScenarioReportTests(unittest.TestCase):
             bridge_total_shock_musd=100.0,
             direct_config={"structural_reallocation_bridge_scale": 0.25, "max_direct_to_bridge_ratio": 1.0},
         )
-        self.assertEqual(direct["method"], "mrio_direct_heuristic_v1")
+        self.assertEqual(direct["method"], "mrio_direct_heuristic")
         self.assertEqual(direct["scenario_id"], "S2")
         self.assertTrue(direct["diagnostics"]["national_placeholder_dataset"])
         self.assertGreater(len(direct["shock_rows"]), 0)
@@ -299,26 +431,42 @@ class ScenarioReportTests(unittest.TestCase):
         self.assertIn("ZA-S2", source_ids)
         self.assertIn("WF-S2", source_ids)
         with tempfile.TemporaryDirectory() as tmp:
-            artifacts = write_scenario_artifacts(Path(tmp), package, direct)
-            self.assertIn("scenario_package_json", artifacts)
+            write_scenario_artifacts(Path(tmp), package, direct)
             self.assertTrue((Path(tmp) / "scenario_package.json").exists())
             self.assertTrue((Path(tmp) / "scenario" / "mrio_direct_inputs.json").exists())
             self.assertTrue((Path(tmp) / "scenario" / "mrio_direct_shocks.csv").exists())
+            registry = ArtifactRegistry("1234abcd", Path(tmp), {"artifacts": {"manifest": {}}})
+            write_scenario_artifacts(Path(tmp), package, direct, artifact_registry=registry)
+            self.assertTrue((Path(tmp) / "inputs" / "scenario_package.json").exists())
+            self.assertTrue((Path(tmp) / "artifacts" / "intermediate" / "scenario" / "mrio_direct_inputs.json").exists())
+            self.assertTrue((Path(tmp) / "artifacts" / "intermediate" / "scenario" / "mrio_direct_shocks.csv").exists())
+            artifact_ids = {row["artifact_id"] for row in registry.exposed_descriptors()}
+            self.assertIn("scenario_package_json", artifact_ids)
 
     def test_integrated_catalog_splits_targets_from_mrio_shock_mapping(self):
         repo_root = Path(__file__).resolve().parents[2]
         catalog = build_integrated_scenario_catalog(
             repo_root / "inputs",
-            repo_root / "Calliope-Africa-main",
+            _repo_calliope_root(repo_root),
             energy_scenarios=[{"key": "new_links", "title": "New links"}],
         )
-        self.assertEqual([row["scenario_id"] for row in catalog["target_scenarios"]], ["S1", "S2"])
+        self.assertEqual(catalog["schema_version"], "model_scenario_catalog")
         self.assertEqual(catalog["defaults"]["mrio_scenario_id"], "S2")
         self.assertEqual(catalog["defaults"]["target_scenario_id"], "S2")
-        self.assertEqual(catalog["defaults"]["mrio_shock_mapping_id"], "mrio_direct_heuristic_v1")
-        self.assertEqual(catalog["mrio_shock_mappings"][0]["mapping_id"], "mrio_direct_heuristic_v1")
-        self.assertIn("target_profiles", catalog["target_scenarios"][1])
-        self.assertGreater(catalog["report"]["africa_national_country_count"], 50)
+        self.assertEqual(catalog["defaults"]["mrio_shock_mapping_id"], "mrio_direct_heuristic")
+        self.assertGreater(catalog["metadata"]["report"]["africa_national_country_count"], 50)
+        self.assertIn("scenario_channels", catalog)
+        self.assertIn("module_configurations", catalog)
+        channel_keys = {row["config_key"] for row in catalog["scenario_channels"]}
+        self.assertIn("scenario.energy_scenario_key", channel_keys)
+        self.assertIn("scenario.target_scenario_id", channel_keys)
+        self.assertNotIn("target_scenarios", catalog)
+        target_channel = next(row for row in catalog["scenario_channels"] if row["config_key"] == "scenario.target_scenario_id")
+        self.assertEqual([row["value"] for row in target_channel["options"]], ["S1", "S2"])
+        self.assertIn("target_profiles", target_channel["options"][1]["metadata"])
+        shock_channel = next(row for row in catalog["scenario_channels"] if row["config_key"] == "scenario.mrio_shock_mapping_id")
+        self.assertEqual(shock_channel["options"][0]["value"], "mrio_direct_heuristic")
+        self.assertIn("scenario.mrio_shock_mapping_id", channel_keys)
         self.assertTrue((repo_root / "inputs" / "generated" / "africa_national_mrio_placeholder_scenarios.json").exists())
 
     def test_geography_alignment_fans_out_national_and_regional_scenarios(self):
@@ -326,17 +474,17 @@ class ScenarioReportTests(unittest.TestCase):
         report = load_or_parse_scenario_report(repo_root / "inputs")
         za_alignment = build_geography_alignment(
             config_dir=repo_root / "inputs",
-            calliope_root=repo_root / "Calliope-Africa-main",
+            calliope_root=_repo_calliope_root(repo_root),
             mrio_scenario=report["scenarios"]["ZA-S2"],
         )
         wf_alignment = build_geography_alignment(
             config_dir=repo_root / "inputs",
-            calliope_root=repo_root / "Calliope-Africa-main",
+            calliope_root=_repo_calliope_root(repo_root),
             mrio_scenario=report["scenarios"]["WF-S2"],
         )
         br_alignment = build_geography_alignment(
             config_dir=repo_root / "inputs",
-            calliope_root=repo_root / "Calliope-Africa-main",
+            calliope_root=_repo_calliope_root(repo_root),
             mrio_scenario=report["scenarios"]["BR-S2"],
         )
         self.assertIn("ZAF", za_alignment["calliope_locations"])
@@ -378,15 +526,15 @@ class ScenarioReportTests(unittest.TestCase):
                 "\n".join(
                     [
                         "parameter,value",
-                        "surrogate.totals.jobs_total_multiplier,2.2",
                         "mario.uncertainty_relative_bounds.jobs_total,0.18",
+                        "mario_direct.max_direct_to_bridge_ratio,0.75",
                     ]
                 ),
                 encoding="utf-8",
             )
             cfg = _load_development_model_config(config_dir)
-            self.assertAlmostEqual(cfg["surrogate"]["totals"]["jobs_total_multiplier"], 2.2)
             self.assertAlmostEqual(cfg["mario"]["uncertainty_relative_bounds"]["jobs_total"], 0.18)
+            self.assertAlmostEqual(cfg["mario_direct"]["max_direct_to_bridge_ratio"], 0.75)
 
     def test_results_health_handles_missing_results(self):
         class _NoResults:
@@ -423,7 +571,7 @@ class IntegratedResultsTests(unittest.TestCase):
         summary = _summary_template("run1")
         summary["development_impacts"]["bridge"] = {"totals": {"jobs_total": 120.0, "gva_total_musd": 20.0}}
         summary["development_impacts"]["mrio_direct"] = {
-            "method": "mrio_direct_heuristic_v1",
+            "method": "mrio_direct_heuristic",
             "totals": {"jobs_total": 30.0, "gva_total_musd": 5.0},
         }
         summary["development_impacts"]["selected_totals"] = {"jobs_total": 120.0, "gva_total_musd": 20.0}
@@ -431,14 +579,14 @@ class IntegratedResultsTests(unittest.TestCase):
         summary["development_impacts"]["overlap_diagnostics"] = {
             "overlap_exists": True,
             "selected_totals_source": "bridge",
-            "temporary_merge_logic": True,
+            "merge_logic": "bridge_authoritative_overlap_handling",
         }
         payload = build_integrated_results(
             summary,
             coupling_manifest={
                 "mrio_direct_heuristic": True,
                 "selected_totals_source": "bridge",
-                "temporary_overlap_policy": "bridge_authoritative_for_headline_totals",
+                "overlap_policy": "bridge_authoritative_for_headline_totals",
             },
         )
         self.assertEqual(payload["source_channels"]["selected_totals"]["jobs_total"], 120.0)
@@ -483,13 +631,42 @@ class IntegratedResultsTests(unittest.TestCase):
             coupling_manifest={
                 "development_engine_mode": "mario",
                 "mapping_coverage_share": 1.0,
-                "fallback_mapping_share": 0.0,
+                "unmapped_mapping_share": 0.0,
                 "placeholder_input_row_count": 0,
                 "allow_placeholder_data": False,
             },
         )
         self.assertEqual(payload["model_quality"]["status"], "production_ready")
         self.assertTrue(payload["metric_resolution"]["records"])
+
+    def test_energy_only_quality_ignores_skipped_mrio_diagnostics(self):
+        summary = _summary_template("run1")
+        summary["model_architecture_id"] = "energy-only"
+        summary["summary_diagnostics"]["physical_emissions"] = {
+            "method": "cost_class_co2_direct",
+            "factor_coverage_share": 1.0,
+            "factor_method_gap_share": 0.0,
+            "total_emissions": 50.0,
+        }
+        summary["summary_diagnostics"]["energy_balance"] = {
+            "max_abs_balance_gap_share": 0.0,
+        }
+        payload = build_integrated_results(
+            summary,
+            coupling_manifest={
+                "development_engine_mode": "skipped_energy_only",
+                "integration_architecture": "energy_only",
+                "mapping_coverage_share": 0.0,
+                "placeholder_input_row_count": 12,
+                "mrio_direct_heuristic": True,
+            },
+        )
+        issue_codes = {row["code"] for row in payload["model_quality"]["issues"]}
+        self.assertEqual(payload["development_confidence"]["coupling_mode"], "skipped_energy_only")
+        self.assertEqual(payload["model_quality"]["status"], "production_ready")
+        self.assertNotIn("placeholder_inputs", issue_codes)
+        self.assertNotIn("mapping_coverage", issue_codes)
+        self.assertNotIn("mrio_direct_heuristic", issue_codes)
 
 
 class SummaryDiagnosticsTests(unittest.TestCase):
@@ -576,29 +753,1131 @@ class MainAndArtifactTests(unittest.TestCase):
             path = Path(tmp) / "summary.json"
             path.write_text("{invalid-json}", encoding="utf-8")
             with self.assertRaises(HTTPException) as ctx:
-                _read_summary_json(path)
+                read_summary_json(path)
             self.assertEqual(ctx.exception.status_code, 503)
 
     def test_create_exchange_bundle_contains_core_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
-            exchange_dir = run_dir / "exchange"
-            exchange_dir.mkdir(parents=True, exist_ok=True)
-            (exchange_dir / "energy_service_balance.csv").write_text("a,b\n1,2\n", encoding="utf-8")
-            (run_dir / "results.csv").write_text("variable,value\ncost,1\n", encoding="utf-8")
-            (run_dir / "development_impacts.json").write_text("{}", encoding="utf-8")
-            (run_dir / "coupling_manifest.json").write_text("{}", encoding="utf-8")
-            (run_dir / "integrated_results.json").write_text("{}", encoding="utf-8")
+            registry = ArtifactRegistry("1234abcd", run_dir, {"artifacts": {"manifest": {}}})
+            registry.path_for("energy_service_balance_csv").write_text("a,b\n1,2\n", encoding="utf-8")
+            registry.register_existing("energy_service_balance_csv")
+            registry.path_for("results_csv").write_text("variable,value\ncost,1\n", encoding="utf-8")
+            registry.register_existing("results_csv")
+            registry.path_for("development_impacts_json").write_text("{}", encoding="utf-8")
+            registry.register_existing("development_impacts_json")
+            registry.path_for("coupling_manifest_json").write_text("{}", encoding="utf-8")
+            registry.register_existing("coupling_manifest_json")
+            registry.path_for("integrated_results_json").write_text("{}", encoding="utf-8")
+            registry.register_existing("integrated_results_json")
 
-            zip_path = create_exchange_bundle_zip(run_dir)
+            zip_path = create_exchange_bundle_zip(run_dir, artifact_registry=registry)
             self.assertTrue(zip_path and zip_path.exists())
             with ZipFile(zip_path, "r") as zf:
                 names = set(zf.namelist())
-            self.assertIn("exchange/energy_service_balance.csv", names)
-            self.assertIn("results.csv", names)
-            self.assertIn("development_impacts.json", names)
-            self.assertIn("coupling_manifest.json", names)
-            self.assertIn("integrated_results.json", names)
+            self.assertIn("artifacts/intermediate/exchange/energy_service_balance.csv", names)
+            self.assertIn("artifacts/final/results.csv", names)
+            self.assertIn("artifacts/final/development_impacts.json", names)
+            self.assertIn("artifacts/final/coupling_manifest.json", names)
+            self.assertIn("artifacts/final/integrated_results.json", names)
+
+    def test_artifact_manifest_and_pruning(self):
+        manifest = load_artifact_manifest(
+            {
+                "artifacts": {
+                    "manifest": {
+                        "results_csv": {
+                            "retain_on_success": False,
+                            "drop_after_consumed_by": "development"
+                        }
+                    }
+                }
+            }
+        )
+        self.assertIn("results_csv", manifest)
+        self.assertFalse(manifest["results_csv"].retain_on_success)
+        self.assertEqual(manifest["results_csv"].drop_after_consumed_by, "development")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = ArtifactRegistry("abcd1234", Path(tmp), {"artifacts": {"manifest": {"results_csv": {"drop_after_consumed_by": "development"}}}})
+            registry.write_text("results_csv", "x,y\n1,2\n")
+            self.assertTrue(registry.path_for("results_csv").exists())
+            registry.prune_consumed_by("development")
+            self.assertFalse(registry.path_for("results_csv").exists())
+
+    def test_model_runtime_manifest_and_bundle_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp)),
+                config_dir=repo_root / "inputs",
+                calliope_root=_repo_calliope_root(repo_root),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+            manifest = load_model_runtime_manifest(settings.model_manifest_path)
+            queue_message = ExecutionQueueMessage(
+                execution_id="job123",
+                run_id="run123",
+                project_id="default",
+                user_id="undp_analyst",
+                request_payload=_run_request().model_dump(mode="json"),
+                created_at="2026-01-01T00:00:00+00:00",
+            ).to_dict()
+            bundle = build_model_run_bundle(
+                settings=settings,
+                request=_run_request(),
+                execution_id="job123",
+                run_id="run123",
+                manifest=manifest,
+                dataset_manifest={"schema_version": "model_dataset_manifest_v1", "datasets": []},
+                queue_message=queue_message,
+            )
+            self.assertEqual(bundle["schema_version"], "model_run_bundle_v1")
+            self.assertEqual(bundle["model_runtime"]["model_id"], "edim-calliope-mrio")
+            self.assertEqual(bundle["queue_message"]["schema_version"], "execution_queue_message")
+            self.assertEqual(bundle["queue_message"]["execution_id"], "job123")
+            self.assertIn("artifact_policy", bundle)
+            self.assertEqual(bundle["artifact_handoff"]["schema_version"], "runtime_artifact_handoff_v1")
+            self.assertEqual(bundle["artifact_handoff"]["mode"], "shared_filesystem")
+            self.assertEqual(bundle["execution"]["artifact_handoff_mode"], "shared_filesystem")
+            self.assertEqual(bundle["provenance"]["schema_version"], "edim_run_provenance")
+            self.assertEqual(bundle["provenance"]["model_runtime"]["model_id"], "edim-calliope-mrio")
+            self.assertTrue(bundle["provenance"]["model_runtime"]["manifest_sha256"])
+            self.assertTrue(bundle["provenance"]["artifact_policy"]["sha256"])
+
+    def test_execution_queue_message_roundtrip_and_local_queue(self):
+        message = ExecutionQueueMessage(
+            execution_id="exec123",
+            run_id="run123",
+            project_id="project123",
+            user_id="undp_analyst",
+            request_payload=_run_request().model_dump(mode="json"),
+            attempt=2,
+            created_at="2026-01-01T00:00:00+00:00",
+            retry_policy={"schema_version": "execution_retry_policy", "max_attempts": 3},
+        )
+        payload = message.to_dict()
+        restored = ExecutionQueueMessage.from_dict(payload)
+        self.assertEqual(restored.execution_id, "exec123")
+        self.assertEqual(restored.attempt, 2)
+        self.assertEqual(restored.retry_policy["schema_version"], "execution_retry_policy")
+
+        attempt = ExecutionAttemptRecord(
+            execution_id="exec123",
+            run_id="run123",
+            attempt=2,
+            worker_id="local-thread:1:test",
+            status="running",
+            started_at="2026-01-01T00:00:00+00:00",
+            heartbeat_at="2026-01-01T00:00:01+00:00",
+            message="Running test attempt.",
+        )
+        restored_attempt = ExecutionAttemptRecord.from_dict(attempt.to_dict())
+        self.assertEqual(restored_attempt.worker_id, "local-thread:1:test")
+        self.assertEqual(restored_attempt.schema_version, "execution_attempt")
+
+        queue = LocalExecutionQueue()
+        queue.put(payload)
+        self.assertEqual(queue.qsize(), 1)
+        self.assertEqual(queue.get()["schema_version"], "execution_queue_message")
+        queue.task_done()
+
+    def test_local_artifact_storage_publishes_shared_filesystem_handoff_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            run_id = "run123"
+            run_dir = settings.runs_dir / run_id
+            run_dir.mkdir(parents=True, exist_ok=True)
+            service = LocalArtifactStorageService(settings)
+            publication = service.publish_run_artifacts(
+                run_id=run_id,
+                run_dir=run_dir,
+                artifact_catalog=[{"artifact_id": "summary_json", "expose_download": True}],
+                handoff_mode="shared_filesystem",
+            )
+            self.assertEqual(publication["schema_version"], "runtime_artifact_publication_v1")
+            self.assertEqual(publication["handoff_mode"], "shared_filesystem")
+            self.assertTrue(publication["published"])
+            self.assertEqual(publication["downloadable_artifact_count"], 1)
+
+    def test_model_runtime_preflight_cli_uses_single_runtime_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp)),
+                config_dir=repo_root / "inputs",
+                calliope_root=_repo_calliope_root(repo_root),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+            manifest = load_model_runtime_manifest(settings.model_manifest_path)
+            run_id = "a" * 32
+            execution_id = "b" * 32
+            bundle = build_model_run_bundle(
+                settings=settings,
+                request=_run_request(),
+                execution_id=execution_id,
+                run_id=run_id,
+                manifest=manifest,
+                dataset_manifest={"schema_version": "model_dataset_manifest_v1", "datasets": []},
+            )
+            bundle_path = Path(tmp) / "request_bundle.json"
+            bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
+
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(repo_root / "model_runtime") + os.pathsep + env.get("PYTHONPATH", "")
+            proc = subprocess.run(
+                [sys.executable, "-m", "edim_model.cli", "preflight", "--bundle", str(bundle_path)],
+                cwd=repo_root,
+                env=env,
+                text=True,
+                capture_output=True,
+                timeout=20,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            events = [json.loads(line) for line in proc.stdout.splitlines() if line.strip().startswith("{")]
+            result = next(row for row in events if row.get("type") == "result")
+            self.assertEqual(result["stage"], "preflight")
+            self.assertEqual(result["payload"]["status"], "passed")
+            self.assertIn("checks", result["payload"])
+
+    def test_model_runtime_catalog_cli_returns_scenarios_and_architectures(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(repo_root / "model_runtime") + os.pathsep + env.get("PYTHONPATH", "")
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "edim_model.cli",
+                    "catalog",
+                    "--config-dir",
+                    str(repo_root / "inputs"),
+                    "--calliope-root",
+                    str(_repo_calliope_root(repo_root)),
+                    "--manifest",
+                    str(repo_root / "model_runtime" / "edim_model" / "model_manifest.json"),
+                    "--architecture-catalog",
+                    str(repo_root / "model_runtime" / "edim_model" / "architecture_catalog.json"),
+                ],
+                cwd=repo_root,
+                env=env,
+                text=True,
+                capture_output=True,
+                timeout=20,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            payload = json.loads(proc.stdout)
+            self.assertEqual(payload["schema_version"], "edim_model_catalog")
+            self.assertEqual(payload["scenario_catalog"]["schema_version"], "model_scenario_catalog")
+            self.assertTrue(payload["architecture_catalog"]["architectures"])
+
+    def test_runs_router_lists_artifacts_from_summary_catalog(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            run_id = "abcd1234"
+            run_dir = settings.runs_dir / run_id
+            registry = ArtifactRegistry(run_id, run_dir, settings.runtime_config)
+            registry.write_text("results_csv", "variable,value\ncost,1\n")
+            summary = {"run_id": run_id, "artifact_catalog": registry.exposed_descriptors(), "warnings": []}
+            registry.write_json("summary_json", summary, dumps=lambda payload: json.dumps(payload))
+            create_platform_repository(settings).create_run_record(
+                project_id="default",
+                run_id=run_id,
+                request_payload=_run_request().model_dump(mode="json"),
+                status="succeeded",
+                dataset_snapshot={},
+                user_id="undp_analyst",
+            )
+
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            response = client.get(f"/api/runs/{run_id}/artifacts")
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertEqual(payload["run_id"], run_id)
+            self.assertEqual(payload["artifacts"][0]["artifact_id"], "results_csv")
+            hidden = client.get(f"/api/runs/{run_id}/artifacts", headers={"X-EDIM-User-Id": "country_officer"})
+            self.assertEqual(hidden.status_code, 404)
+
+    def test_runs_router_downloads_artifact_by_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            run_id = "abcd1234"
+            run_dir = settings.runs_dir / run_id
+            registry = ArtifactRegistry(run_id, run_dir, settings.runtime_config)
+            registry.write_text("report_markdown", "# Report\n")
+            summary = {"run_id": run_id, "artifact_catalog": registry.exposed_descriptors(), "warnings": []}
+            registry.write_json("summary_json", summary, dumps=lambda payload: json.dumps(payload))
+            create_platform_repository(settings).create_run_record(
+                project_id="default",
+                run_id=run_id,
+                request_payload=_run_request().model_dump(mode="json"),
+                status="succeeded",
+                dataset_snapshot={},
+                user_id="undp_analyst",
+            )
+
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            response = client.get(f"/api/runs/{run_id}/artifacts/report_markdown")
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("# Report", response.text)
+            hidden = client.get(f"/api/runs/{run_id}/artifacts/report_markdown", headers={"X-EDIM-User-Id": "country_officer"})
+            self.assertEqual(hidden.status_code, 404)
+
+    def test_scenarios_router_returns_catalog(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp)),
+                config_dir=repo_root / "inputs",
+                calliope_root=_repo_calliope_root(repo_root),
+            )
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            response = client.get("/api/scenarios")
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertEqual(payload["schema_version"], "model_scenario_catalog")
+            self.assertIn("module_configurations", payload)
+            self.assertIn("scenario_channels", payload)
+            self.assertNotIn("energy_scenarios", payload)
+            self.assertNotIn("target_scenarios", payload)
+            self.assertNotIn("mrio_shock_mappings", payload)
+            self.assertTrue(any(row["module_id"] == "calliope" for row in payload["module_configurations"]))
+            self.assertTrue(any(row["config_key"] == "scenario.energy_scenario_key" for row in payload["scenario_channels"]))
+
+    def test_input_datasets_router_returns_catalog(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            (settings.config_dir / "scenario_metadata.csv").write_text("key,title\nnew_links,New links\n", encoding="utf-8")
+            (settings.config_dir / "scenario_geography_mapping.csv").write_text("mrio_geography_code,calliope_country_code,calliope_location,alignment_level,notes\nZA,ZA,ZA,national,\n", encoding="utf-8")
+            (settings.config_dir / "development_model.csv").write_text("indicator,driver,coefficient\njobs,investment,1\n", encoding="utf-8")
+            _seed_mario_inputs(settings.config_dir)
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            response = client.get("/api/input-datasets")
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertIn("datasets", payload)
+            self.assertTrue(any(row["id"] == "calliope_model" for row in payload["datasets"]))
+
+    def test_input_dataset_upload_creates_versioned_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            response = client.post(
+                "/api/input-datasets/lever_mappings/upload",
+                files={"file": ("lever_mappings.csv", b"key,value\nx,y\n", "text/csv")},
+            )
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertTrue(payload["version_id"])
+            self.assertTrue(Path(payload["path"]).exists())
+            self.assertEqual(payload["scope"], "user_override")
+            self.assertTrue((settings.runs_dir.parent / "dataset_uploads" / "users" / "undp_analyst" / "active_versions.json").exists())
+
+            catalog = client.get("/api/input-datasets").json()["datasets"]
+            lever_row = next(row for row in catalog if row["id"] == "lever_mappings")
+            self.assertTrue(lever_row["versioned_override"])
+
+    def test_input_dataset_upload_rejects_missing_required_csv_headers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            response = client.post(
+                "/api/input-datasets/lever_mappings/upload",
+                files={"file": ("lever_mappings.csv", b"not_key,value\nx,y\n", "text/csv")},
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("missing required columns", response.json()["detail"])
+
+    def test_platform_project_api_is_user_owned_with_admin_visibility(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            session = client.get("/api/session", headers={"X-EDIM-User-Id": "country_officer"}).json()
+            self.assertEqual(session["auth_mode"], "test_user_header")
+            self.assertEqual(session["user"]["user_id"], "country_officer")
+            self.assertTrue(any(row["user_id"] == "admin" for row in session["available_users"]))
+            unknown = client.get("/api/session", headers={"X-EDIM-User-Id": "unknown_user"})
+            self.assertEqual(unknown.status_code, 401)
+            created = client.post(
+                "/api/projects",
+                headers={"X-EDIM-User-Id": "undp_analyst"},
+                json={"title": "National energy transition", "geography": "ZA"},
+            )
+            self.assertEqual(created.status_code, 200)
+            project_id = created.json()["project"]["project_id"]
+            analyst_projects = client.get("/api/projects", headers={"X-EDIM-User-Id": "undp_analyst"}).json()["projects"]
+            country_projects = client.get("/api/projects", headers={"X-EDIM-User-Id": "country_officer"}).json()["projects"]
+            admin_projects = client.get("/api/projects", headers={"X-EDIM-User-Id": "admin"}).json()["projects"]
+            self.assertEqual(analyst_projects[0]["project_id"], project_id)
+            self.assertEqual(country_projects, [])
+            self.assertTrue(any(row["project_id"] == project_id for row in admin_projects))
+            renamed = client.patch(
+                f"/api/projects/{project_id}",
+                headers={"X-EDIM-User-Id": "undp_analyst"},
+                json={"title": "Renamed project"},
+            )
+            self.assertEqual(renamed.status_code, 200)
+            self.assertEqual(renamed.json()["project"]["title"], "Renamed project")
+            archived = client.patch(
+                f"/api/projects/{project_id}",
+                headers={"X-EDIM-User-Id": "undp_analyst"},
+                json={"status": "archived"},
+            )
+            self.assertEqual(archived.status_code, 200)
+            self.assertEqual(archived.json()["project"]["status"], "archived")
+            restored = client.patch(
+                f"/api/projects/{project_id}",
+                headers={"X-EDIM-User-Id": "undp_analyst"},
+                json={"status": "active"},
+            )
+            self.assertEqual(restored.status_code, 200)
+            deleted = client.delete(f"/api/projects/{project_id}", headers={"X-EDIM-User-Id": "undp_analyst"})
+            self.assertEqual(deleted.status_code, 200)
+            self.assertEqual(client.get(f"/api/projects/{project_id}", headers={"X-EDIM-User-Id": "undp_analyst"}).status_code, 404)
+
+    def test_input_dataset_versions_can_be_filtered_activated_and_deleted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            first = client.post(
+                "/api/input-datasets/lever_mappings/upload",
+                files={"file": ("lever_mappings.csv", b"key,value\nx,y\n", "text/csv")},
+            ).json()
+            second = client.post(
+                "/api/input-datasets/lever_mappings/upload",
+                files={"file": ("lever_mappings.csv", b"key,value\na,b\n", "text/csv")},
+            ).json()
+
+            filtered = client.get("/api/input-datasets?layer=adapter&input_property=lever").json()["datasets"]
+            self.assertEqual([row["id"] for row in filtered], ["lever_mappings"])
+
+            versions = client.get("/api/input-datasets/lever_mappings/versions").json()["versions"]
+            self.assertGreaterEqual(len(versions), 2)
+            activated = client.post(f"/api/input-datasets/lever_mappings/versions/{first['version_id']}/activate")
+            self.assertEqual(activated.status_code, 200)
+            active_row = next(row for row in client.get("/api/input-datasets").json()["datasets"] if row["id"] == "lever_mappings")
+            self.assertEqual(active_row["active_version_id"], first["version_id"])
+            version_download = client.get(f"/api/input-datasets/lever_mappings/versions/{first['version_id']}/download")
+            self.assertEqual(version_download.status_code, 200)
+            self.assertIn(b"key,value", version_download.content)
+
+            deleted = client.delete(f"/api/input-datasets/lever_mappings/versions/{second['version_id']}")
+            self.assertEqual(deleted.status_code, 200)
+            remaining = client.get("/api/input-datasets/lever_mappings/versions").json()["versions"]
+            self.assertFalse(any(row["version_id"] == second["version_id"] for row in remaining))
+
+    def test_input_dataset_overrides_are_user_scoped_and_snapshotted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp), dedupe_enabled=False),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            project_a = client.post("/api/projects", headers={"X-EDIM-User-Id": "undp_analyst"}, json={"title": "Project A"}).json()["project"]["project_id"]
+            upload = client.post(
+                "/api/input-datasets/lever_mappings/upload",
+                headers={"X-EDIM-User-Id": "undp_analyst"},
+                files={"file": ("lever_mappings.csv", b"key,value\nx,y\n", "text/csv")},
+            )
+            self.assertEqual(upload.status_code, 200)
+            self.assertEqual(upload.json()["scope"], "user_override")
+
+            analyst_row = next(row for row in client.get("/api/input-datasets", headers={"X-EDIM-User-Id": "undp_analyst"}).json()["datasets"] if row["id"] == "lever_mappings")
+            country_row = next(row for row in client.get("/api/input-datasets", headers={"X-EDIM-User-Id": "country_officer"}).json()["datasets"] if row["id"] == "lever_mappings")
+            self.assertTrue(analyst_row["versioned_override"])
+            self.assertFalse(country_row["versioned_override"])
+
+            draft = client.post(
+                f"/api/projects/{project_a}/runs",
+                headers={"X-EDIM-User-Id": "undp_analyst"},
+                json=_public_run_payload(),
+            ).json()["run"]
+            submitted = client.post(f"/api/projects/{project_a}/runs/{draft['run_id']}/submit", headers={"X-EDIM-User-Id": "undp_analyst"}).json()["run"]
+            deadline = time.time() + 8.0
+            while time.time() < deadline:
+                status_payload = client.get(f"/api/executions/{submitted['execution_id']}/status", headers={"X-EDIM-User-Id": "undp_analyst"}).json()
+                if status_payload["status"] in {"succeeded", "failed", "cancelled"}:
+                    break
+                time.sleep(0.05)
+            hidden = client.get(f"/api/projects/{project_a}/runs/{draft['run_id']}", headers={"X-EDIM-User-Id": "country_officer"})
+            self.assertEqual(hidden.status_code, 404)
+            record = client.get(f"/api/projects/{project_a}/runs/{draft['run_id']}/diagnostics", headers={"X-EDIM-User-Id": "admin"}).json()["run"]
+            self.assertEqual(record["execution_queue_message"]["schema_version"], "execution_queue_message")
+            self.assertEqual(record["execution_queue_message"]["execution_id"], submitted["execution_id"])
+            snapshot_rows = record["dataset_snapshot"]["datasets"]
+            lever_snapshot = next(row for row in snapshot_rows if row["id"] == "lever_mappings")
+            self.assertEqual(lever_snapshot["active_version_id"], upload.json()["version_id"])
+            self.assertEqual(record["dataset_snapshot"]["dataset_staging"]["schema_version"], "dataset_staging_v1")
+            self.assertEqual(record["dataset_snapshot"]["dataset_staging"]["mode"], "copy_to_run")
+
+    def test_local_dataset_repository_can_copy_inputs_into_run_package(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            run_dir = settings.runs_dir / "_queued" / "exec123"
+            repository = LocalDatasetRepository(settings)
+
+            manifest = repository.stage_runtime_datasets(
+                user_id="undp_analyst",
+                run_dir=run_dir,
+                staging_mode="copy_to_run",
+            )
+
+            self.assertEqual(manifest["dataset_staging"]["schema_version"], "dataset_staging_v1")
+            self.assertEqual(manifest["dataset_staging"]["mode"], "copy_to_run")
+            lever_row = next(row for row in manifest["datasets"] if row["id"] == "lever_mappings")
+            self.assertEqual(lever_row["staging_status"], "copied")
+            self.assertEqual(lever_row["storage_ref"]["storage_scope"], "run_input")
+            self.assertTrue(Path(lever_row["path"]).exists())
+            self.assertTrue(str(lever_row["staged_relative_path"]).startswith("inputs/datasets/lever_mappings/"))
+            self.assertEqual(len(lever_row["content_sha256"]), 64)
+
+    def test_environment_setup_router_returns_checks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            (settings.config_dir / "scenario_metadata.csv").write_text("key,title\nnew_links,New links\n", encoding="utf-8")
+            (settings.config_dir / "scenario_geography_mapping.csv").write_text("mrio_geography_code,calliope_country_code,calliope_location,alignment_level,notes\nZA,ZA,ZA,national,\n", encoding="utf-8")
+            (settings.config_dir / "development_model.csv").write_text("indicator,driver,coefficient\njobs,investment,1\n", encoding="utf-8")
+            _seed_mario_inputs(settings.config_dir)
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            response = client.get("/api/environment-setup")
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertIn("checks", payload)
+            self.assertIn("ok", payload)
+            self.assertTrue(payload["runtime_preflight"]["ok"])
+
+    def test_model_runtimes_router_returns_manifest_and_dataset_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp)),
+                config_dir=repo_root / "inputs",
+                calliope_root=_repo_calliope_root(repo_root),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            response = client.get("/api/model-runtimes")
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertEqual(payload["default_model_id"], "edim-calliope-mrio")
+            self.assertEqual(payload["artifact_handoff_mode"], "shared_filesystem")
+            self.assertEqual(payload["dataset_staging_mode"], "copy_to_run")
+            self.assertIn("configuration_schema", payload)
+            self.assertIn("architecture_catalog", payload)
+            self.assertIn("scenario_catalog", payload)
+            self.assertTrue(payload["architecture_catalog"]["architectures"])
+            self.assertTrue(any(row.get("graph") for row in payload["model_architectures"]))
+            self.assertIn("energy-development", [row["id"] for row in payload["model_architectures"]])
+            engine_channel = next(
+                row for row in payload["scenario_catalog"]["scenario_channels"] if row["config_key"] == "energy_model_engine"
+            )
+            self.assertEqual({row["value"] for row in engine_channel["options"]}, {"calliope", "osemosys"})
+            osemosys_option = next(row for row in engine_channel["options"] if row["value"] == "osemosys")
+            self.assertTrue(osemosys_option.get("disabled"))
+            self.assertTrue(any(row["artifact_id"] == "summary_json" for row in payload["declared_outputs"]))
+            self.assertTrue(any(row["id"] == "calliope_model" for row in payload["datasets"]))
+
+    def test_system_manifest_endpoint_exposes_backend_provider_and_schema_contracts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp)),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            response = client.get("/api/system/manifest")
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertEqual(payload["schema_version"], "edim_system_manifest")
+            self.assertTrue(payload["ok"])
+            contracts = payload["contracts"]
+            self.assertEqual(contracts["system_manifest"], "edim_system_manifest")
+            self.assertEqual(contracts["model_run_bundle"], "model_run_bundle_v1")
+            self.assertEqual(contracts["execution_queue_message"], "execution_queue_message")
+            self.assertEqual(contracts["execution_retry_policy"], "execution_retry_policy")
+            self.assertEqual(contracts["execution_attempt"], "execution_attempt")
+            self.assertEqual(contracts["runtime_event"], "runtime_event_v1")
+            self.assertIn("platform_repository", payload["provider_boundaries"])
+            self.assertIn("POST /api/projects/{project_id}/runs/{run_id}/submit", payload["public_endpoints"]["runs"])
+            self.assertEqual(payload["runtime"]["execution_retry_policy"]["schema_version"], "execution_retry_policy")
+            self.assertIn("operational_notes", payload)
+
+    def test_create_app_accepts_dataset_provider_injection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+
+            class _InjectedDatasetRepository:
+                def list_input_datasets(self, *, user_id, layer="", input_property="", role=""):
+                    return [
+                        {
+                            "id": "injected_dataset",
+                            "label": "Injected dataset",
+                            "layer": "scenario",
+                            "role": "provider injection test",
+                            "required": True,
+                            "scope": "system",
+                            "upload_policy": "project_override",
+                            "filename": "injected.csv",
+                            "source_filename": "injected.csv",
+                            "exists": True,
+                            "size_bytes": 12,
+                            "active_version_id": "",
+                            "versioned_override": False,
+                            "download_url": "/api/input-datasets/injected_dataset/download",
+                        }
+                    ]
+
+                def runtime_dataset_manifest(self, *, user_id):
+                    return {
+                        "schema_version": "model_dataset_manifest_v1",
+                        "datasets": [
+                            {
+                                "id": "injected_dataset",
+                                "label": "Injected dataset",
+                                "layer": "scenario",
+                                "role": "provider injection test",
+                                "path": "/object-store/injected.csv",
+                                "required": True,
+                                "scope": "system",
+                                "upload_policy": "project_override",
+                                "active_version_id": "",
+                                "source_path": "/object-store/injected.csv",
+                            }
+                        ],
+                    }
+
+            app = create_app(settings=settings, dataset_repository=_InjectedDatasetRepository())
+            client = TestClient(app)
+            datasets = client.get("/api/input-datasets").json()["datasets"]
+            self.assertEqual(datasets[0]["id"], "injected_dataset")
+            runtimes = client.get("/api/model-runtimes").json()
+            self.assertEqual(runtimes["datasets"][0]["path"], "/object-store/injected.csv")
+
+    def test_create_app_accepts_event_store_provider_injection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+
+            class _InjectedEventStore:
+                runs_dir = settings.runs_dir
+
+                def __init__(self):
+                    self.events = {}
+
+                def event_log_path(self, execution_id):
+                    return settings.runs_dir / "_injected_events" / f"{execution_id}.jsonl"
+
+                def append_event(self, execution_id, event):
+                    self.events.setdefault(execution_id, []).append(dict(event))
+
+                def read_events(self, execution_id):
+                    return list(self.events.get(execution_id, []))
+
+                def import_event_log(self, execution_id, source_path):
+                    self.append_event(execution_id, {"type": "imported", "path": str(source_path)})
+
+            event_store = _InjectedEventStore()
+            app = create_app(settings=settings, event_store=event_store)
+            client = TestClient(app)
+            run_id = "eventstore123"
+            execution_id = "execution123"
+            app.state.platform_repository.create_run_record(
+                project_id="default",
+                run_id=run_id,
+                execution_id=execution_id,
+                request_payload=_run_request().model_dump(mode="json"),
+                status="running",
+                user_id="undp_analyst",
+            )
+            event_store.append_event(
+                execution_id,
+                {
+                    "schema_version": "runtime_event_v1",
+                    "type": "progress",
+                    "stage": "solve_energy",
+                    "progress": 0.5,
+                    "message": "Injected event store",
+                },
+            )
+
+            events = client.get(f"/api/executions/{execution_id}/events").json()["events"]
+            self.assertEqual(events[0]["stage"], "solve_energy")
+            logs = client.get(f"/api/runs/{run_id}/logs").json()
+            self.assertEqual(logs["events"][0]["message"], "Injected event store")
+            self.assertNotIn("record", logs)
+
+    def test_openapi_exposes_system_manifest_schemas(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp)),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            openapi = client.get("/openapi.json").json()
+            schemas = openapi["components"]["schemas"]
+            for schema_name in (
+                "InputDatasetListResponse",
+                "DatasetUploadResponse",
+                "DatasetVersionsResponse",
+                "DatasetDeleteResponse",
+                "EnvironmentSetupResponse",
+                "SystemManifestResponse",
+                "ProjectListResponse",
+                "ProjectRunListResponse",
+                "ProjectRunResponse",
+                "ReportListResponse",
+                "ExportListResponse",
+                "ModelRuntimeCatalogResponse",
+                "RunEventsResponse",
+                "RunArtifactListResponse",
+            ):
+                self.assertIn(schema_name, schemas)
+
+            paths = openapi["paths"]
+            self.assertEqual(
+                paths["/api/input-datasets"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/InputDatasetListResponse",
+            )
+            self.assertEqual(
+                paths["/api/environment-setup"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/EnvironmentSetupResponse",
+            )
+            self.assertEqual(
+                paths["/api/model-runtimes"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/ModelRuntimeCatalogResponse",
+            )
+            self.assertEqual(
+                paths["/api/projects/{project_id}/runs/validate"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/EnvironmentSetupResponse",
+            )
+            self.assertEqual(
+                paths["/api/system/manifest"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/SystemManifestResponse",
+            )
+            self.assertNotIn("/api/handoff-contract", paths)
+            self.assertEqual(
+                paths["/api/executions/{execution_id}/events"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/RunEventsResponse",
+            )
+            self.assertEqual(
+                paths["/api/runs/{run_id}/artifacts"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/RunArtifactListResponse",
+            )
+            self.assertEqual(
+                paths["/api/projects"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/ProjectListResponse",
+            )
+            self.assertEqual(
+                paths["/api/projects/{project_id}/runs"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/ProjectRunListResponse",
+            )
+            self.assertEqual(
+                paths["/api/projects/{project_id}/runs/{run_id}"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/PublicProjectRunResponse",
+            )
+            self.assertEqual(
+                paths["/api/projects/{project_id}/runs/{run_id}/diagnostics"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/ProjectRunResponse",
+            )
+
+    def test_project_run_api_submits_and_reports_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp), dedupe_enabled=False),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            project = client.post("/api/projects", json={"title": "Run API smoke"}).json()["project"]
+            project_id = project["project_id"]
+            draft_response = client.post(
+                f"/api/projects/{project_id}/runs",
+                json=_public_run_payload(),
+            )
+            self.assertEqual(draft_response.status_code, 200)
+            run_id = draft_response.json()["run"]["run_id"]
+            response = client.post(f"/api/projects/{project_id}/runs/{run_id}/submit")
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("run", response.json())
+            execution_id = response.json()["run"]["execution_id"]
+            self.assertTrue(run_id)
+            deadline = time.time() + 8.0
+            final = None
+            while time.time() < deadline:
+                status_payload = client.get(f"/api/executions/{execution_id}/status").json()
+                if status_payload["status"] in {"succeeded", "failed", "cancelled"}:
+                    final = status_payload
+                    break
+                time.sleep(0.05)
+            self.assertIsNotNone(final)
+            self.assertEqual(final["status"], "succeeded")
+            self.assertEqual(final["run_id"], run_id)
+            events = client.get(f"/api/executions/{execution_id}/events").json()["events"]
+            self.assertTrue(any(row.get("type") == "result" for row in events))
+
+            records = client.get(f"/api/projects/{project_id}/runs").json()["runs"]
+            self.assertTrue(any(row["run_id"] == run_id and row["status"] == "succeeded" for row in records))
+            logs = client.get(f"/api/runs/{run_id}/logs").json()
+            self.assertEqual(logs["execution_id"], execution_id)
+            self.assertTrue(any(row.get("type") == "result" for row in logs["events"]))
+            self.assertNotIn("record", logs)
+
+            restarted_app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            restarted_client = TestClient(restarted_app)
+            persisted_status = restarted_client.get(f"/api/executions/{execution_id}/status")
+            self.assertEqual(persisted_status.status_code, 200)
+            self.assertEqual(persisted_status.json()["run_id"], run_id)
+            self.assertEqual(persisted_status.json()["status"], "succeeded")
+
+    def test_project_run_public_contract_hides_internal_execution_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp), dedupe_enabled=False),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            project = client.post("/api/projects", json={"title": "Compact contract"}).json()["project"]
+            project_id = project["project_id"]
+            public_payload = {
+                "run_name": "Compact run",
+                "model_architecture_id": "energy-development",
+                "energy_model_engine": "calliope",
+                "scenario": {
+                    "energy_scenario_key": "new_links",
+                    "target_scenario_id": "S2",
+                    "target_year": 2030,
+                },
+                "run_profile": "analysis",
+                "levers": {"demand_multiplier": 1.1},
+            }
+
+            draft = client.post(f"/api/projects/{project_id}/runs", json=public_payload)
+            self.assertEqual(draft.status_code, 200)
+            record = draft.json()["run"]
+            self.assertEqual(record["project_id"], project_id)
+            self.assertNotIn("request", record)
+            self.assertNotIn("dataset_snapshot", record)
+            self.assertNotIn("execution_queue_message", record)
+            self.assertNotIn("execution_attempts", record)
+            self.assertNotIn("artifact_catalog", record)
+            self.assertEqual(record["configuration"]["scenario"]["energy_scenario_key"], "new_links")
+            self.assertEqual(record["configuration"]["scenario"]["target_scenario_id"], "S2")
+            diagnostic_record = client.get(f"/api/projects/{project_id}/runs/{record['run_id']}/diagnostics").json()["run"]
+            self.assertEqual(diagnostic_record["request"]["energy_scenario_key"], "new_links")
+            self.assertEqual(diagnostic_record["request"]["mrio_scenario_id"], "S2")
+            self.assertTrue(diagnostic_record["request"]["strict_validation"])
+            self.assertTrue(diagnostic_record["request"]["allow_placeholder_data"])
+
+            rows = client.get(f"/api/projects/{project_id}/runs").json()["runs"]
+            self.assertEqual(len(rows), 1)
+            row = rows[0]
+            self.assertNotIn("request", row)
+            self.assertNotIn("dataset_snapshot", row)
+            self.assertNotIn("artifact_policy", row)
+            self.assertNotIn("execution_queue_message", row)
+            self.assertNotIn("execution_attempts", row)
+            self.assertNotIn("artifact_catalog", row)
+            self.assertEqual(row["configuration"]["scenario"]["energy_scenario_key"], "new_links")
+            self.assertEqual(row["configuration"]["scenario"]["target_scenario_id"], "S2")
+            self.assertEqual(row["configuration"]["run_profile"], "analysis")
+
+            validation = client.post(f"/api/projects/{project_id}/runs/validate", json={"configuration": public_payload})
+            self.assertEqual(validation.status_code, 200)
+            self.assertIn("runtime_preflight", validation.json())
+
+            submitted = client.post(f"/api/projects/{project_id}/runs/{record['run_id']}/submit")
+            self.assertEqual(submitted.status_code, 200)
+            submitted_row = submitted.json()["run"]
+            self.assertNotIn("request", submitted_row)
+            self.assertNotIn("execution_queue_message", submitted_row)
+            self.assertNotIn("execution_attempts", submitted_row)
+            status = client.get(f"/api/executions/{submitted_row['execution_id']}/status")
+            self.assertEqual(status.status_code, 200)
+            status_row = status.json()
+            self.assertNotIn("request", status_row)
+            self.assertNotIn("dataset_snapshot", status_row)
+            self.assertNotIn("execution_queue_message", status_row)
+            self.assertNotIn("execution_attempts", status_row)
+            deadline = time.time() + 8.0
+            while time.time() < deadline:
+                status_row = client.get(f"/api/executions/{submitted_row['execution_id']}/status").json()
+                if status_row["status"] in {"succeeded", "failed", "cancelled"}:
+                    break
+                time.sleep(0.05)
+
+    def test_project_run_draft_submit_duplicate_report_and_export(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp), dedupe_enabled=False),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            project = client.post("/api/projects", json={"title": "Single-user project", "geography": "ZA"}).json()["project"]
+            project_id = project["project_id"]
+            upload = client.post(
+                "/api/input-datasets/lever_mappings/upload",
+                files={"file": ("lever_mappings.csv", b"key,value\nx,y\n", "text/csv")},
+            )
+            self.assertEqual(upload.status_code, 200)
+            uploaded_version_id = upload.json()["version_id"]
+            draft = client.post(f"/api/projects/{project_id}/runs", json=_public_run_payload("Draft A"))
+            self.assertEqual(draft.status_code, 200)
+            draft_record = draft.json()["run"]
+            run_id = draft_record["run_id"]
+            self.assertEqual(draft_record["project_run_number"], 1)
+
+            patched = client.patch(f"/api/projects/{project_id}/runs/{run_id}", json={"run_name": "Draft B"})
+            self.assertEqual(patched.status_code, 200)
+            self.assertEqual(patched.json()["run"]["run_name"], "Draft B")
+
+            submitted = client.post(f"/api/projects/{project_id}/runs/{run_id}/submit")
+            self.assertEqual(submitted.status_code, 200)
+            execution_id = submitted.json()["run"]["execution_id"]
+            deadline = time.time() + 8.0
+            while time.time() < deadline:
+                status_payload = client.get(f"/api/executions/{execution_id}/status").json()
+                if status_payload["status"] in {"succeeded", "failed", "cancelled"}:
+                    break
+                time.sleep(0.05)
+            self.assertEqual(client.get(f"/api/projects/{project_id}/runs/{run_id}").json()["run"]["status"], "succeeded")
+            rogue_intermediate = settings.runs_dir / run_id / "work" / "secret_intermediate.txt"
+            rogue_intermediate.parent.mkdir(parents=True, exist_ok=True)
+            rogue_intermediate.write_text("must not be bundled unless declared by artifact policy", encoding="utf-8")
+
+            duplicate = client.post(f"/api/projects/{project_id}/runs/{run_id}/duplicate")
+            self.assertEqual(duplicate.status_code, 200)
+            self.assertEqual(duplicate.json()["run"]["status"], "draft")
+            self.assertEqual(duplicate.json()["run"]["project_run_number"], 2)
+
+            report = client.post(f"/api/projects/{project_id}/reports", json={"run_ids": [run_id]}).json()["report"]
+            self.assertEqual(report["status"], "succeeded")
+            self.assertEqual(report["status_history"][-1]["status"], "succeeded")
+            report_download = client.get(f"/api/projects/{project_id}/reports/{report['report_id']}/download")
+            self.assertEqual(report_download.status_code, 200)
+            self.assertIn("EDIM", report_download.text)
+            self.assertEqual(report["source_schema_version"], "edim_project_report_source_v1")
+            report_data = client.get(f"/api/projects/{project_id}/reports/{report['report_id']}/data")
+            self.assertEqual(report_data.status_code, 200)
+            report_source = report_data.json()
+            self.assertEqual(report_source["schema_version"], "edim_project_report_source_v1")
+            self.assertEqual(report_source["project"]["project_id"], project_id)
+            self.assertEqual(report_source["runs"][0]["run_id"], run_id)
+            self.assertIn("artifact_catalog", report_source["runs"][0])
+
+            export = client.post(f"/api/projects/{project_id}/exports", json={"run_ids": [run_id]}).json()["export"]
+            self.assertEqual(export["status"], "succeeded")
+            blocked_delete = client.delete(f"/api/input-datasets/lever_mappings/versions/{uploaded_version_id}")
+            self.assertEqual(blocked_delete.status_code, 409)
+            self.assertIn("referenced by submitted run snapshots", str(blocked_delete.json()["detail"]))
+            export_download = client.get(f"/api/projects/{project_id}/exports/{export['export_id']}/download")
+            self.assertEqual(export_download.status_code, 200)
+            self.assertIn("storage_ref", export)
+            self.assertEqual(export["storage_ref"]["storage_scope"], "platform")
+            self.assertTrue(export["storage_ref"]["object_key"].startswith("exports/"))
+            with ZipFile(io.BytesIO(export_download.content)) as zf:
+                names = set(zf.namelist())
+                self.assertIn("manifest.json", names)
+                self.assertIn("datasets/uploaded_dataset_manifest.json", names)
+                self.assertTrue(any(name.startswith("reports/") and name.endswith(".md") for name in names))
+                self.assertTrue(any(name.startswith("reports/") and name.endswith(".source.json") for name in names))
+                self.assertTrue(any(name.startswith("datasets/users/undp_analyst/lever_mappings/") and name.endswith(".csv") for name in names))
+                self.assertTrue(any(name == f"runs/{run_id}/artifacts/final/summary.json" for name in names))
+                self.assertNotIn(f"runs/{run_id}/work/secret_intermediate.txt", names)
+
+            deleted_project = client.delete(f"/api/projects/{project_id}?delete_files=true")
+            self.assertEqual(deleted_project.status_code, 200)
+            self.assertGreaterEqual(deleted_project.json()["deleted_runs"], 1)
+            self.assertEqual(client.get(f"/api/projects/{project_id}").status_code, 404)
+            self.assertEqual(client.get(f"/api/projects/{project_id}/runs/{run_id}").status_code, 404)
+
+    def test_project_run_lifecycle_rejects_completed_mutation_and_resubmit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp), dedupe_enabled=False),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            project = client.post("/api/projects", json={"title": "Lifecycle project"}).json()["project"]
+            project_id = project["project_id"]
+            draft = client.post(f"/api/projects/{project_id}/runs", json=_public_run_payload()).json()["run"]
+            run_id = draft["run_id"]
+
+            submitted = client.post(f"/api/projects/{project_id}/runs/{run_id}/submit").json()["run"]
+            execution_id = submitted["execution_id"]
+            submitted_record = client.get(f"/api/projects/{project_id}/runs/{run_id}").json()["run"]
+            self.assertEqual(submitted_record["run_id"], run_id)
+            self.assertEqual(submitted_record["project_run_number"], 1)
+            self.assertEqual(submitted_record["created_at"], draft["created_at"])
+            duplicate_inflight_submit = client.post(f"/api/projects/{project_id}/runs/{run_id}/submit")
+            self.assertEqual(duplicate_inflight_submit.status_code, 409)
+            deadline = time.time() + 8.0
+            while time.time() < deadline:
+                status_payload = client.get(f"/api/executions/{execution_id}/status").json()
+                if status_payload["status"] in {"succeeded", "failed", "cancelled"}:
+                    break
+                time.sleep(0.05)
+            self.assertEqual(client.get(f"/api/projects/{project_id}/runs/{run_id}").json()["run"]["status"], "succeeded")
+
+            edit_response = client.patch(f"/api/projects/{project_id}/runs/{run_id}", json={"run_name": "Should not mutate"})
+            self.assertEqual(edit_response.status_code, 409)
+            status_response = client.patch(f"/api/projects/{project_id}/runs/{run_id}", json={"status": "draft"})
+            self.assertEqual(status_response.status_code, 422)
+            resubmit_response = client.post(f"/api/projects/{project_id}/runs/{run_id}/submit")
+            self.assertEqual(resubmit_response.status_code, 409)
+
+    def test_cancel_project_run_restores_draft_and_clears_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp), dedupe_enabled=False),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+
+            def _fake_run(execution_request, execution_context, progress_callback=None, cancel_requested=None):
+                if progress_callback:
+                    progress_callback("solve_energy", 0.4, "Solving")
+                partial = settings.runs_dir / execution_context.run_id / "artifacts" / "partial.txt"
+                partial.parent.mkdir(parents=True, exist_ok=True)
+                partial.write_text("partial", encoding="utf-8")
+                for _ in range(150):
+                    if cancel_requested and cancel_requested():
+                        raise RuntimeError("cancelled")
+                    time.sleep(0.01)
+                return ModelExecutionResult(run_id=execution_context.run_id, summary=_summary_template(execution_context.run_id), warnings=[])
+
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_FakeRuntime(_fake_run)))
+            client = TestClient(app)
+            project = client.post("/api/projects", json={"title": "Cancel project"}).json()["project"]
+            project_id = project["project_id"]
+            draft = client.post(f"/api/projects/{project_id}/runs", json=_public_run_payload()).json()["run"]
+            run_id = draft["run_id"]
+            submitted = client.post(f"/api/projects/{project_id}/runs/{run_id}/submit").json()["run"]
+            execution_id = submitted["execution_id"]
+            deadline = time.time() + 4.0
+            while time.time() < deadline:
+                payload = client.get(f"/api/executions/{execution_id}/status").json()
+                if payload["status"] == "running":
+                    break
+                time.sleep(0.03)
+
+            cancel_response = client.post(f"/api/executions/{execution_id}/cancel")
+            self.assertEqual(cancel_response.status_code, 200)
+            status_payload = cancel_response.json()
+            deadline = time.time() + 6.0
+            while time.time() < deadline:
+                status_payload = client.get(f"/api/executions/{execution_id}/status").json()
+                if status_payload["status"] == "draft":
+                    break
+                time.sleep(0.03)
+            self.assertEqual(status_payload["status"], "draft")
+            self.assertIsNone(status_payload["artifacts"])
+            record = client.get(f"/api/projects/{project_id}/runs/{run_id}").json()["run"]
+            self.assertEqual(record["status"], "draft")
+            self.assertFalse(record["summary_available"])
+            self.assertEqual(record["execution_id"], "")
+            diagnostic_record = client.get(f"/api/projects/{project_id}/runs/{run_id}/diagnostics").json()["run"]
+            self.assertEqual(diagnostic_record["artifact_catalog"], [])
+            records = client.get(f"/api/projects/{project_id}/runs").json()["runs"]
+            self.assertFalse(any(row["status"] == "cancelled" for row in records))
+            self.assertTrue(any(row["run_id"] == run_id and row["status"] == "draft" for row in records))
+            self.assertFalse((settings.runs_dir / run_id).exists())
+            self.assertFalse((settings.runs_dir / "_queued" / execution_id).exists())
+
+    def test_sqlite_platform_store_persists_runs_reports_and_exports(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp), dedupe_enabled=False),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+                platform_store_backend="sqlite",
+                platform_sqlite_path=Path(tmp) / "platform" / "platform.sqlite3",
+            )
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+
+            project = client.post("/api/projects", json={"title": "SQLite-backed project", "geography": "ZA"}).json()["project"]
+            project_id = project["project_id"]
+            draft = client.post(f"/api/projects/{project_id}/runs", json=_public_run_payload()).json()["run"]
+            submitted = client.post(f"/api/projects/{project_id}/runs/{draft['run_id']}/submit").json()["run"]
+            execution_id = submitted["execution_id"]
+            run_id = submitted["run_id"]
+            deadline = time.time() + 8.0
+            while time.time() < deadline:
+                payload = client.get(f"/api/executions/{execution_id}/status").json()
+                if payload["status"] in {"succeeded", "failed", "cancelled"}:
+                    break
+                time.sleep(0.05)
+            self.assertTrue(settings.platform_sqlite_path.exists())
+
+            restarted_app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            restarted_client = TestClient(restarted_app)
+            status = restarted_client.get(f"/api/executions/{execution_id}/status")
+            self.assertEqual(status.status_code, 200)
+            self.assertEqual(status.json()["run_id"], run_id)
+            self.assertEqual(status.json()["status"], "succeeded")
+            records = restarted_client.get(f"/api/projects/{project_id}/runs").json()["runs"]
+            self.assertTrue(any(row["run_id"] == run_id for row in records))
+
+            report = restarted_client.post(f"/api/projects/{project_id}/reports", json={"run_ids": [run_id]}).json()["report"]
+            self.assertEqual(report["status"], "succeeded")
+            self.assertTrue(report["storage_ref"]["object_key"].startswith("reports/"))
+            self.assertTrue(report["source_data_storage_ref"]["object_key"].startswith("reports/"))
+            self.assertEqual(restarted_client.get(f"/api/projects/{project_id}/reports/{report['report_id']}/data").status_code, 200)
+            export = restarted_client.post(f"/api/projects/{project_id}/exports", json={"run_ids": [run_id]}).json()["export"]
+            self.assertEqual(export["status"], "succeeded")
+            self.assertTrue(export["storage_ref"]["object_key"].startswith("exports/"))
+            self.assertGreater(export["storage_ref"]["size_bytes"], 0)
 
     def test_report_markdown_contains_key_sections(self):
         summary = {
@@ -634,9 +1913,9 @@ class MainAndArtifactTests(unittest.TestCase):
                 "import_leakage_musd": 4.0,
             },
             "development_confidence": {
-                "coupling_mode": "surrogate",
+                "coupling_mode": "mario",
                 "mapping_coverage_share": 0.9,
-                "fallback_mapping_share": 0.1,
+                "unmapped_mapping_share": 0.1,
                 "mario_runtime_executed": False,
                 "mario_runtime_seconds": 0.0,
                 "mario_runner_source": "",
@@ -651,16 +1930,200 @@ class MainAndArtifactTests(unittest.TestCase):
 
 
 class JobManagerTests(unittest.TestCase):
+    def test_job_manager_runs_injected_runtime_and_events(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp), dedupe_enabled=False),
+                model_manifest_path=repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+                dataset_manifest_path=repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+            )
+            manager = JobManager(settings, runtime=_successful_fake_runtime())
+            job = manager.submit(_run_request())
+            final = _wait_terminal(manager, job.execution_id, timeout_seconds=10.0)
+            self.assertEqual(final.status, "succeeded")
+            self.assertIsNotNone(final.summary)
+            events = RuntimeEventLog(manager.event_log_path(job.execution_id)).read()
+            self.assertTrue(any(row.get("type") == "result" for row in events))
+
+    def test_job_manager_publishes_runtime_artifacts_through_storage_provider(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp), dedupe_enabled=False)
+            calls = []
+
+            class _InjectedArtifactStorage:
+                def publish_run_artifacts(self, *, run_id, run_dir, artifact_catalog, handoff_mode):
+                    calls.append(
+                        {
+                            "run_id": run_id,
+                            "run_dir": str(run_dir),
+                            "artifact_catalog": list(artifact_catalog),
+                            "handoff_mode": handoff_mode,
+                        }
+                    )
+                    return {
+                        "schema_version": "runtime_artifact_publication_v1",
+                        "run_id": run_id,
+                        "handoff_mode": handoff_mode,
+                        "storage_provider": "injected_storage",
+                        "status": "published",
+                        "published": True,
+                        "artifact_count": len(artifact_catalog),
+                    }
+
+            def _fake_run(execution_request, execution_context, progress_callback=None, cancel_requested=None):
+                summary = _summary_template(execution_context.run_id)
+                summary["artifact_catalog"] = []
+                return ModelExecutionResult(run_id=execution_context.run_id, summary=summary, warnings=[])
+
+            manager = JobManager(
+                settings,
+                runtime=_FakeRuntime(_fake_run),
+                artifact_storage=_InjectedArtifactStorage(),
+            )
+            job = manager.submit(_run_request())
+            final = _wait_terminal(manager, job.execution_id, timeout_seconds=8.0)
+
+            self.assertEqual(final.status, "succeeded")
+            self.assertEqual(calls[0]["handoff_mode"], "shared_filesystem")
+            self.assertIsNotNone(final.summary)
+            self.assertEqual(final.summary.artifact_publication["storage_provider"], "injected_storage")
+
+    def test_job_manager_stages_dataset_manifest_into_request_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = replace(
+                _build_settings(Path(tmp), dedupe_enabled=False),
+                dataset_staging_mode="copy_to_run",
+            )
+            captured = {}
+
+            def _fake_run(execution_request, execution_context, progress_callback=None, cancel_requested=None):
+                captured["dataset_manifest"] = execution_request.request_bundle["dataset_manifest"]
+                captured["queue_message"] = execution_request.request_bundle["queue_message"]
+                return ModelExecutionResult(run_id=execution_context.run_id, summary=_summary_template(execution_context.run_id), warnings=[])
+
+            manager = JobManager(settings, runtime=_FakeRuntime(_fake_run))
+            job = manager.submit(_run_request())
+            final = _wait_terminal(manager, job.execution_id, timeout_seconds=8.0)
+
+            self.assertEqual(final.status, "succeeded")
+            self.assertEqual(captured["dataset_manifest"]["dataset_staging"]["mode"], "copy_to_run")
+            self.assertEqual(captured["queue_message"]["schema_version"], "execution_queue_message")
+            self.assertEqual(captured["queue_message"]["execution_id"], job.execution_id)
+            self.assertEqual(captured["queue_message"]["run_id"], final.run_id)
+            self.assertEqual(captured["queue_message"]["retry_policy"]["schema_version"], "execution_retry_policy")
+            self.assertEqual(final.execution_queue_message["schema_version"], "execution_queue_message")
+            self.assertTrue(final.worker_id.startswith("local-thread:"))
+            self.assertEqual(len(final.execution_attempts), 1)
+            self.assertEqual(final.execution_attempts[0]["schema_version"], "execution_attempt")
+            self.assertEqual(final.execution_attempts[0]["status"], "succeeded")
+            self.assertFalse(final.execution_attempts[0]["cancellation_requested"])
+            lever_row = next(row for row in captured["dataset_manifest"]["datasets"] if row["id"] == "lever_mappings")
+            self.assertEqual(lever_row["staging_status"], "copied")
+            self.assertTrue(Path(lever_row["path"]).exists())
+
+    def test_job_manager_uses_dataset_snapshot_from_submit_time(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp), dedupe_enabled=False)
+            dataset_repository = LocalDatasetRepository(settings)
+            first = dataset_repository.register_upload(
+                "lever_mappings",
+                "lever_mappings.csv",
+                b"key,value\nfirst,1\n",
+                user_id="undp_analyst",
+            )
+            release_worker = threading.Event()
+
+            class _BlockingQueue:
+                def __init__(self):
+                    self._queue = queue.Queue()
+
+                def put(self, message):
+                    self._queue.put(message)
+
+                def get(self):
+                    release_worker.wait(timeout=5.0)
+                    return self._queue.get()
+
+                def task_done(self):
+                    self._queue.task_done()
+
+                def qsize(self):
+                    return self._queue.qsize()
+
+            captured = {}
+
+            def _fake_run(execution_request, execution_context, progress_callback=None, cancel_requested=None):
+                captured["dataset_manifest"] = execution_request.request_bundle["dataset_manifest"]
+                return ModelExecutionResult(run_id=execution_context.run_id, summary=_summary_template(execution_context.run_id), warnings=[])
+
+            manager = JobManager(
+                settings,
+                runtime=_FakeRuntime(_fake_run),
+                dataset_repository=dataset_repository,
+                execution_queue=_BlockingQueue(),
+            )
+            job = manager.submit(_run_request(), user_id="undp_analyst")
+            dataset_repository.register_upload(
+                "lever_mappings",
+                "lever_mappings.csv",
+                b"key,value\nsecond,2\n",
+                user_id="undp_analyst",
+            )
+            release_worker.set()
+            final = _wait_terminal(manager, job.execution_id, timeout_seconds=8.0)
+
+            self.assertEqual(final.status, "succeeded")
+            lever_row = next(row for row in captured["dataset_manifest"]["datasets"] if row["id"] == "lever_mappings")
+            self.assertEqual(lever_row["active_version_id"], first["version_id"])
+            record = manager._run_repository.get_run_record(final.run_id, user_id="undp_analyst")  # noqa: SLF001
+            snapshot_row = next(row for row in record["dataset_snapshot"]["datasets"] if row["id"] == "lever_mappings")
+            self.assertEqual(snapshot_row["active_version_id"], first["version_id"])
+
+    def test_job_manager_fails_nonlocal_handoff_without_published_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = replace(
+                _build_settings(Path(tmp), dedupe_enabled=False),
+                runtime_artifact_handoff_mode="worker_staged_upload",
+            )
+
+            class _UnpublishedArtifactStorage:
+                def publish_run_artifacts(self, *, run_id, run_dir, artifact_catalog, handoff_mode):
+                    return {
+                        "schema_version": "runtime_artifact_publication_v1",
+                        "run_id": run_id,
+                        "handoff_mode": handoff_mode,
+                        "storage_provider": "unpublished_test_storage",
+                        "status": "not_uploaded",
+                        "published": False,
+                        "artifact_count": len(artifact_catalog),
+                    }
+
+            def _fake_run(execution_request, execution_context, progress_callback=None, cancel_requested=None):
+                return ModelExecutionResult(run_id=execution_context.run_id, summary=_summary_template(execution_context.run_id), warnings=[])
+
+            manager = JobManager(
+                settings,
+                runtime=_FakeRuntime(_fake_run),
+                artifact_storage=_UnpublishedArtifactStorage(),
+            )
+            job = manager.submit(_run_request())
+            final = _wait_terminal(manager, job.execution_id, timeout_seconds=8.0)
+
+            self.assertEqual(final.status, "failed")
+            self.assertIn("Runtime artifact handoff failed", final.error or "")
+
     def test_dedupes_identical_inflight_requests(self):
         with tempfile.TemporaryDirectory() as tmp:
             settings = _build_settings(Path(tmp), dedupe_enabled=True)
             calls = {"count": 0}
 
-            def _fake_run(settings, req, progress_callback=None, cancel_requested=None):
+            def _fake_run(execution_request, execution_context, progress_callback=None, cancel_requested=None):
                 calls["count"] += 1
                 time.sleep(0.2)
                 run_id = f"run-{calls['count']:02d}"
                 (settings.runs_dir / run_id).mkdir(parents=True, exist_ok=True)
+                req = RunRequest(**execution_request.request_payload)
                 summary = {
                     "run_id": run_id,
                     "energy_scenario_key": req.energy_scenario_key,
@@ -669,32 +2132,35 @@ class JobManagerTests(unittest.TestCase):
                     "run_profile": req.run_profile,
                     "warnings": [],
                 }
-                return run_id, summary, [], settings.runs_dir
+                return ModelExecutionResult(run_id=run_id, summary=summary, warnings=[])
 
             req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
-            with patch("api_service.jobs.run_calliope_synchronously", side_effect=_fake_run):
-                manager = JobManager(settings)
-                first = manager.submit(req)
-                time.sleep(0.03)
-                second = manager.submit(req)
-                self.assertEqual(first.job_id, second.job_id)
-                final = _wait_terminal(manager, first.job_id)
-                self.assertEqual(final.status, "succeeded")
-                self.assertEqual(calls["count"], 1)
+            manager = JobManager(settings, runtime=_FakeRuntime(_fake_run))
+            first = manager.submit(req)
+            time.sleep(0.03)
+            second = manager.submit(req)
+            self.assertEqual(first.execution_id, second.execution_id)
+            final = _wait_terminal(manager, first.execution_id)
+            self.assertEqual(final.status, "succeeded")
+            self.assertEqual(calls["count"], 1)
 
     def test_cancel_running_job(self):
         with tempfile.TemporaryDirectory() as tmp:
             settings = _build_settings(Path(tmp), dedupe_enabled=False)
 
-            def _fake_run(settings, req, progress_callback=None, cancel_requested=None):
+            def _fake_run(execution_request, execution_context, progress_callback=None, cancel_requested=None):
                 if progress_callback:
                     progress_callback("solve_energy", 0.5, "Solving")
+                partial_artifact = settings.runs_dir / execution_context.run_id / "artifacts" / "partial.txt"
+                partial_artifact.parent.mkdir(parents=True, exist_ok=True)
+                partial_artifact.write_text("partial output that must be cleared on cancel", encoding="utf-8")
                 for _ in range(120):
                     if cancel_requested and cancel_requested():
-                        raise RunCancelledError("Run cancelled by user request.")
+                        raise RuntimeError("Run cancelled by user request.")
                     time.sleep(0.01)
                 run_id = "run-long"
                 (settings.runs_dir / run_id).mkdir(parents=True, exist_ok=True)
+                req = RunRequest(**execution_request.request_payload)
                 summary = {
                     "run_id": run_id,
                     "energy_scenario_key": req.energy_scenario_key,
@@ -703,29 +2169,42 @@ class JobManagerTests(unittest.TestCase):
                     "run_profile": req.run_profile,
                     "warnings": [],
                 }
-                return run_id, summary, [], settings.runs_dir
+                return ModelExecutionResult(run_id=run_id, summary=summary, warnings=[])
 
             req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
-            with patch("api_service.jobs.run_calliope_synchronously", side_effect=_fake_run):
-                manager = JobManager(settings)
-                job = manager.submit(req)
-                deadline = time.time() + 2.0
-                while time.time() < deadline:
-                    if manager.get(job.job_id).status == "running":
-                        break
-                    time.sleep(0.02)
-                manager.cancel(job.job_id)
-                final = _wait_terminal(manager, job.job_id)
-                self.assertEqual(final.status, "cancelled")
+            manager = JobManager(settings, runtime=_FakeRuntime(_fake_run))
+            job = manager.submit(req)
+            deadline = time.time() + 2.0
+            while time.time() < deadline:
+                if manager.get(job.execution_id).status == "running":
+                    break
+                time.sleep(0.02)
+            manager.cancel(job.execution_id)
+            deadline = time.time() + 4.0
+            final = manager.get(job.execution_id)
+            while time.time() < deadline:
+                final = manager.get(job.execution_id)
+                if final.status == "draft":
+                    break
+                time.sleep(0.02)
+            self.assertEqual(final.status, "draft")
+            self.assertFalse(final.cancellation_requested)
+            self.assertEqual(final.stage, "draft")
+            self.assertEqual(final.progress, 0.0)
+            self.assertEqual(final.execution_attempts, [])
+            self.assertIsNone(final.artifacts)
+            self.assertFalse((settings.runs_dir / job.run_id).exists())
+            self.assertFalse((settings.runs_dir / "_queued" / job.execution_id).exists())
 
     def test_queue_capacity_guard(self):
         with tempfile.TemporaryDirectory() as tmp:
             settings = _build_settings(Path(tmp), dedupe_enabled=False, queue_capacity=1)
 
-            def _fake_run(settings, req, progress_callback=None, cancel_requested=None):
+            def _fake_run(execution_request, execution_context, progress_callback=None, cancel_requested=None):
                 time.sleep(0.25)
                 run_id = "run-one"
                 (settings.runs_dir / run_id).mkdir(parents=True, exist_ok=True)
+                req = RunRequest(**execution_request.request_payload)
                 summary = {
                     "run_id": run_id,
                     "energy_scenario_key": req.energy_scenario_key,
@@ -734,55 +2213,309 @@ class JobManagerTests(unittest.TestCase):
                     "run_profile": req.run_profile,
                     "warnings": [],
                 }
-                return run_id, summary, [], settings.runs_dir
+                return ModelExecutionResult(run_id=run_id, summary=summary, warnings=[])
 
             req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
-            with patch("api_service.jobs.run_calliope_synchronously", side_effect=_fake_run):
-                manager = JobManager(settings)
-                first = manager.submit(req)
-                with self.assertRaises(JobQueueFullError):
-                    manager.submit(req)
-                _wait_terminal(manager, first.job_id)
+            manager = JobManager(settings, runtime=_FakeRuntime(_fake_run))
+            first = manager.submit(req)
+            with self.assertRaises(JobQueueFullError):
+                manager.submit(req)
+            _wait_terminal(manager, first.execution_id)
 
-    def test_cancel_running_job_subprocess_mode(self):
-        if "fork" not in mp.get_all_start_methods():
-            self.skipTest("Subprocess cancellation test requires fork start method.")
 
+class SubprocessModelRuntimeTests(unittest.TestCase):
+    def test_subprocess_runtime_uses_safe_environment_allowlist(self):
         with tempfile.TemporaryDirectory() as tmp:
-            settings = _build_settings(Path(tmp), dedupe_enabled=False)
+            settings = replace(
+                _build_settings(Path(tmp)),
+                runtime_config={"model_runtime": {"safe_env": ["EDIM_RUNTIME_CACHE_DIR", "EDIM_EXTERNAL_API_KEY"]}},
+            )
+            manifest = ModelRuntimeManifest(
+                schema_version="model_runtime_manifest_v1",
+                model_id="test-runtime",
+                model_version="test",
+                label="Test runtime",
+                description="",
+                entrypoint_type="subprocess",
+                entrypoint=[sys.executable, "-c", "print('ok')"],
+                resource_requirements={},
+            )
+            runtime = SubprocessModelRuntime(settings, manifest)
+            with patch.dict(
+                os.environ,
+                {
+                    "EDIM_EXTERNAL_API_KEY": "secret",
+                    "EDIM_DATABASE_PASSWORD": "secret",
+                    "EDIM_RUNTIME_CACHE_DIR": "/tmp/edim-runtime-cache",
+                    "PATH": os.environ.get("PATH", ""),
+                },
+                clear=False,
+            ):
+                env = runtime._env()  # noqa: SLF001
+            self.assertNotIn("EDIM_EXTERNAL_API_KEY", env)
+            self.assertNotIn("EDIM_DATABASE_PASSWORD", env)
+            self.assertEqual(env["EDIM_RUNTIME_CACHE_DIR"], "/tmp/edim-runtime-cache")
+            self.assertEqual(env["PYTHONUNBUFFERED"], "1")
+            self.assertIn(str(runtime._cwd()), env["PYTHONPATH"])  # noqa: SLF001
 
-            def _fake_run(settings, req, progress_callback=None, cancel_requested=None):
-                if progress_callback:
-                    progress_callback("solve_energy", 0.55, "Solving")
-                for _ in range(300):
-                    time.sleep(0.01)
-                run_id = "run-subprocess"
-                (settings.runs_dir / run_id).mkdir(parents=True, exist_ok=True)
-                summary = {
-                    "run_id": run_id,
-                    "energy_scenario_key": req.energy_scenario_key,
-                    "mrio_scenario_id": req.mrio_scenario_id,
-                    "target_year": req.target_year,
-                    "run_profile": req.run_profile,
-                    "warnings": [],
-                }
-                return run_id, summary, [], settings.runs_dir
+    def test_subprocess_runtime_drains_stderr_without_deadlock(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            settings = _build_settings(base)
+            run_id = "subproc123"
+            script = (
+                "import json, sys;"
+                "[print('stderr line %s' % i, file=sys.stderr, flush=True) for i in range(400)];"
+                "print(json.dumps({'schema_version':'runtime_event_v1','type':'result','stage':'complete',"
+                "'progress':1.0,'run_id':'subproc123','payload':{'summary':{'run_id':'subproc123',"
+                "'energy_scenario_key':'new_links','mrio_scenario_id':'S2','target_year':2030,"
+                "'run_profile':'dev','warnings':[]}}}), flush=True)"
+            )
+            manifest = ModelRuntimeManifest(
+                schema_version="model_runtime_manifest_v1",
+                model_id="stderr-runtime",
+                model_version="test",
+                label="stderr runtime",
+                description="",
+                entrypoint_type="subprocess",
+                entrypoint=[sys.executable, "-c", script],
+                resource_requirements={"timeout_seconds": 10},
+            )
+            bundle_path = base / "bundle.json"
+            bundle_path.write_text('{"schema_version":"model_run_bundle_v1"}', encoding="utf-8")
+            context = ModelExecutionContext(
+                run_id=run_id,
+                run_dir=settings.runs_dir / "_queued" / "stderr-test",
+                request_bundle_path=bundle_path,
+                artifact_policy={},
+                event_log_path=base / "events.jsonl",
+            )
+            request = ModelExecutionRequest(run_id=run_id, request_payload={}, scenario_package={}, artifact_policy={}, run_profile="dev")
 
-            req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
-            with patch("api_service.jobs.run_calliope_synchronously", side_effect=_fake_run):
-                manager = JobManager(settings, use_subprocess=True)
-                job = manager.submit(req)
-                deadline = time.time() + 2.0
-                while time.time() < deadline:
-                    if manager.get(job.job_id).status == "running":
-                        break
-                    time.sleep(0.02)
-                manager.cancel(job.job_id)
-                final = _wait_terminal(manager, job.job_id)
-                self.assertEqual(final.status, "cancelled")
+            result = SubprocessModelRuntime(settings, manifest).execute(request, context)
+
+            self.assertEqual(result.run_id, run_id)
+            events = RuntimeEventLog(base / "events.jsonl").read()
+            self.assertTrue(any(row.get("type") == "stderr" for row in events))
+
+    def test_subprocess_runtime_enforces_manifest_timeout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            settings = _build_settings(base)
+            manifest = ModelRuntimeManifest(
+                schema_version="model_runtime_manifest_v1",
+                model_id="timeout-runtime",
+                model_version="test",
+                label="timeout runtime",
+                description="",
+                entrypoint_type="subprocess",
+                entrypoint=[sys.executable, "-c", "import time; time.sleep(2)"],
+                resource_requirements={"timeout_seconds": 0.2},
+            )
+            bundle_path = base / "bundle.json"
+            bundle_path.write_text('{"schema_version":"model_run_bundle_v1"}', encoding="utf-8")
+            context = ModelExecutionContext(
+                run_id="timeout123",
+                run_dir=settings.runs_dir / "_queued" / "timeout-test",
+                request_bundle_path=bundle_path,
+                artifact_policy={},
+                event_log_path=base / "timeout-events.jsonl",
+            )
+            request = ModelExecutionRequest(run_id="timeout123", request_payload={}, scenario_package={}, artifact_policy={}, run_profile="dev")
+
+            with self.assertRaisesRegex(RuntimeError, "exceeded timeout"):
+                SubprocessModelRuntime(settings, manifest).execute(request, context)
+
+
+class BackendHandoffSmokeToolTests(unittest.TestCase):
+    def test_handoff_smoke_request_shape_and_runtime_helpers(self):
+        args = backend_handoff_smoke.parse_args(
+            [
+                "--base-url",
+                "http://127.0.0.1:8000/",
+                "--user-id",
+                "energy_planner",
+                "--energy-scenario-key",
+                "new_links",
+                "--mrio-scenario-id",
+                "S1",
+                "--target-year",
+                "2040",
+                "--run-profile",
+                "dev",
+                "--carbon-price-usd-per-tco2",
+                "25",
+            ]
+        )
+        req = backend_handoff_smoke._run_request("project-123", args)
+        self.assertEqual(req["model_architecture_id"], "energy-only")
+        self.assertEqual(req["energy_model_engine"], "calliope")
+        self.assertEqual(req["scenario"]["energy_scenario_key"], "new_links")
+        self.assertEqual(req["scenario"]["target_scenario_id"], "S1")
+        self.assertEqual(req["scenario"]["target_year"], 2040)
+        self.assertEqual(req["run_profile"], "dev")
+        self.assertNotIn("strict_validation", req)
+        self.assertNotIn("allow_placeholder_data", req)
+        self.assertEqual(req["levers"]["carbon_price_usd_per_tco2"], 25.0)
+        self.assertEqual(args.timeout_seconds, backend_handoff_smoke.DEFAULT_RUN_TIMEOUT_SECONDS)
+        self.assertEqual(
+            backend_handoff_smoke._absolute_url("http://127.0.0.1:8000", "/api/projects"),
+            "http://127.0.0.1:8000/api/projects",
+        )
+
+    def test_handoff_smoke_timeout_guidance_identifies_solver_timeout(self):
+        guidance = backend_handoff_smoke._timeout_guidance({"status": "running", "stage": "solve_energy"})
+        self.assertIn("real energy solver", guidance)
+        self.assertIn("--timeout-seconds 900", guidance)
+
+    def test_handoff_smoke_can_request_full_energy_development_architecture(self):
+        args = backend_handoff_smoke.parse_args(["--model-architecture-id", "energy-development"])
+        req = backend_handoff_smoke._run_request("project-123", args)
+        self.assertEqual(req["model_architecture_id"], "energy-development")
 
 
 class MetadataTests(unittest.TestCase):
+    def test_generic_stage_orchestrator_runs_ordered_stages_without_model_knowledge(self):
+        events = []
+        orchestrator = StageOrchestrator(
+            emit_progress=lambda stage, progress, message: events.append(("progress", stage, progress, message)),
+            check_cancel=lambda: events.append(("cancel_check",)),
+        )
+
+        orchestrator.run(
+            {"value": 2},
+            [
+                ModelStage(
+                    stage_id="first",
+                    label="First stage",
+                    start_progress=0.2,
+                    start_message="Starting first",
+                    handler=lambda context: events.append(("handler", "first", context["value"])),
+                ),
+                ModelStage(
+                    stage_id="second",
+                    label="Second stage",
+                    handler=lambda context: events.append(("handler", "second", context["value"] * 2)),
+                ),
+            ],
+        )
+
+        self.assertEqual(
+            events,
+            [
+                ("cancel_check",),
+                ("progress", "first", 0.2, "Starting first"),
+                ("handler", "first", 2),
+                ("cancel_check",),
+                ("cancel_check",),
+                ("handler", "second", 4),
+                ("cancel_check",),
+            ],
+        )
+
+    def test_model_runtime_entrypoint_delegates_to_edim_pipeline(self):
+        from model_runtime.edim_model.core import runner as core_runner
+
+        expected = ("run-1", {"ok": True}, [], Path("/tmp/run-1"))
+        with patch("model_runtime.edim_model.core.edim_pipeline.run_edim_pipeline", return_value=expected) as mocked:
+            result = core_runner.run_model_synchronously(settings=object(), req=object())
+
+        self.assertEqual(result, expected)
+        mocked.assert_called_once()
+
+    def test_model_runtime_entrypoint_does_not_expose_model_specific_aliases(self):
+        from model_runtime.edim_model.core import runner as core_runner
+        from model_runtime.edim_model import local_runtime
+
+        self.assertFalse(hasattr(core_runner, "run_calliope_synchronously"))
+        self.assertFalse(hasattr(local_runtime, "run_local_model"))
+
+    def test_model_architecture_catalog_matches_runtime_contracts(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        model_manifest = json.loads(
+            (repo_root / "model_runtime" / "edim_model" / "model_manifest.json").read_text(encoding="utf-8")
+        )
+        catalog_path = Path(str(model_manifest.get("architecture_catalog_path") or ""))
+        if not catalog_path.is_absolute():
+            catalog_path = repo_root / catalog_path
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        architectures = catalog.get("architectures") if isinstance(catalog.get("architectures"), list) else []
+        self.assertTrue(architectures)
+        architecture_ids = {row.get("id") for row in architectures if isinstance(row, dict)}
+        self.assertIn(catalog.get("defaultArchitectureId"), architecture_ids)
+        supported = set(model_manifest.get("supported_model_architectures") or [])
+        self.assertTrue(architecture_ids.issubset(supported))
+
+        module_catalog = {row["module_id"]: row for row in model_module_catalog()}
+        manifest_modules = {row["module_id"]: row for row in model_manifest.get("modules") or []}
+        self.assertTrue(set(module_catalog).issubset(set(manifest_modules)))
+        self.assertEqual(module_catalog["calliope"]["implementation_status"], "ready")
+        self.assertEqual(
+            module_catalog["calliope"]["asset_root"],
+            "model_runtime/model_modules/calliope/Calliope-Africa-main",
+        )
+        self.assertTrue((repo_root / module_catalog["calliope"]["asset_root"]).exists())
+        self.assertEqual(module_catalog["osemosys"]["implementation_status"], "planned")
+        self.assertEqual(module_catalog["osemosys"].get("supported_engines"), [])
+        self.assertEqual(module_catalog["mrio"]["kind"], "development")
+        self.assertEqual(set(model_manifest.get("supported_energy_model_engines") or []), {"calliope"})
+        for row in model_manifest.get("modules") or []:
+            self.assertTrue(row.get("scenario_channels"), row.get("module_id"))
+
+        artifact_ids = set(load_artifact_manifest({}).keys())
+        for architecture in architectures:
+            box_ids = {box.get("id") for box in architecture.get("boxes", []) if isinstance(box, dict)}
+            graph = architecture.get("graph") if isinstance(architecture.get("graph"), dict) else {}
+            node_ids = {node.get("id") for node in graph.get("nodes", []) if isinstance(node, dict)}
+            self.assertTrue(node_ids.issubset(box_ids))
+            for edge in graph.get("edges", []) or []:
+                self.assertIn(edge.get("from"), node_ids)
+                self.assertIn(edge.get("to"), node_ids)
+            for artifact in architecture.get("outputArtifacts", []) or []:
+                self.assertIn(artifact.get("key"), artifact_ids)
+
+    def test_module_scenario_catalog_declares_module_owned_channels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(__file__).resolve().parents[2]
+            settings = replace(
+                _build_settings(Path(tmp)),
+                config_dir=repo_root / "inputs",
+                calliope_root=_repo_calliope_root(repo_root),
+            )
+            manifest = load_model_runtime_manifest(repo_root / "model_runtime" / "edim_model" / "model_manifest.json").to_dict()
+            catalog = module_scenario_catalog(settings, manifest)
+            self.assertEqual(catalog["schema_version"], "model_scenario_catalog")
+            module_ids = {row["module_id"] for row in catalog["module_configurations"]}
+            self.assertIn("calliope", module_ids)
+            self.assertIn("osemosys", module_ids)
+            self.assertIn("mrio", module_ids)
+            channels = {row["config_key"]: row for row in catalog["scenario_channels"]}
+            self.assertEqual(channels["scenario.energy_scenario_key"]["module_id"], "calliope")
+            self.assertEqual(channels["scenario.target_scenario_id"]["module_id"], "mrio")
+            self.assertEqual({row["value"] for row in channels["energy_model_engine"]["options"]}, {"calliope", "osemosys"})
+            self.assertTrue(next(row for row in channels["energy_model_engine"]["options"] if row["value"] == "osemosys").get("disabled"))
+            self.assertEqual(catalog["defaults"]["energy_model_engine"], "calliope")
+            self.assertEqual(catalog["defaults"]["target_scenario_id"], "S2")
+
+    def test_model_module_registry_rejects_unknown_and_marks_planned_energy_engine(self):
+        manifest = load_model_runtime_manifest(
+            Path(__file__).resolve().parents[2] / "model_runtime" / "edim_model" / "model_manifest.json"
+        )
+        issues = validate_request_against_manifest(
+            {
+                "energy_model_engine": "osemosys",
+                "model_architecture_id": "energy-only",
+            },
+            manifest,
+        )
+        self.assertTrue([issue for issue in issues if "energy_model_engine" in issue])
+        planned_module = get_energy_model_module("osemosys")
+        self.assertEqual(planned_module.info.implementation_status, "planned")
+        with self.assertRaisesRegex(ModelModuleError, "OSeMOSYS is registered as a planned energy module"):
+            planned_module.resolve_model_definition(Path("."))
+        with self.assertRaisesRegex(ModelModuleError, "Unknown energy model engine"):
+            get_energy_model_module("unknown")
+
     def test_scenario_metadata_parses_tags_and_templates(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "scenario_metadata.csv"
@@ -806,6 +2539,7 @@ class EnvironmentSetupTests(unittest.TestCase):
     def test_environment_setup_reports_ready_when_required_inputs_exist(self):
         with tempfile.TemporaryDirectory() as tmp:
             settings = _build_settings(Path(tmp))
+            _seed_mario_inputs(settings.config_dir)
             report = build_environment_setup_report(
                 settings=settings,
                 queue_stats={"capacity": 3, "active_jobs": 1},
@@ -870,7 +2604,7 @@ class EnvironmentSetupTests(unittest.TestCase):
             settings = replace(_build_settings(base), development_engine="mario")
             _seed_mario_inputs(settings.config_dir)
             (settings.config_dir / "mario_inputs" / "employment_intensity.csv").write_text(
-                "mario_region,mario_sector,jobs_per_musd_direct,jobs_per_musd_total,reference_year,source,notes\nEast_Africa,Gas_supply_chain,4.0,7.0,2019,seeded_placeholder_v1,seeded placeholder estimate\n",
+                "mario_region,mario_sector,jobs_per_musd_direct,jobs_per_musd_total,reference_year,source,notes\nEast_Africa,Gas_supply_chain,4.0,7.0,2019,seeded_placeholder,seeded placeholder estimate\n",
                 encoding="utf-8",
             )
             report = build_environment_setup_report(
@@ -904,7 +2638,7 @@ class MarioRuntimeTests(unittest.TestCase):
             config_dir.mkdir(parents=True, exist_ok=True)
             _seed_mario_inputs(config_dir)
             (config_dir / "mario_inputs" / "scenario_assumptions.csv").write_text(
-                "assumption_key,scenario_key,value,unit,effective_year,source,notes\ncarbon_price,new_links,10,usd_per_tco2,2019,seeded_placeholder_v1,seeded placeholder carbon path\n",
+                "assumption_key,scenario_key,value,unit,effective_year,source,notes\ncarbon_price,new_links,10,usd_per_tco2,2019,seeded_placeholder,seeded placeholder carbon path\n",
                 encoding="utf-8",
             )
             health = mario_inputs_health(config_dir)
@@ -977,7 +2711,7 @@ class MarioRuntimeTests(unittest.TestCase):
             self.assertTrue(runtime_meta["mario_runtime_executed"])
             self.assertTrue(any("no exchange shock rows" in w.lower() for w in warnings))
 
-    def test_exchange_builder_falls_back_to_summary_monetary_totals(self):
+    def test_exchange_builder_requires_tech_level_cost_rows(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             settings = _build_settings(base)
@@ -998,18 +2732,16 @@ class MarioRuntimeTests(unittest.TestCase):
                 },
             }
 
-            _, shock_meta, _, warnings = _write_exchange_files_for_mario(
-                model=_NoCostModel(),
-                settings=settings,
-                req=req,
-                run_id="abcd1234",
-                run_dir=run_dir,
-                summary_diagnostics=summary["summary_diagnostics"],
-                summary=summary,
-            )
-            self.assertGreater(shock_meta["total_rows"], 0)
-            self.assertTrue(shock_meta["fallback_exchange_used"])
-            self.assertTrue(any("fell back to summary-based allocation" in w for w in warnings))
+            with self.assertRaisesRegex(RuntimeError, "no tech-level monetary component rows"):
+                _write_exchange_files_for_mario(
+                    model=_NoCostModel(),
+                    settings=settings,
+                    req=req,
+                    run_id="abcd1234",
+                    run_dir=run_dir,
+                    summary_diagnostics=summary["summary_diagnostics"],
+                    summary=summary,
+                )
 
     def test_exchange_builder_uses_cost_var_for_operating_shocks_when_om_components_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1068,7 +2800,7 @@ class MarioRuntimeTests(unittest.TestCase):
                 },
             }
 
-            _, shock_meta, _, warnings = _write_exchange_files_for_mario(
+            _, shock_meta, warnings = _write_exchange_files_for_mario(
                 model=_FakeModel(),
                 settings=settings,
                 req=req,
@@ -1078,26 +2810,19 @@ class MarioRuntimeTests(unittest.TestCase):
                 summary=summary,
             )
             self.assertGreater(shock_meta["operating_rows"], 0)
-            self.assertFalse(shock_meta["fallback_exchange_used"])
             source_map = shock_meta.get("source_variable_by_component") or {}
             self.assertEqual(source_map.get("variable_con"), "cost_var")
             self.assertEqual(source_map.get("variable_prod"), "cost_var")
             self.assertFalse(any("cost_var" in w for w in warnings))
 
-    def test_auto_engine_falls_back_to_surrogate_on_mario_failure(self):
+    def test_mario_engine_raises_on_runtime_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
             settings = _build_settings(Path(tmp))
-            settings = replace(settings, development_engine="auto", mario_fail_on_error=False)
+            settings = replace(settings, development_engine="mario", mario_fail_on_error=False)
             req = RunRequest(energy_scenario_key="new_links", mrio_scenario_id="ZA-S2", target_year=2030, run_profile="dev", strict_validation=False, allow_placeholder_data=True, levers=LeverValues())
             summary = {"summary_diagnostics": {}, "warnings": []}
-            expected = (
-                {"method": "surrogate_test"},
-                {"development_impacts_json": "/api/run/x/development"},
-                {"development_engine_mode": "surrogate"},
-                ["fallback warning"],
-            )
-            with patch("api_service.runner._build_mario_development_outputs", side_effect=RuntimeError("boom")):
-                with patch("api_service.runner._build_surrogate_development_outputs", return_value=expected) as patched:
+            with patch("model_runtime.edim_model.core.runner._build_mario_development_outputs", side_effect=RuntimeError("boom")):
+                with self.assertRaisesRegex(RuntimeError, "boom"):
                     out = _build_development_outputs(
                         settings=settings,
                         model=object(),
@@ -1109,8 +2834,6 @@ class MarioRuntimeTests(unittest.TestCase):
                         mapping_quality={},
                         scenario_package=_scenario_package(),
                     )
-                    self.assertEqual(out[0]["method"], "surrogate_test")
-                    self.assertTrue(patched.called)
 
 
 if __name__ == "__main__":

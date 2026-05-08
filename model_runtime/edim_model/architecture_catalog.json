@@ -1,0 +1,485 @@
+{
+  "schemaVersion": "edim_model_architecture_catalog",
+  "defaultArchitectureId": "energy-development",
+  "updatedAt": "2026-05-07",
+  "description": "Selectable model architecture catalog. Each architecture controls the visible graph layout, required scenario channels, dataset boxes, result tabs, and output artifact list.",
+  "architectures": [
+    {
+      "id": "energy-development",
+      "label": "Energy-development",
+      "shortLabel": "Energy + development",
+      "description": "Full EDIM architecture linking the energy model to bridge outputs and MRIO/development impacts.",
+      "requiresMrio": true,
+      "requiresBridge": true,
+      "enabledDatasetLayers": [
+        "calliope",
+        "scenario",
+        "mrio",
+        "bridge"
+      ],
+      "resultTabs": [
+        "overview",
+        "system",
+        "development",
+        "method"
+      ],
+      "boxes": [
+        {
+          "id": "scenario",
+          "type": "input",
+          "title": "Integrated scenario definition",
+          "subtitle": "User parameters + scenario datasets",
+          "stages": [
+            "scenario_prepare"
+          ]
+        },
+        {
+          "id": "calliope_data",
+          "type": "input",
+          "title": "Energy model input data",
+          "subtitle": "Static model files, scenario definitions, levers, and model metadata",
+          "datasetLayers": [
+            "calliope",
+            "scenario"
+          ],
+          "stages": [
+            "energy_input_prepare",
+            "build_model"
+          ]
+        },
+        {
+          "id": "adapter",
+          "type": "model",
+          "title": "Unified scenario adapter",
+          "subtitle": "Routes one scenario package into the selected energy model, bridge, and MRIO inputs",
+          "stages": [
+            "scenario_prepare",
+            "energy_input_prepare",
+            "mrio_direct_prepare"
+          ]
+        },
+        {
+          "id": "mrio_data",
+          "type": "input",
+          "title": "MRIO input data",
+          "subtitle": "Intensity, sector split, indicator, geography, and structured scenario-target datasets",
+          "datasetLayers": [
+            "mrio",
+            "bridge"
+          ],
+          "stages": [
+            "mrio_direct_prepare",
+            "development"
+          ]
+        },
+        {
+          "id": "calliope",
+          "type": "model",
+          "title": "Energy model",
+          "subtitle": "Selected engine solves generation, capacity, costs, reliability, emissions, and spatial energy outputs",
+          "stages": [
+            "build_model",
+            "solve_energy",
+            "write_artifacts",
+            "build_summary"
+          ]
+        },
+        {
+          "id": "bridge",
+          "type": "model",
+          "title": "Energy-to-MRIO bridge",
+          "subtitle": "Translates solved energy outputs into investment, operating, fuel, and price/tax shocks",
+          "stages": [
+            "bridge_prepare"
+          ]
+        },
+        {
+          "id": "mrio",
+          "type": "model",
+          "title": "MRIO development runtime",
+          "subtitle": "Combines bridge channel, direct MRIO assumptions, and general MRIO input datasets",
+          "stages": [
+            "development"
+          ]
+        },
+        {
+          "id": "outputs",
+          "type": "output",
+          "title": "Integrated outputs",
+          "subtitle": "Downloadable run artifacts, diagnostics, and dashboard-ready results",
+          "stages": [
+            "build_integrated",
+            "complete"
+          ]
+        }
+      ],
+      "graph": {
+        "canvas": {
+          "width": 1480,
+          "height": 1740
+        },
+        "fixedNodes": [
+          "scenario"
+        ],
+        "nodes": [
+          {
+            "id": "scenario",
+            "x": 40,
+            "y": 30,
+            "w": 1400,
+            "h": 650
+          },
+          {
+            "id": "calliope_data",
+            "x": 40,
+            "y": 820,
+            "w": 360,
+            "h": 170
+          },
+          {
+            "id": "adapter",
+            "x": 505,
+            "y": 820,
+            "w": 470,
+            "h": 150
+          },
+          {
+            "id": "mrio_data",
+            "x": 1040,
+            "y": 820,
+            "w": 390,
+            "h": 170
+          },
+          {
+            "id": "calliope",
+            "x": 72,
+            "y": 1100,
+            "w": 380,
+            "h": 150
+          },
+          {
+            "id": "bridge",
+            "x": 515,
+            "y": 1240,
+            "w": 390,
+            "h": 140
+          },
+          {
+            "id": "mrio",
+            "x": 1015,
+            "y": 1265,
+            "w": 410,
+            "h": 155
+          },
+          {
+            "id": "outputs",
+            "x": 520,
+            "y": 1560,
+            "w": 430,
+            "h": 155
+          }
+        ],
+        "edges": [
+          {
+            "from": "scenario",
+            "to": "adapter",
+            "label": "scenario settings"
+          },
+          {
+            "from": "calliope_data",
+            "to": "calliope",
+            "label": "static energy inputs"
+          },
+          {
+            "from": "adapter",
+            "to": "calliope",
+            "label": "engine patch"
+          },
+          {
+            "from": "adapter",
+            "to": "mrio",
+            "label": "MRIO shocks"
+          },
+          {
+            "from": "calliope",
+            "to": "bridge",
+            "label": "solved outputs"
+          },
+          {
+            "from": "calliope",
+            "to": "outputs",
+            "label": "energy results"
+          },
+          {
+            "from": "bridge",
+            "to": "mrio",
+            "label": "bridge channel"
+          },
+          {
+            "from": "mrio_data",
+            "to": "mrio",
+            "label": "MRIO datasets"
+          },
+          {
+            "from": "mrio",
+            "to": "outputs",
+            "label": "development results"
+          }
+        ],
+        "notes": "Compact runtime graph used by the main modeling UI. Detailed architecture reference uses the top-level nodes/edges in this same file."
+      },
+      "outputArtifacts": [
+        {
+          "key": "results_csv",
+          "label": "Energy results CSV"
+        },
+        {
+          "key": "summary_json",
+          "label": "Energy summary JSON"
+        },
+        {
+          "key": "integrated_results_json",
+          "label": "Energy dashboard payload JSON"
+        },
+        {
+          "key": "report_markdown",
+          "label": "Run report Markdown"
+        },
+        {
+          "key": "scenario_package_json",
+          "label": "Scenario package JSON"
+        },
+        {
+          "key": "energy_input_manifest_json",
+          "label": "Energy input manifest JSON"
+        },
+        {
+          "key": "ui_override_patch_yaml",
+          "label": "Energy runtime override patch YAML"
+        },
+        {
+          "key": "development_impacts_json",
+          "label": "Development impacts JSON"
+        },
+        {
+          "key": "coupling_manifest_json",
+          "label": "Coupling manifest JSON"
+        },
+        {
+          "key": "exchange_bundle_zip",
+          "label": "Exchange bundle ZIP"
+        },
+        {
+          "key": "report_scenario_reference_json",
+          "label": "Report scenario reference JSON"
+        },
+        {
+          "key": "geography_alignment_json",
+          "label": "Geography alignment diagnostics JSON"
+        },
+        {
+          "key": "mrio_direct_inputs_json",
+          "label": "MRIO-direct inputs JSON"
+        },
+        {
+          "key": "mrio_direct_shocks_csv",
+          "label": "MRIO-direct shocks CSV"
+        },
+        {
+          "key": "energy_service_balance_csv",
+          "label": "Energy service balance CSV"
+        },
+        {
+          "key": "calliope_component_activity_csv",
+          "label": "Energy component activity CSV"
+        },
+        {
+          "key": "investment_shocks_csv",
+          "label": "Investment shocks CSV"
+        },
+        {
+          "key": "operating_shocks_csv",
+          "label": "Operating shocks CSV"
+        },
+        {
+          "key": "prices_and_taxes_csv",
+          "label": "Prices and taxes CSV"
+        }
+      ]
+    },
+    {
+      "id": "energy-only",
+      "label": "Energy-only",
+      "shortLabel": "Energy only",
+      "description": "Energy-system architecture for scenarios where users only need energy model outputs and do not want MRIO/development outputs in the UI.",
+      "requiresMrio": false,
+      "requiresBridge": false,
+      "enabledDatasetLayers": [
+        "calliope",
+        "scenario"
+      ],
+      "resultTabs": [
+        "overview",
+        "system",
+        "method"
+      ],
+      "boxes": [
+        {
+          "id": "scenario",
+          "type": "input",
+          "title": "Integrated scenario definition",
+          "subtitle": "User parameters + scenario datasets",
+          "stages": [
+            "scenario_prepare"
+          ]
+        },
+        {
+          "id": "calliope_data",
+          "type": "input",
+          "title": "Energy model input data",
+          "subtitle": "Static model files, scenario definitions, levers, and model metadata",
+          "datasetLayers": [
+            "calliope",
+            "scenario"
+          ],
+          "stages": [
+            "energy_input_prepare",
+            "build_model"
+          ]
+        },
+        {
+          "id": "adapter",
+          "type": "model",
+          "title": "Unified scenario adapter",
+          "subtitle": "Routes one scenario package into the selected energy model, bridge, and MRIO inputs",
+          "stages": [
+            "scenario_prepare",
+            "energy_input_prepare",
+            "mrio_direct_prepare"
+          ]
+        },
+        {
+          "id": "calliope",
+          "type": "model",
+          "title": "Energy model",
+          "subtitle": "Selected engine solves generation, capacity, costs, reliability, emissions, and spatial energy outputs",
+          "stages": [
+            "build_model",
+            "solve_energy",
+            "write_artifacts",
+            "build_summary"
+          ]
+        },
+        {
+          "id": "outputs",
+          "type": "output",
+          "title": "Integrated outputs",
+          "subtitle": "Downloadable run artifacts, diagnostics, and dashboard-ready results",
+          "stages": [
+            "build_integrated",
+            "complete"
+          ]
+        }
+      ],
+      "graph": {
+        "canvas": {
+          "width": 1480,
+          "height": 1320
+        },
+        "fixedNodes": [
+          "scenario"
+        ],
+        "nodes": [
+          {
+            "id": "scenario",
+            "x": 40,
+            "y": 30,
+            "w": 1400,
+            "h": 600
+          },
+          {
+            "id": "calliope_data",
+            "x": 60,
+            "y": 780,
+            "w": 390,
+            "h": 190
+          },
+          {
+            "id": "adapter",
+            "x": 545,
+            "y": 795,
+            "w": 390,
+            "h": 150
+          },
+          {
+            "id": "calliope",
+            "x": 1020,
+            "y": 780,
+            "w": 390,
+            "h": 170
+          },
+          {
+            "id": "outputs",
+            "x": 545,
+            "y": 1120,
+            "w": 440,
+            "h": 165
+          }
+        ],
+        "edges": [
+          {
+            "from": "scenario",
+            "to": "adapter",
+            "label": "scenario settings"
+          },
+          {
+            "from": "calliope_data",
+            "to": "calliope",
+            "label": "static energy inputs"
+          },
+          {
+            "from": "adapter",
+            "to": "calliope",
+            "label": "engine patch"
+          },
+          {
+            "from": "calliope",
+            "to": "outputs",
+            "label": "energy results"
+          }
+        ],
+        "notes": "Energy-only runtime graph. Development/MRIO data, bridge, and MRIO result panels are intentionally omitted from the visible workspace."
+      },
+      "outputArtifacts": [
+        {
+          "key": "results_csv",
+          "label": "Energy results CSV"
+        },
+        {
+          "key": "summary_json",
+          "label": "Energy summary JSON"
+        },
+        {
+          "key": "integrated_results_json",
+          "label": "Energy dashboard payload JSON"
+        },
+        {
+          "key": "report_markdown",
+          "label": "Run report Markdown"
+        },
+        {
+          "key": "scenario_package_json",
+          "label": "Scenario package JSON"
+        },
+        {
+          "key": "energy_input_manifest_json",
+          "label": "Energy input manifest JSON"
+        },
+        {
+          "key": "ui_override_patch_yaml",
+          "label": "Energy runtime override patch YAML"
+        }
+      ]
+    }
+  ]
+}

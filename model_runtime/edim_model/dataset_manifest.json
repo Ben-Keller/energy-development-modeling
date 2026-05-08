@@ -1,0 +1,177 @@
+{
+  "schema_version": "model_dataset_manifest_v1",
+  "model_id": "edim-calliope-mrio",
+  "datasets": [
+    {
+      "id": "scenario_metadata",
+      "label": "Energy scenario metadata",
+      "layer": "scenario",
+      "role": "Maps energy-model override keys into scenario labels and user-facing descriptions.",
+      "path_template": "{config_dir}/scenario_metadata.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "scenario_report",
+      "label": "Structured MRIO scenario targets",
+      "layer": "scenario",
+      "role": "Structured scenario target data used for integrated target pathways and MRIO-direct assumptions.",
+      "path_template": "{config_dir}/generated/scenario_report_scenarios.json",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "scenario_report_scenarios_csv",
+      "label": "Structured MRIO scenario target table",
+      "layer": "scenario",
+      "role": "CSV extraction of scenario targets for analyst review and project override workflows.",
+      "path_template": "{config_dir}/mario_inputs/scenario_report_scenarios.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "africa_placeholder_scenarios",
+      "label": "Africa national placeholder target scenarios",
+      "layer": "scenario",
+      "role": "National S1/S2 placeholder targets for African countries not explicitly defined in the report.",
+      "path_template": "{config_dir}/generated/africa_national_mrio_placeholder_scenarios.json",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "scenario_geography_mapping",
+      "label": "Scenario geography mapping",
+      "layer": "scenario",
+      "role": "Maps MRIO geographies to energy-model countries and subnational locations.",
+      "path_template": "{config_dir}/scenario_geography_mapping.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "calliope_model",
+      "label": "Energy model definition",
+      "layer": "energy_model",
+      "role": "Primary executable energy model definition for the selected runtime engine.",
+      "path_template": "{calliope_root}/model.yaml",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "calliope_overrides",
+      "label": "Energy model scenario overrides",
+      "layer": "energy_model",
+      "role": "Energy-model override definitions used by the scenario selector.",
+      "path_template": "{calliope_root}/overrides.yaml",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "lever_mappings",
+      "label": "Policy lever mappings",
+      "layer": "adapter",
+      "role": "Maps UI policy levers to model-side parameter adjustments.",
+      "path_template": "{config_dir}/lever_mappings.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override",
+      "user_upload_listable": false
+    },
+    {
+      "id": "development_model",
+      "label": "Development model configuration",
+      "layer": "mrio",
+      "role": "Development/MRIO runtime configuration and model controls.",
+      "path_template": "{config_dir}/development_model.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "employment_intensity",
+      "label": "Employment intensity",
+      "layer": "mrio",
+      "role": "Jobs per monetary shock by MRIO region and supplier sector.",
+      "path_template": "{config_dir}/mario_inputs/employment_intensity.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "value_added_intensity",
+      "label": "Value-added intensity",
+      "layer": "mrio",
+      "role": "Gross value added per monetary shock by MRIO region and supplier sector.",
+      "path_template": "{config_dir}/mario_inputs/value_added_intensity.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "development_indicator_mapping",
+      "label": "Development indicator mapping",
+      "layer": "mrio",
+      "role": "Maps MRIO impacts into development indicators shown in the dashboard.",
+      "path_template": "{config_dir}/mario_inputs/development_indicator_mapping.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "scenario_assumptions",
+      "label": "MRIO scenario assumptions",
+      "layer": "mrio",
+      "role": "Assumptions used by direct MRIO shock preparation.",
+      "path_template": "{config_dir}/mario_inputs/scenario_assumptions.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "country_to_pool",
+      "label": "Country to power-pool mapping",
+      "layer": "mrio",
+      "role": "Country and region mapping used for spatial aggregation and MRIO alignment.",
+      "path_template": "{config_dir}/mario_inputs/country_to_pool.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "capex_sector_split",
+      "label": "CAPEX sector split",
+      "layer": "bridge",
+      "role": "Splits energy-model capital expenditure shocks into MRIO supplier sectors.",
+      "path_template": "{config_dir}/mario_inputs/capex_sector_split.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "opex_sector_split",
+      "label": "OPEX sector split",
+      "layer": "bridge",
+      "role": "Splits operating and fuel shocks into MRIO supplier sectors.",
+      "path_template": "{config_dir}/mario_inputs/opex_sector_split.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    },
+    {
+      "id": "calliope_tech_to_mario_sector",
+      "label": "Energy technology to MRIO sector",
+      "layer": "bridge",
+      "role": "Maps solved energy technologies to MRIO sector accounts.",
+      "path_template": "{config_dir}/mario_inputs/calliope_tech_to_mario_sector.csv",
+      "scope": "system",
+      "required": true,
+      "upload_policy": "project_override"
+    }
+  ]
+}
