@@ -25,12 +25,12 @@ class MrioDevelopmentModule(DevelopmentModelModule):
             _mrio_shock_mapping_options,
             _read_csv_rows,
             _target_scenario_catalog_entry,
-            write_africa_national_mrio_placeholder_scenarios,
+            load_or_build_africa_national_mrio_placeholder_scenarios,
         )
         from ..core.scenario_report import load_or_parse_scenario_report
 
         report = load_or_parse_scenario_report(settings.config_dir)
-        africa_mrio = write_africa_national_mrio_placeholder_scenarios(settings.config_dir, report)
+        africa_mrio = load_or_build_africa_national_mrio_placeholder_scenarios(settings.config_dir, report)
         target_years: set[int] = set()
         target_scenarios = []
         for scenario_id in ("S1", "S2"):

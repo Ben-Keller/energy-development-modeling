@@ -271,6 +271,10 @@ Switching runtime targets clears the loaded workspace state and reloads session,
 projects, datasets, runtime catalogs, and scenario catalogs from the selected API.
 If `EDIM_BACKEND_API_BASE` is not set, the Backend side of the switch is disabled.
 This variable is a public API URL only; never put secrets in frontend runtime config.
+On switch, the frontend first probes `GET /api/system/manifest` and displays
+`Contract ok`, `Contract warning`, or `Contract error` in the header. Backend
+mode is not used if the manifest is unreachable, has the wrong schema, or reports
+failed diagnostics.
 
 ## Backend Handoff Smoke Test
 

@@ -46,6 +46,20 @@ Backend side of the switch is disabled. `EDIM_BACKEND_API_BASE` is a public API
 URL only; it must not contain credentials, API keys, signed URLs, or tenant
 secrets because it is loaded into the browser runtime.
 
+When the user switches targets, the frontend now probes `GET /api/system/manifest`
+before loading project data. The switch displays a compact compatibility state:
+
+- `Contract ok`: the manifest schema is correct, manifest diagnostics are clean, and the endpoints used by the frontend are listed.
+- `Contract warning`: the backend is reachable, but one or more frontend-required endpoints are not listed in the manifest.
+- `Contract error`: the manifest is unavailable, has the wrong schema, or reports failed diagnostics. Backend mode is not used when this check fails.
+
+For early Azure testing, the hosted backend can use the same local test-user
+contract by accepting `X-EDIM-User-Id`. If production auth is introduced before
+handoff testing, the frontend API client has a single `window.EDIM_AUTH_PROVIDER`
+extension point, but no speculative bearer/cookie auth behavior is hard-coded.
+The backend must also allow the frontend origin through CORS and allow the
+headers/methods used by the API surface below.
+
 ## Identity Contract
 
 The API route layer now depends on `UserContext` from `backend/api_service/services/users.py`.

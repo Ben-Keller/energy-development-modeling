@@ -2008,6 +2008,97 @@ function toApiUrl(pathOrUrl) {
   return `${activeBase}${pathOrUrl}`;
 }
 
+const SYSTEM_MANIFEST_SCHEMA = "edim_system_manifest";
+const FRONTEND_REQUIRED_ENDPOINTS = [
+  "GET /api/session",
+  "GET /api/projects",
+  "POST /api/projects",
+  "PATCH /api/projects/{project_id}",
+  "DELETE /api/projects/{project_id}",
+  "GET /api/projects/{project_id}/runs",
+  "POST /api/projects/{project_id}/runs",
+  "PATCH /api/projects/{project_id}/runs/{run_id}",
+  "POST /api/projects/{project_id}/runs/{run_id}/submit",
+  "POST /api/projects/{project_id}/runs/{run_id}/duplicate",
+  "DELETE /api/projects/{project_id}/runs/{run_id}",
+  "GET /api/runs",
+  "GET /api/executions/{execution_id}/status",
+  "POST /api/executions/{execution_id}/cancel",
+  "GET /api/executions/{execution_id}/events",
+  "GET /api/runs/{run_id}/summary",
+  "GET /api/runs/{run_id}/integrated",
+  "GET /api/runs/{run_id}/artifacts",
+  "GET /api/runs/{run_id}/artifacts/{artifact_id}",
+  "GET /api/runs/{run_id}/logs",
+  "POST /api/runs/{run_id}/export",
+  "GET /api/input-datasets",
+  "GET /api/input-datasets/{dataset_id}/download",
+  "POST /api/input-datasets/{dataset_id}/upload",
+  "GET /api/input-datasets/{dataset_id}/versions",
+  "GET /api/input-datasets/{dataset_id}/versions/{version_id}/download",
+  "POST /api/input-datasets/{dataset_id}/versions/{version_id}/activate",
+  "DELETE /api/input-datasets/{dataset_id}/versions/{version_id}",
+  "GET /api/scenarios",
+  "GET /api/model-runtimes",
+  "POST /api/projects/{project_id}/runs/validate",
+  "GET /api/projects/{project_id}/reports",
+  "POST /api/projects/{project_id}/reports",
+  "GET /api/projects/{project_id}/reports/{report_id}/download",
+  "GET /api/projects/{project_id}/reports/{report_id}/data",
+  "GET /api/projects/{project_id}/exports",
+  "POST /api/projects/{project_id}/exports",
+  "GET /api/projects/{project_id}/exports/{export_id}/download",
+  "GET /api/system/manifest",
+];
+
+function flattenManifestEndpoints(manifest) {
+  const endpointGroups = (manifest && manifest.public_endpoints) || {};
+  const endpoints = new Set();
+  Object.values(endpointGroups).forEach((group) => {
+    if (Array.isArray(group)) {
+      group.forEach((endpoint) => endpoints.add(String(endpoint || "").trim()));
+    }
+  });
+  return endpoints;
+}
+
+function evaluateSystemManifest(manifest, target) {
+  const endpointSet = flattenManifestEndpoints(manifest);
+  const missingEndpoints = FRONTEND_REQUIRED_ENDPOINTS.filter((endpoint) => !endpointSet.has(endpoint));
+  const schemaVersion = String((manifest && manifest.schema_version) || "");
+  const schemaOk = schemaVersion === SYSTEM_MANIFEST_SCHEMA;
+  const manifestOk = Boolean(manifest && manifest.ok !== false);
+  const manifestDiagnostics = Array.isArray(manifest && manifest.diagnostics) ? manifest.diagnostics : [];
+  const errorDiagnostics = manifestDiagnostics.filter((row) => String(row && row.status) === "error");
+  const status = !schemaOk || !manifestOk || errorDiagnostics.length
+    ? "error"
+    : missingEndpoints.length
+      ? "warning"
+      : "ok";
+  const apiBase = target && target.apiBase ? target.apiBase : "";
+  const mode = target && target.mode ? target.mode : "local";
+  const message = status === "ok"
+    ? `Contract ok: ${mode} API is compatible.`
+    : status === "warning"
+      ? `Contract warning: ${missingEndpoints.length} frontend endpoint${missingEndpoints.length === 1 ? "" : "s"} not listed.`
+      : !schemaOk
+        ? `Contract error: expected ${SYSTEM_MANIFEST_SCHEMA}, received ${schemaVersion || "missing schema"}.`
+        : errorDiagnostics.length
+          ? `Contract error: ${errorDiagnostics.length} manifest diagnostic${errorDiagnostics.length === 1 ? "" : "s"} failed.`
+          : "Contract error: system manifest reports not ready.";
+  return {
+    status,
+    message,
+    apiBase,
+    mode,
+    schemaVersion,
+    missingEndpoints,
+    diagnostics: manifestDiagnostics,
+    checkedAt: new Date().toISOString(),
+    manifest,
+  };
+}
+
 /* Consolidated frontend API and artifact helpers. */
 
 /* API client */
@@ -2208,6 +2299,7 @@ function toApiUrl(pathOrUrl) {
       }
       return localHeaderAuthProvider.setActiveUserId(userId);
     },
+    fetchSystemManifest: async () => apiGet("/api/system/manifest", "Failed to load system manifest"),
     fetchSession: async () => apiGet("/api/session", "Failed to load local session"),
     fetchProjects: async () => (await apiGet("/api/projects", "Failed to load projects")).projects || [],
     createProject: async (payload) => (await apiPost("/api/projects", payload, "Failed to create project")).project,
@@ -5825,14 +5917,18 @@ function AnalysisCanvasInfoModal({ onClose }) {
 
 function BackendTargetSwitch({
   apiTarget,
+  compatibility,
   onApiTargetModeChange,
   disabled,
 }) {
   const target = apiTarget || {};
+  const contract = compatibility || {};
   const backendMode = String(target.mode || "local") === "backend";
   const backendConfigured = Boolean(target.hasBackendApiBase);
   const apiBase = String(target.apiBase || target.localApiBase || "").replace(/^https?:\/\//, "");
   const backendBase = String(target.backendApiBase || "").replace(/^https?:\/\//, "");
+  const contractStatus = String(contract.status || "").trim();
+  const contractMessage = String(contract.message || "").trim();
   return (
     <div className={`backend-target-control ${backendMode ? "backend" : "local"}`}>
       <div className="backend-target-row">
@@ -5861,6 +5957,14 @@ function BackendTargetSwitch({
       ) : (
         <div className="backend-target-base" title={target.apiBase || ""}>API {apiBase || "current origin"}</div>
       )}
+      {contractStatus ? (
+        <div
+          className={`backend-target-contract ${contractStatus}`}
+          title={contractMessage || "System manifest compatibility status"}
+        >
+          {contractStatus === "checking" ? "Checking contract" : contractMessage || `Contract ${contractStatus}`}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -5874,6 +5978,7 @@ function DashboardHeader({
   activeProjectId,
   onReturnToProjects,
   apiTarget,
+  systemCompatibility,
   onApiTargetModeChange,
   apiTargetLoading,
 }) {
@@ -5908,6 +6013,7 @@ function DashboardHeader({
       <div className="header-right-controls">
         <BackendTargetSwitch
           apiTarget={apiTarget}
+          compatibility={systemCompatibility}
           onApiTargetModeChange={onApiTargetModeChange}
           disabled={apiTargetLoading}
         />
@@ -7981,6 +8087,7 @@ function App() {
       ? api.getApiTarget()
       : { mode: "local", localApiBase: window.location.origin, backendApiBase: "", apiBase: window.location.origin }
   ));
+  const [systemCompatibility, setSystemCompatibility] = useState(null);
   const [projects, setProjects] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState("");
   const [projectRuns, setProjectRuns] = useState([]);
@@ -8404,6 +8511,34 @@ function App() {
     if (successMessage) setStatusMessage(successMessage);
   }
 
+  async function probeSystemCompatibility() {
+    const target = api.getApiTarget ? api.getApiTarget() : apiTarget;
+    setSystemCompatibility({
+      status: "checking",
+      mode: target.mode,
+      apiBase: target.apiBase,
+      message: "Checking API contract...",
+    });
+    try {
+      const manifest = await api.fetchSystemManifest();
+      const compatibility = evaluateSystemManifest(manifest, target);
+      setSystemCompatibility(compatibility);
+      return compatibility;
+    } catch (err) {
+      const compatibility = {
+        status: "error",
+        mode: target.mode,
+        apiBase: target.apiBase,
+        message: toErrorMessage(err, "Contract error: system manifest is unavailable"),
+        missingEndpoints: [],
+        diagnostics: [],
+        checkedAt: new Date().toISOString(),
+      };
+      setSystemCompatibility(compatibility);
+      return compatibility;
+    }
+  }
+
   async function applyApiTarget(nextMode) {
     if (!api.setApiTarget) return;
     const mode = String(nextMode || "local") === "backend" ? "backend" : "local";
@@ -8420,9 +8555,16 @@ function App() {
     setStatusMessage("");
     setPlatformActionLoading(true);
     try {
+      const compatibility = await probeSystemCompatibility();
+      if (mode === "backend" && compatibility.status === "error") {
+        const restored = api.setApiTarget({ mode: currentTarget.mode || "local" });
+        setApiTarget(restored);
+        setErrorMessage(compatibility.message || "Backend API contract check failed.");
+        return;
+      }
       await reloadPlatformShell(
         mode === "backend"
-          ? `Connected to backend API: ${next.apiBase}`
+          ? `Connected to backend API: ${next.apiBase}${compatibility.status === "warning" ? " (contract warning)" : ""}`
           : `Connected to local API: ${next.apiBase}`
       );
     } catch (err) {
@@ -8494,6 +8636,7 @@ function App() {
         setErrorMessage("Backend mode is unavailable because EDIM_BACKEND_API_BASE is not configured.");
         return;
       }
+      await probeSystemCompatibility();
       await reloadPlatformShell("");
       if (cancelled) return;
     }
@@ -9613,6 +9756,7 @@ function App() {
         activeProjectId={activeProjectId}
         onReturnToProjects={() => setRunViewMode("projects")}
         apiTarget={apiTarget}
+        systemCompatibility={systemCompatibility}
         onApiTargetModeChange={handleApiTargetModeChange}
         apiTargetLoading={platformActionLoading}
       />
