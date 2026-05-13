@@ -55,6 +55,15 @@ function copyAbsoluteFile(sourcePath, targetRelativePath) {
   fs.copyFileSync(sourcePath, target);
 }
 
+function copyDirectory(relativePath) {
+  const source = path.join(root, relativePath);
+  const target = path.join(dist, relativePath);
+  if (!fs.existsSync(source) || !fs.statSync(source).isDirectory()) {
+    throw new Error(`Missing frontend asset directory: ${relativePath}.`);
+  }
+  fs.cpSync(source, target, { recursive: true });
+}
+
 function readDotEnvValue(key) {
   const envPath = path.join(repoRoot, '.env');
   if (!fs.existsSync(envPath)) return '';
@@ -76,9 +85,11 @@ function readDotEnvValue(key) {
 }
 
 function runtimeConfigContent() {
+  const localApiBase = process.env.EDIM_LOCAL_API_BASE || readDotEnvValue('EDIM_LOCAL_API_BASE') || '';
   const backendApiBase = process.env.EDIM_BACKEND_API_BASE || readDotEnvValue('EDIM_BACKEND_API_BASE') || '';
   return [
     '// Generated frontend runtime configuration.',
+    `window.EDIM_LOCAL_API_BASE = ${JSON.stringify(localApiBase)};`,
     `window.EDIM_BACKEND_API_BASE = ${JSON.stringify(backendApiBase)};`,
     '',
   ].join('\n');
@@ -92,16 +103,28 @@ if (process.argv.includes('--check')) {
 fs.rmSync(dist, { recursive: true, force: true });
 [
   'index.html',
+  'api-client.js',
+  'hero-visual.jsx',
   'app.jsx',
   'geo/README.md',
   'geo/world_fit.geojson',
   'geo/countries.geojson',
   'geo/edim_locations_placeholder.geojson',
   'assets/undp-logo.svg',
+  'hero-defaults.json',
 ].forEach(copyFile);
+copyDirectory('assets/webp');
+copyDirectory('methodology');
 copyAbsoluteFile(architectureCatalogPath, 'model_architectures.json');
 fs.writeFileSync(path.join(dist, 'runtime-config.js'), runtimeConfigContent());
-fs.writeFileSync(path.join(dist, 'runtime-config.local.js'), 'window.EDIM_BACKEND_API_BASE = window.EDIM_BACKEND_API_BASE || "";\n');
+fs.writeFileSync(
+  path.join(dist, 'runtime-config.local.js'),
+  [
+    'window.EDIM_LOCAL_API_BASE = window.EDIM_LOCAL_API_BASE || "";',
+    'window.EDIM_BACKEND_API_BASE = window.EDIM_BACKEND_API_BASE || "";',
+    '',
+  ].join('\n')
+);
 
 const manifest = {
   schema_version: 'edim_frontend_static_bundle',
@@ -109,6 +132,8 @@ const manifest = {
   entrypoint: 'index.html',
   included_paths: [
     'index.html',
+    'api-client.js',
+    'hero-visual.jsx',
     'app.jsx',
     'runtime-config.js',
     'runtime-config.local.js',
@@ -117,6 +142,10 @@ const manifest = {
     'geo/countries.geojson',
     'geo/edim_locations_placeholder.geojson',
     'assets/undp-logo.svg',
+    'assets/webp/',
+    'hero-defaults.json',
+    'methodology/methodology.css',
+    'methodology/methodology.js',
   ],
 };
 fs.writeFileSync(path.join(dist, 'bundle-manifest.json'), JSON.stringify(manifest, null, 2));

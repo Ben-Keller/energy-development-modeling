@@ -78,7 +78,7 @@ def _repo_calliope_root(repo_root: Path) -> Path:
     return repo_root / "model_runtime" / "model_modules" / "calliope" / "Calliope-Africa-main"
 
 
-def _build_settings(base: Path, *, dedupe_enabled: bool = True, queue_capacity: int = 200) -> Settings:
+def _build_settings(base: Path, *, dedupe_enabled: bool = True, queue_capacity: int = 12) -> Settings:
     calliope_root = base / "model_runtime" / "model_modules" / "calliope" / "Calliope-Africa-main"
     calliope_root.mkdir(parents=True, exist_ok=True)
     (calliope_root / "model.yaml").write_text("model: {}", encoding="utf-8")

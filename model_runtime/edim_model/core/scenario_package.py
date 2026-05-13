@@ -26,7 +26,7 @@ AFRICA_MRIO_SCENARIO_LABELS = {
         "short_label": "Full decarbonization",
         "scenario_type": "full_decarbonization",
         "description": (
-            "Africa-wide national placeholder scenario. South Africa uses the ZA-S1 report record; "
+            "Africa national placeholder scenario. South Africa uses the ZA-S1 report record; "
             "all other African countries use Rest-of-Africa WF-S1 assumptions until country-specific "
             "expert MRIO scenario records are supplied."
         ),
@@ -36,7 +36,7 @@ AFRICA_MRIO_SCENARIO_LABELS = {
         "short_label": "National policy target",
         "scenario_type": "policy_target",
         "description": (
-            "Africa-wide national placeholder scenario. South Africa uses the ZA-S2 report record; "
+            "Africa national placeholder scenario. South Africa uses the ZA-S2 report record; "
             "all other African countries use Rest-of-Africa WF-S2 assumptions until country-specific "
             "expert MRIO scenario records are supplied."
         ),

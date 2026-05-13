@@ -23,7 +23,7 @@ const PROJECT_TYPE_OPTIONS = [
 ];
 
 const PROJECT_GEOGRAPHY_OPTIONS = [
-  "Africa-wide",
+  "Africa",
   "North Africa",
   "West Africa",
   "Central Africa",
@@ -35,6 +35,55 @@ const PROJECT_GEOGRAPHY_OPTIONS = [
 ];
 
 const DEFAULT_MODEL_ARCHITECTURE_ID = "energy-development";
+
+const LANDING_HERO_BASE_TUNING = {
+  scale: 1.16,
+  curvature: 1,
+  drift: 1,
+  pulseSpeed: 1,
+  interaction: 1,
+  lines: 1.58,
+  labels: 1,
+  titleStrength: 1.35,
+  pulses: 1,
+  images: 1,
+  contrast: 1.52,
+  glow: 1.25,
+  flashlight: 1.35,
+  flashlightSize: 1,
+};
+
+const LANDING_HERO_DEFAULTS_PATH =
+  String(window.EDIM_HERO_DEFAULTS_PATH || "").trim() || "./hero-defaults.json";
+
+function getFrontendApiBase() {
+  const api = window.EDIM_API_CLIENT || {};
+  return typeof api.getApiBase === "function" ? api.getApiBase() : window.location.origin;
+}
+
+function normalizeLandingHeroTuning(values) {
+  const source = values && typeof values === "object" ? values : {};
+  return Object.keys(LANDING_HERO_BASE_TUNING).reduce((acc, key) => {
+    const fallback = Number(LANDING_HERO_BASE_TUNING[key] || 1);
+    const value = Number(source[key]);
+    acc[key] = Number.isFinite(value) ? value : fallback;
+    return acc;
+  }, {});
+}
+
+function normalizeLandingHeroDefaults(payload) {
+  const source = payload && typeof payload === "object" ? payload : {};
+  const tuningSource = source.tuningDefaults && typeof source.tuningDefaults === "object"
+    ? source.tuningDefaults
+    : source.tuning && typeof source.tuning === "object"
+      ? source.tuning
+      : source;
+  return {
+    schema: "edim_hero_background_defaults",
+    theme: source.theme || "solar",
+    tuningDefaults: normalizeLandingHeroTuning(tuningSource),
+  };
+}
 
 const POLICY_LEVER_TOOLTIPS = {
   renewables_capex_multiplier:
@@ -153,9 +202,9 @@ const ARCHITECTURE_BOXES = [
 
 const DEFAULT_FLOW_NODE_LAYOUT = {
   scenario: { x: 40, y: 30, w: 1400, h: 650 },
-  calliope_data: { x: 40, y: 820, w: 360, h: 170 },
+  calliope_data: { x: 40, y: 820, w: 176, h: 170 },
   adapter: { x: 505, y: 820, w: 470, h: 150 },
-  mrio_data: { x: 1040, y: 820, w: 390, h: 170 },
+  mrio_data: { x: 1040, y: 820, w: 191, h: 170 },
   calliope: { x: 72, y: 1100, w: 380, h: 150 },
   bridge: { x: 515, y: 1240, w: 390, h: 140 },
   mrio: { x: 1015, y: 1265, w: 410, h: 155 },
@@ -381,6 +430,12 @@ function projectTypeLabel(project) {
     PROJECT_TYPE_OPTIONS.find((row) => row.value === architectureId) ||
     PROJECT_TYPE_OPTIONS.find((row) => row.projectType === projectType);
   return option ? option.label : projectType || architectureId || "Energy-development";
+}
+
+function projectGeographyLabel(value) {
+  const label = String(value || "").trim();
+  if (!label) return "";
+  return label === "Africa-wide" ? "Africa" : label;
 }
 
 const LOCATION_MAP_ID_KEYS = [
@@ -2103,202 +2158,36 @@ function evaluateSystemManifest(manifest, target) {
 
 /* API client */
 (function () {
-  // Thin browser API boundary for the dashboard. Components should call this
-  // client instead of constructing URLs directly so hosted shells can swap auth,
-  // base URLs, and download behavior without touching UI components.
-  const USER_STORAGE_KEY = "edim.active_user_id";
-  const API_MODE_STORAGE_KEY = "edim.api_target_mode";
-  const LOCAL_API_BASE = normalizeApiBase(window.EDIM_LOCAL_API_BASE || window.EDIM_API_BASE || window.location.origin);
-  const configuredBackendBase = normalizeApiBase(window.EDIM_BACKEND_API_BASE || "");
-  let apiTargetMode = window.localStorage
-    ? String(window.localStorage.getItem(API_MODE_STORAGE_KEY) || "local").toLowerCase()
-    : "local";
-  if (!["local", "backend"].includes(apiTargetMode)) apiTargetMode = "local";
-  const backendApiBase = configuredBackendBase;
-  if (apiTargetMode === "backend" && !backendApiBase) apiTargetMode = "local";
-  let activeUserId = window.localStorage ? window.localStorage.getItem(USER_STORAGE_KEY) || "undp_analyst" : "undp_analyst";
-
-  function normalizeApiBase(value) {
-    return String(value || "").trim().replace(/\/+$/, "");
+  const http = window.EDIM_HTTP_CLIENT;
+  if (!http) {
+    throw new Error("EDIM_HTTP_CLIENT must be loaded before app.jsx");
   }
-
-  function currentApiBase() {
-    if (apiTargetMode === "backend") return backendApiBase || LOCAL_API_BASE;
-    return LOCAL_API_BASE;
-  }
-
-  function apiUrl(pathOrUrl) {
-    if (!pathOrUrl) return currentApiBase();
-    if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-    const path = String(pathOrUrl).startsWith("/") ? String(pathOrUrl) : `/${pathOrUrl}`;
-    return `${currentApiBase()}${path}`;
-  }
-
-  function apiTargetDescriptor() {
-    return {
-      mode: apiTargetMode,
-      localApiBase: LOCAL_API_BASE,
-      backendApiBase,
-      apiBase: currentApiBase(),
-      hasBackendApiBase: Boolean(backendApiBase),
-    };
-  }
-
-  function setApiTarget(next) {
-    const payload = next && typeof next === "object" ? next : {};
-    const nextMode = String(payload.mode || apiTargetMode || "local").toLowerCase() === "backend" ? "backend" : "local";
-    apiTargetMode = nextMode === "backend" && !backendApiBase ? "local" : nextMode;
-    if (window.localStorage) {
-      window.localStorage.setItem(API_MODE_STORAGE_KEY, apiTargetMode);
-    }
-    return apiTargetDescriptor();
-  }
-
-  const localHeaderAuthProvider = {
-    id: "test_user_header",
-    getActiveUserId: () => activeUserId,
-    setActiveUserId: (userId) => {
-      activeUserId = String(userId || "undp_analyst");
-      if (window.localStorage) window.localStorage.setItem(USER_STORAGE_KEY, activeUserId);
-      return activeUserId;
-    },
-    headers: () => ({ "X-EDIM-User-Id": activeUserId }),
-  };
-
-  let authProvider = window.EDIM_AUTH_PROVIDER || localHeaderAuthProvider;
-
-  function currentAuthHeaders() {
-    if (authProvider && typeof authProvider.headers === "function") {
-      return authProvider.headers() || {};
-    }
-    const userId = authProvider && typeof authProvider.getActiveUserId === "function"
-      ? authProvider.getActiveUserId()
-      : activeUserId;
-    return userId ? { "X-EDIM-User-Id": userId } : {};
-  }
-
-  function authHeaders(extra) {
-    return {
-      ...(extra || {}),
-      ...currentAuthHeaders(),
-    };
-  }
-
-  function appendQueryParam(pathOrUrl, key, value) {
-    if (!value) return pathOrUrl;
-    const separator = String(pathOrUrl).includes("?") ? "&" : "?";
-    return `${pathOrUrl}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
-  }
-
-  function downloadUrl(pathOrUrl) {
-    if (!pathOrUrl) return currentApiBase();
-    const absolute = apiUrl(pathOrUrl);
-    const providerId = authProvider && authProvider.id ? String(authProvider.id) : "";
-    const headers = currentAuthHeaders();
-    const localUserId = headers["X-EDIM-User-Id"];
-    // Plain anchor downloads cannot send custom headers. The local test-user
-    // auth shim also accepts user_id query params; production auth providers
-    // should use cookie/session auth or fetch/blob downloads instead.
-    if (providerId === "test_user_header" && localUserId) {
-      return appendQueryParam(absolute, "user_id", localUserId);
-    }
-    return absolute;
-  }
-
-  async function parseApiError(res, defaultMessage) {
-    let text = "";
-    try {
-      const data = await res.json();
-      text = data && (data.detail || data.message || data.error) ? String(data.detail || data.message || data.error) : "";
-    } catch (err) {
-      try {
-        text = await res.text();
-      } catch (ignore) {
-        text = "";
-      }
-    }
-    if (text.trim()) return `${defaultMessage}: ${text}`;
-    return `${defaultMessage}: HTTP ${res.status}`;
-  }
-
-  async function apiGet(path, defaultMessage) {
-    const res = await fetch(apiUrl(path), { headers: authHeaders() });
-    if (!res.ok) throw new Error(await parseApiError(res, defaultMessage));
-    return res.json();
-  }
-
-  async function apiGetText(path, defaultMessage) {
-    const res = await fetch(apiUrl(path), { headers: authHeaders() });
-    if (!res.ok) throw new Error(await parseApiError(res, defaultMessage));
-    return res.text();
-  }
-
-  async function apiPost(path, body, defaultMessage) {
-    const res = await fetch(apiUrl(path), {
-      method: "POST",
-      headers: authHeaders({ "Content-Type": "application/json" }),
-      body: body == null ? undefined : JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(await parseApiError(res, defaultMessage));
-    return res.json();
-  }
-
-  async function apiPatch(path, body, defaultMessage) {
-    const res = await fetch(apiUrl(path), {
-      method: "PATCH",
-      headers: authHeaders({ "Content-Type": "application/json" }),
-      body: body == null ? undefined : JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(await parseApiError(res, defaultMessage));
-    return res.json();
-  }
-
-  async function apiDelete(path, defaultMessage) {
-    const res = await fetch(apiUrl(path), { method: "DELETE", headers: authHeaders() });
-    if (!res.ok) throw new Error(await parseApiError(res, defaultMessage));
-    return res.json();
-  }
-
-  async function uploadInputDataset(datasetId, file) {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch(apiUrl(`/api/input-datasets/${encodeURIComponent(datasetId)}/upload`), {
-      method: "POST",
-      headers: authHeaders(),
-      body: form,
-    });
-    if (!res.ok) throw new Error(await parseApiError(res, "Failed to upload input dataset"));
-    return res.json();
-  }
+  const {
+    apiGet,
+    apiGetText,
+    apiPost,
+    apiPatch,
+    apiDelete,
+    uploadInputDataset,
+    downloadUrl,
+  } = http;
 
   window.EDIM_API_CLIENT = {
-    API_BASE: currentApiBase(),
-    getApiBase: currentApiBase,
-    getApiTarget: apiTargetDescriptor,
-    setApiTarget,
-    parseApiError,
+    API_BASE: http.getApiBase(),
+    getApiBase: http.getApiBase,
+    getApiTarget: http.getApiTarget,
+    setApiTarget: http.setApiTarget,
+    parseApiError: http.parseApiError,
     apiGet,
     apiGetText,
     apiPost,
     apiPatch,
     apiDelete,
     downloadUrl,
-    getAuthProvider: () => authProvider,
-    setAuthProvider: (provider) => {
-      authProvider = provider || localHeaderAuthProvider;
-    },
-    getActiveUserId: () => {
-      if (authProvider && typeof authProvider.getActiveUserId === "function") {
-        return authProvider.getActiveUserId();
-      }
-      return activeUserId;
-    },
-    setActiveUserId: (userId) => {
-      if (authProvider && typeof authProvider.setActiveUserId === "function") {
-        return authProvider.setActiveUserId(userId);
-      }
-      return localHeaderAuthProvider.setActiveUserId(userId);
-    },
+    getAuthProvider: http.getAuthProvider,
+    setAuthProvider: http.setAuthProvider,
+    getActiveUserId: http.getActiveUserId,
+    setActiveUserId: http.setActiveUserId,
     fetchSystemManifest: async () => apiGet("/api/system/manifest", "Failed to load system manifest"),
     fetchSession: async () => apiGet("/api/session", "Failed to load local session"),
     fetchProjects: async () => (await apiGet("/api/projects", "Failed to load projects")).projects || [],
@@ -2400,23 +2289,18 @@ function evaluateSystemManifest(manifest, target) {
 
 /* Workspace artifact contracts */
 (function () {
-  function fallbackApiBase() {
-    const api = window.EDIM_API_CLIENT || {};
-    return typeof api.getApiBase === "function" ? api.getApiBase() : window.location.origin;
-  }
-
   function artifactHref(runId, artifact) {
     if (!artifact || !runId) return "";
     const api = window.EDIM_API_CLIENT || {};
     if (artifact.download_url) {
-      const href = /^https?:\/\//i.test(artifact.download_url) ? artifact.download_url : `${fallbackApiBase()}${artifact.download_url}`;
+      const href = /^https?:\/\//i.test(artifact.download_url) ? artifact.download_url : `${getFrontendApiBase()}${artifact.download_url}`;
       return typeof api.downloadUrl === "function" ? api.downloadUrl(artifact.download_url) : href;
     }
     if (artifact.path) {
       const artifactId = artifact.artifact_id || "";
       if (artifactId) {
         const path = `/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`;
-        return typeof api.downloadUrl === "function" ? api.downloadUrl(path) : `${fallbackApiBase()}${path}`;
+        return typeof api.downloadUrl === "function" ? api.downloadUrl(path) : `${getFrontendApiBase()}${path}`;
       }
     }
     return "";
@@ -2467,10 +2351,6 @@ function evaluateSystemManifest(manifest, target) {
 
 /* Result artifact catalog */
 (function () {
-  function fallbackApiBase() {
-    const api = window.EDIM_API_CLIENT || {};
-    return typeof api.getApiBase === "function" ? api.getApiBase() : window.location.origin;
-  }
   const resultArtifacts = window.EDIM_RESULT_ARTIFACTS || {};
 
   const DEFAULT_OUTPUT_ARTIFACTS = [
@@ -2500,7 +2380,7 @@ function evaluateSystemManifest(manifest, target) {
       if (!runId) return { ...row, href: "" };
       const path = `/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(row.key)}`;
       const api = window.EDIM_API_CLIENT || {};
-      return { ...row, href: typeof api.downloadUrl === "function" ? api.downloadUrl(path) : `${fallbackApiBase()}${path}` };
+      return { ...row, href: typeof api.downloadUrl === "function" ? api.downloadUrl(path) : `${getFrontendApiBase()}${path}` };
     });
   }
 
@@ -5929,47 +5809,83 @@ function BackendTargetSwitch({
   const backendBase = String(target.backendApiBase || "").replace(/^https?:\/\//, "");
   const contractStatus = String(contract.status || "").trim();
   const contractMessage = String(contract.message || "").trim();
+  const contractLabel = contractStatus
+    ? contractStatus === "checking"
+      ? "Checking contract"
+      : contractMessage || `Contract ${contractStatus}`
+    : "Contract not checked";
   return (
-    <div className={`backend-target-control ${backendMode ? "backend" : "local"}`}>
-      <div className="backend-target-row">
-        <span className="backend-target-label">Runtime</span>
-        <label className="backend-mode-slider">
-          <span className={!backendMode ? "active" : ""}>Local</span>
-          <input
-            type="checkbox"
-            checked={backendMode}
-            onChange={(event) => onApiTargetModeChange(event.target.checked ? "backend" : "local")}
-            disabled={disabled || (!backendConfigured && !backendMode)}
-            aria-label="Switch between local and hosted backend runtime"
-          />
-          <span className="backend-mode-track" aria-hidden="true">
-            <span className="backend-mode-thumb" />
+    <div className={`runtime-target-control ${backendMode ? "is-backend" : "is-local"}`}>
+      <div className="runtime-target-row">
+        <span className="runtime-target-label">Runtime</span>
+        <label className="runtime-switch-control">
+          <span className={`runtime-switch-label ${!backendMode ? "is-active" : ""}`}>Local</span>
+          <span className="runtime-toggle-shell">
+            <input
+              className="runtime-toggle-input"
+              type="checkbox"
+              checked={backendMode}
+              onChange={(event) => onApiTargetModeChange(event.target.checked ? "backend" : "local")}
+              disabled={disabled || (!backendConfigured && !backendMode)}
+              aria-label="Switch between local and hosted backend runtime"
+            />
+            <span className="runtime-toggle-track" aria-hidden="true">
+              <span className="runtime-toggle-thumb" />
+            </span>
           </span>
-          <span className={backendMode ? "active" : ""}>Backend</span>
+          <span className={`runtime-switch-label ${backendMode ? "is-active" : ""}`}>Backend</span>
         </label>
+        <span className="runtime-info-slot">
+          <button
+            type="button"
+            className={`runtime-info-button ${contractStatus || (backendConfigured ? "idle" : "warning")}`}
+            aria-label="Runtime backend details"
+          >
+            i
+          </button>
+          <span className="runtime-info-panel">
+            <span><b>Active:</b> {backendMode ? "Backend" : "Local"}</span>
+            <span><b>API:</b> {backendMode && backendConfigured ? (backendBase || "configured backend") : (apiBase || "current origin")}</span>
+            <span><b>Backend env:</b> {backendConfigured ? "Set" : "Not set"}</span>
+            <span><b>Contract:</b> {contractLabel}</span>
+          </span>
+        </span>
       </div>
-      {backendMode && backendConfigured ? (
-        <div className="backend-target-base" title={target.backendApiBase || ""}>Backend {backendBase}</div>
-      ) : !backendConfigured ? (
-        <div className="backend-target-base warning" title="Set EDIM_BACKEND_API_BASE in the frontend runtime environment.">
-          Backend env not set
-        </div>
-      ) : (
-        <div className="backend-target-base" title={target.apiBase || ""}>API {apiBase || "current origin"}</div>
-      )}
-      {contractStatus ? (
-        <div
-          className={`backend-target-contract ${contractStatus}`}
-          title={contractMessage || "System manifest compatibility status"}
-        >
-          {contractStatus === "checking" ? "Checking contract" : contractMessage || `Contract ${contractStatus}`}
-        </div>
-      ) : null}
     </div>
   );
 }
 
-function DashboardHeader({
+function ProductBrand({ onClick = null }) {
+  const clickable = typeof onClick === "function";
+  const className = `edim-brand${clickable ? " brand-home-button" : ""}`;
+  const content = (
+    <>
+      <img
+        className="edim-logo"
+        src="./assets/undp-logo.svg?v=edim"
+        alt="UNDP"
+      />
+      <span className="edim-brand-copy">
+        <strong>Energy Development Modeling</strong>
+        <small>United Nations Development Programme</small>
+      </span>
+    </>
+  );
+  if (clickable) {
+    return (
+      <button type="button" className={className} onClick={onClick} aria-label="Return to landing page">
+        {content}
+      </button>
+    );
+  }
+  return (
+    <div className={className}>
+      {content}
+    </div>
+  );
+}
+
+function UnifiedHeader({
   runViewMode,
   currentUserId,
   availableUsers,
@@ -5981,34 +5897,34 @@ function DashboardHeader({
   systemCompatibility,
   onApiTargetModeChange,
   apiTargetLoading,
+  onReturnToLanding,
 }) {
   const activeProject = (projects || []).find((project) => project.project_id === activeProjectId) || null;
   const inProjectWorkspace = runViewMode !== "projects" && activeProject;
-  const projectTitle = inProjectWorkspace ? activeProject.title || "Untitled project" : "Projects overview";
+  const projectTitle = runViewMode
+    ? (inProjectWorkspace ? activeProject.title || "Untitled project" : "Projects overview")
+    : "";
   return (
-    <div className="app-header">
-      <div className="header-brand">
-        <img className="header-logo" src="./assets/undp-logo.svg?v=edim" alt="UNDP" />
-        <div className="header-product-title" aria-label="Energy Development Modeling">
-          <span>Energy</span>
-          <span>Development</span>
-          <span>Modeling</span>
-        </div>
-      </div>
+    <header className="edim-topbar">
+      <ProductBrand onClick={onReturnToLanding} />
 
-      <div className={`header-project-area ${inProjectWorkspace ? "in-project" : ""}`}>
-        {inProjectWorkspace ? (
-          <>
+      {projectTitle ? (
+        <div className={`header-project-area ${inProjectWorkspace ? "in-project" : ""}`}>
+          {inProjectWorkspace ? (
+            <>
+              <div className="header-project-title">{projectTitle}</div>
+              <button type="button" className="header-back-button" onClick={onReturnToProjects}>
+                <span aria-hidden="true">↩</span>
+                <span>Back to projects</span>
+              </button>
+            </>
+          ) : (
             <div className="header-project-title">{projectTitle}</div>
-            <button type="button" className="header-back-button" onClick={onReturnToProjects}>
-              <span aria-hidden="true">↩</span>
-              <span>Back to projects</span>
-            </button>
-          </>
-        ) : (
-          <div className="header-project-title">{projectTitle}</div>
-        )}
-      </div>
+          )}
+        </div>
+      ) : (
+        <div className="header-project-area" aria-hidden="true" />
+      )}
 
       <div className="header-right-controls">
         <BackendTargetSwitch
@@ -6028,6 +5944,229 @@ function DashboardHeader({
           </select>
         </label>
       </div>
+    </header>
+  );
+}
+
+function LandingHeroVisualSlot({ tuning }) {
+  const HeroBackground = window.EDIMHeroBackground && window.EDIMHeroBackground.HeroBackground;
+  const resolvedTuning = {
+    ...LANDING_HERO_BASE_TUNING,
+    ...(tuning || {}),
+  };
+  return (
+    <div className="landing-hero-visual-slot" aria-hidden="true">
+      <div id="landing-hero-d3-root" className="landing-hero-d3-root" data-visual-slot="landing-hero-d3">
+        {HeroBackground ? (
+          <HeroBackground
+            theme="solar"
+            intensity={1.12}
+            seed={31}
+            tuning={resolvedTuning}
+            style={{ zIndex: 0 }}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function LandingCardVisual({ type }) {
+  const visualClass = `landing-card-visual ${type}`;
+  if (type === "country") {
+    return (
+      <div className={visualClass} aria-hidden="true">
+        <svg viewBox="0 0 240 140">
+          <path d="M24 98 C48 48, 86 78, 112 38 C148 -8, 192 34, 214 82" />
+          <circle cx="66" cy="76" r="14" />
+          <circle cx="122" cy="50" r="22" />
+          <circle cx="184" cy="72" r="16" />
+          <line x1="66" y1="76" x2="122" y2="50" />
+          <line x1="122" y1="50" x2="184" y2="72" />
+        </svg>
+      </div>
+    );
+  }
+  if (type === "evidence") {
+    return (
+      <div className={visualClass} aria-hidden="true">
+        <svg viewBox="0 0 240 140">
+          <rect x="28" y="88" width="28" height="24" />
+          <rect x="70" y="64" width="28" height="48" />
+          <rect x="112" y="42" width="28" height="70" />
+          <rect x="154" y="72" width="28" height="40" />
+          <path d="M36 48 L86 58 L126 28 L178 48 L210 30" />
+          <circle cx="126" cy="28" r="8" />
+        </svg>
+      </div>
+    );
+  }
+  return (
+    <div className={visualClass} aria-hidden="true">
+      <svg viewBox="0 0 240 140">
+        <polygon points="54,34 90,54 90,96 54,116 18,96 18,54" />
+        <polygon points="132,20 178,46 178,98 132,124 86,98 86,46" />
+        <polygon points="204,42 232,58 232,90 204,106 176,90 176,58" />
+        <line x1="90" y1="76" x2="86" y2="76" />
+        <line x1="178" y1="74" x2="176" y2="74" />
+      </svg>
+    </div>
+  );
+}
+
+function LandingPage({
+  currentUserId,
+  availableUsers,
+  onUserChange,
+  apiTarget,
+  systemCompatibility,
+  onApiTargetModeChange,
+  apiTargetLoading,
+  onEnter,
+  onOpenMethodology,
+  statusMessage,
+  errorMessage,
+}) {
+  const currentUser = (availableUsers || []).find((user) => user.user_id === currentUserId) || null;
+  const canEnter = Boolean(currentUserId) && !apiTargetLoading;
+  const landingVideoSrc = String(window.EDIM_LANDING_VIDEO_SRC || "").trim();
+  const [heroDefaults, setHeroDefaults] = useState(normalizeLandingHeroTuning(LANDING_HERO_BASE_TUNING));
+  const heroFlashlightRef = useRef(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadHeroDefaults() {
+      try {
+        const response = await fetch(LANDING_HERO_DEFAULTS_PATH, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = normalizeLandingHeroDefaults(await response.json());
+        if (cancelled) return;
+        setHeroDefaults(payload.tuningDefaults);
+      } catch (err) {
+        // The built-in base tuning remains the fallback if the static config is unavailable.
+      }
+    }
+    loadHeroDefaults();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    const overlay = heroFlashlightRef.current;
+    if (!overlay) return undefined;
+    const clearFlashlight = () => {
+      overlay.style.setProperty("--landing-hero-flashlight-opacity", "0");
+    };
+    window.addEventListener("blur", clearFlashlight);
+    return () => window.removeEventListener("blur", clearFlashlight);
+  }, []);
+  function updateHeroFlashlight(event) {
+    const overlay = heroFlashlightRef.current;
+    if (!overlay) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 100;
+    const y = ((event.clientY - rect.top) / Math.max(rect.height, 1)) * 100;
+    overlay.style.setProperty("--landing-hero-flashlight-x", `${Math.max(0, Math.min(100, x)).toFixed(2)}%`);
+    overlay.style.setProperty("--landing-hero-flashlight-y", `${Math.max(0, Math.min(100, y)).toFixed(2)}%`);
+    const textAreaMultiplier = x < 48 ? 0.18 + (Math.max(0, x) / 48) * 0.38 : 0.62;
+    overlay.style.setProperty("--landing-hero-flashlight-opacity", textAreaMultiplier.toFixed(3));
+  }
+  function clearHeroFlashlight() {
+    const overlay = heroFlashlightRef.current;
+    if (overlay) overlay.style.setProperty("--landing-hero-flashlight-opacity", "0");
+  }
+  return (
+    <div className="landing-shell">
+      <UnifiedHeader
+        currentUserId={currentUserId}
+        availableUsers={availableUsers}
+        onUserChange={onUserChange}
+        apiTarget={apiTarget}
+        systemCompatibility={systemCompatibility}
+        onApiTargetModeChange={onApiTargetModeChange}
+        apiTargetLoading={apiTargetLoading}
+        onReturnToLanding={null}
+      />
+
+      <main className="landing-main">
+        <section className="landing-hero-section" onPointerMove={updateHeroFlashlight} onPointerLeave={clearHeroFlashlight}>
+          <LandingHeroVisualSlot tuning={heroDefaults} />
+          <div className="landing-hero-scrim" aria-hidden="true" />
+          <div ref={heroFlashlightRef} className="landing-hero-flashlight" aria-hidden="true" />
+          <div className="landing-hero-card">
+            <h1>Model development outcomes from energy transition pathways.</h1>
+            <p>
+              Help countries connect energy-system choices to jobs, growth, emissions, affordability, and service delivery
+              so transition planning can support development priorities and investment decisions.
+            </p>
+            <div className="landing-actions">
+              <button type="button" className="landing-primary-action" onClick={onEnter} disabled={!canEnter}>
+                Open projects
+              </button>
+              <button type="button" className="landing-secondary-action" onClick={onOpenMethodology}>
+                Explore the methodology
+              </button>
+            </div>
+            {errorMessage ? <div className="warn landing-message">{errorMessage}</div> : null}
+            {statusMessage ? <div className="ok landing-message">{statusMessage}</div> : null}
+          </div>
+        </section>
+
+        <section className="landing-video-section">
+          <div className="landing-section-heading">
+            <div className="landing-section-kicker">Platform overview</div>
+            <h2>From energy pathways to development evidence.</h2>
+            <p>
+              The workspace is structured around projects, model architectures, scenario packages, model runs, exports,
+              and comparison views so country teams can move from question to evidence without losing provenance.
+            </p>
+          </div>
+          <div className="landing-video-frame">
+            {landingVideoSrc ? (
+              <video controls playsInline preload="metadata" src={landingVideoSrc}>
+                Platform overview video.
+              </video>
+            ) : (
+              <div className="landing-video-placeholder">
+                <div className="landing-video-play" aria-hidden="true">▶</div>
+                <div>
+                  <div className="landing-video-title">Platform overview video</div>
+                  <div className="landing-video-copy">Set <code>EDIM_LANDING_VIDEO_SRC</code> to replace this preview with a hosted or local video asset.</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="landing-feature-section">
+          <div className="landing-section-heading compact">
+            <div className="landing-section-kicker">What the platform supports</div>
+            <h2>Clean workflows for country energy-transition decisions.</h2>
+          </div>
+          <div className="landing-feature-grid">
+            <article className="landing-feature-card">
+              <LandingCardVisual type="energy" />
+              <h3>Energy for development</h3>
+              <p>Assess how power-sector pathways shape employment, value creation, emissions, reliability, and access outcomes.</p>
+            </article>
+            <article className="landing-feature-card">
+              <LandingCardVisual type="country" />
+              <h3>Country decision support</h3>
+              <p>Organize scenarios around national planning questions, compare alternatives, and maintain traceable evidence for partners.</p>
+            </article>
+            <article className="landing-feature-card">
+              <LandingCardVisual type="evidence" />
+              <h3>Investment-ready outputs</h3>
+              <p>Translate model runs into downloadable artifacts, reports, and comparison views that support prioritization and financing dialogue.</p>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <footer className="landing-footer">
+        <div>United Nations Development Programme</div>
+        <div>Energy Development Modeling</div>
+        <div>Decision support for sustainable energy transitions.</div>
+      </footer>
     </div>
   );
 }
@@ -6285,6 +6424,90 @@ function FlowEdgeLayer({ positions, edges, canvas }) {
   );
 }
 
+function MethodologyArchitectureDiagram({
+  selectedArchitecture = DEFAULT_MODEL_ARCHITECTURE_ID,
+  architectureCatalog,
+  activeNodeIds = [],
+}) {
+  const architecture = architectureById(
+    architectureCatalog || normalizeArchitectureCatalog(null),
+    selectedArchitecture
+  );
+  const flowDefinition = normalizeFlowDefinition(architecture && architecture.graph);
+  const boxes = ((architecture && architecture.boxes) || ARCHITECTURE_BOXES).map((box) => ({ ...box }));
+  const boxById = new Map(boxes.map((box) => [box.id, box]));
+  const orderedNodeIds = flowDefinition.order || DEFAULT_FLOW_NODE_ORDER;
+  const positions = flowDefinition.nodes || {};
+  const canvas = flowDefinition.canvas || DEFAULT_FLOW_CANVAS_SIZE;
+  const activeSet = new Set(activeNodeIds || []);
+  const developmentMuted = selectedArchitecture === "energy-only" && architectureIncludesDevelopment(architecture);
+  const mutedSet = new Set(developmentMuted ? ["bridge", "mrio", "mrio_data"] : []);
+  const edges = (flowDefinition.edges || DEFAULT_FLOW_EDGES).filter((edge) => {
+    if (!positions[edge.from] || !positions[edge.to]) return false;
+    return !mutedSet.has(edge.from) && !mutedSet.has(edge.to);
+  });
+
+  return (
+    <div className="methodology-architecture-diagram" aria-label={`${architecture.shortLabel || architecture.label} model architecture`}>
+      <svg
+        viewBox={`0 0 ${canvas.width} ${canvas.height}`}
+        preserveAspectRatio="xMidYMid meet"
+        aria-hidden="true"
+      >
+        <defs>
+          <marker id="methodology-flow-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+            <path d="M 0 0 L 12 6 L 0 12 z" fill="#67e8f9" opacity="0.82" />
+          </marker>
+        </defs>
+        {edges.map((edge) => {
+          const from = positions[edge.from];
+          const to = positions[edge.to];
+          const sourceSide = flowSideFor(from, to);
+          const targetSide = flowSideFor(to, from);
+          const edgeRows = edges;
+          const outgoing = edgeRows.filter((row) => row.from === edge.from && flowSideFor(positions[row.from], positions[row.to]) === sourceSide);
+          const incoming = edgeRows.filter((row) => row.to === edge.to && flowSideFor(positions[row.to], positions[row.from]) === targetSide);
+          const sourceOffset = flowSlotOffset(outgoing.indexOf(edge), outgoing.length, 36);
+          const targetOffset = flowSlotOffset(incoming.indexOf(edge), incoming.length, 36);
+          const start = flowAnchor(from, sourceSide, sourceOffset);
+          const end = flowAnchor(to, targetSide, targetOffset);
+          return (
+            <g key={`${edge.from}-${edge.to}`}>
+              <path d={flowEdgePath(from, to, sourceSide, targetSide, sourceOffset, targetOffset)} markerEnd="url(#methodology-flow-arrow)" />
+              <text x={(start.x + end.x) / 2} y={(start.y + end.y) / 2 - 10}>{edge.label}</text>
+            </g>
+          );
+        })}
+      </svg>
+      {orderedNodeIds.map((id) => {
+        const box = boxById.get(id);
+        const rect = positions[id];
+        if (!box || !rect) return null;
+        const isMuted = mutedSet.has(id);
+        const isActive = activeSet.has(id) || (!activeSet.size && !isMuted);
+        return (
+          <article
+            key={id}
+            className={`methodology-architecture-node ${box.type} ${isMuted ? "muted" : ""} ${isActive ? "active" : ""}`}
+            style={{
+              left: `${(rect.x / canvas.width) * 100}%`,
+              top: `${(rect.y / canvas.height) * 100}%`,
+              width: `${(rect.w / canvas.width) * 100}%`,
+              minHeight: `${Math.max(82, (rect.h / canvas.height) * 420)}px`,
+            }}
+          >
+            <div className="methodology-architecture-node-type">{box.type}</div>
+            <h3>{box.title}</h3>
+            <p>{box.subtitle}</p>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+window.EDIMMethodologyArchitectureDiagram = MethodologyArchitectureDiagram;
+
 function FlowNode({
   box,
   rect,
@@ -6395,6 +6618,25 @@ function FlowModelCanvas({
     });
     return rows;
   }, [orderedNodeIds, positions, measuredNodes]);
+  const dynamicCanvas = useMemo(() => {
+    const baseCanvas = flowDefinition.canvas || DEFAULT_FLOW_CANVAS_SIZE;
+    const padding = 96;
+    let width = Number(baseCanvas.width) || DEFAULT_FLOW_CANVAS_SIZE.width;
+    let height = Number(baseCanvas.height) || DEFAULT_FLOW_CANVAS_SIZE.height;
+    orderedNodeIds.forEach((id) => {
+      const rect = positions[id];
+      if (!rect) return;
+      const measured = measuredNodes[id] || {};
+      const nodeWidth = Number(measured.w || rect.w || 0);
+      const nodeHeight = Number(measured.h || rect.h || 0);
+      if (Number.isFinite(nodeWidth)) width = Math.max(width, rect.x + nodeWidth + padding);
+      if (Number.isFinite(nodeHeight)) height = Math.max(height, rect.y + nodeHeight + padding);
+    });
+    return {
+      width: Math.ceil(width),
+      height: Math.ceil(height),
+    };
+  }, [flowDefinition.canvas, measuredNodes, orderedNodeIds, positions]);
 
   useEffect(() => {
     const nextDefinition = normalizeFlowDefinition(architecture && architecture.graph);
@@ -6438,7 +6680,7 @@ function FlowModelCanvas({
   function moveDrag(event) {
     const drag = dragRef.current;
     if (!drag) return;
-    const canvas = flowDefinition.canvas || DEFAULT_FLOW_CANVAS_SIZE;
+    const canvas = dynamicCanvas || flowDefinition.canvas || DEFAULT_FLOW_CANVAS_SIZE;
     const nextX = Math.max(12, Math.min(canvas.width - 280, drag.originX + event.clientX - drag.startX));
     const nextY = Math.max(12, Math.min(canvas.height - 110, drag.originY + event.clientY - drag.startY));
     setPositions((prev) => ({
@@ -6587,8 +6829,8 @@ function FlowModelCanvas({
         </div>
       </div>
       <div className="flow-model-viewport">
-        <div className="flow-model-canvas" style={{ width: flowDefinition.canvas.width, height: flowDefinition.canvas.height }}>
-          <FlowEdgeLayer positions={edgePositions} edges={flowDefinition.edges} canvas={flowDefinition.canvas} />
+        <div className="flow-model-canvas" style={{ width: dynamicCanvas.width, height: dynamicCanvas.height }}>
+          <FlowEdgeLayer positions={edgePositions} edges={flowDefinition.edges} canvas={dynamicCanvas} />
           {orderedNodeIds.map((id) => {
             const box = boxById.get(id);
             const rect = positions[id];
@@ -7111,6 +7353,7 @@ function ProjectWorkspacePanel({
   onToggleCompareRun,
   onCreateReport,
   onCreateRunExport,
+  onNewModel,
   actionLoading,
 }) {
   // Project-level controls intentionally sit outside the model diagram. They
@@ -7129,6 +7372,14 @@ function ProjectWorkspacePanel({
             {(projectRuns || []).length} runs · {successfulRuns.length} completed · {selectedSuccessful.length} selected
           </div>
         </div>
+        <button
+          type="button"
+          className="project-new-model-button"
+          onClick={onNewModel}
+          disabled={actionLoading || !activeProject}
+        >
+          New Model
+        </button>
       </div>
 
       <div className="project-selection-section">
@@ -7279,13 +7530,16 @@ function UploadedDatasetsPanel({ inputDatasets, onRefresh, actionLoading }) {
         </div>
         <button
           type="button"
+          className={`icon-button refresh-icon-button ${loading ? "is-loading" : ""}`}
           onClick={async () => {
             await refreshVersions();
             if (typeof onRefresh === "function") await onRefresh();
           }}
           disabled={actionLoading || loading}
+          aria-label={loading ? "Refreshing datasets" : "Refresh datasets"}
+          title={loading ? "Refreshing datasets" : "Refresh datasets"}
         >
-          {loading ? "Loading..." : "Refresh datasets"}
+          <span aria-hidden="true">↻</span>
         </button>
       </div>
       {message ? <div className="warn" style={{ marginTop: 10 }}>{message}</div> : null}
@@ -7312,106 +7566,6 @@ function UploadedDatasetsPanel({ inputDatasets, onRefresh, actionLoading }) {
           No uploaded dataset versions are available for this user yet. Upload model inputs from the dataset boxes inside a project workspace.
         </div>
       )}
-    </div>
-  );
-}
-
-function ProjectInfoRail({
-  activeProject,
-  projectRuns,
-  projectReports,
-  projectExports,
-  compareRunIds,
-  isAdminView = false,
-}) {
-  const runs = projectRuns || [];
-  const successfulRuns = succeededProjectRuns(runs);
-  const statusCounts = runs.reduce((acc, run) => {
-    const status = normalizeStatus(run && run.status) || "unknown";
-    acc[status] = (acc[status] || 0) + 1;
-    return acc;
-  }, {});
-  const selectedCompareRuns = successfulRuns.filter((run) => compareRunIds.includes(run.run_id));
-  const sortedRuns = [...runs].sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")));
-  const latestRun = sortedRuns[0] || null;
-  const latestReport = (projectReports || [])[0] || null;
-  const modifiedAt = activeProject && (activeProject.updated_at || activeProject.last_modified_at || activeProject.created_at);
-
-  if (!activeProject) {
-    return (
-      <div className="project-summary-panel" aria-label="Project information">
-        <div className="run-management-eyebrow">Project</div>
-        <h2>No project selected</h2>
-      </div>
-    );
-  }
-
-  return (
-    <div className="project-summary-panel" aria-label="Project information">
-      <div className="run-management-eyebrow">Project homepage</div>
-      <h2>{activeProject.title || "Untitled project"}</h2>
-      <div className="muted" style={{ fontSize: 12 }}>
-        {activeProject.geography || "No geography"} · {projectTypeLabel(activeProject)}
-      </div>
-
-      <div className="project-info-stat-grid">
-        <MetricCard label="Runs" value={String(runs.length)} />
-        <MetricCard label="Completed" value={String(successfulRuns.length)} />
-        <MetricCard label="Reports" value={String((projectReports || []).length)} />
-        <MetricCard label="Exports" value={String((projectExports || []).length)} />
-      </div>
-
-      <div className="project-info-section">
-        <div className="run-management-section-title">Run inventory</div>
-        <div className="project-info-pill-row">
-          <span>Draft <b>{statusCounts.draft || 0}</b></span>
-          <span>Queued <b>{statusCounts.queued || 0}</b></span>
-          <span>Running <b>{statusCounts.running || 0}</b></span>
-          <span>Succeeded <b>{statusCounts.succeeded || 0}</b></span>
-          <span>Failed <b>{statusCounts.failed || 0}</b></span>
-        </div>
-      </div>
-
-      <div className="project-info-section">
-        <div className="run-management-section-title">Compare set</div>
-        {selectedCompareRuns.length ? (
-          <div className="project-info-list">
-            {selectedCompareRuns.slice(0, 5).map((run) => (
-              <div key={run.run_id} className="project-info-list-row">
-                <b>{runLabel(run)}</b>
-                <span className="muted">{runMetadataLine(run)}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="muted" style={{ fontSize: 12 }}>No runs selected for comparison.</div>
-        )}
-      </div>
-
-      <div className="project-info-section">
-        <div className="run-management-section-title">Latest activity</div>
-        <div className="project-info-list">
-          <div className="project-info-list-row">
-            <b>Last modified</b>
-            <span className="muted">{formatTimestamp(modifiedAt)}</span>
-          </div>
-          <div className="project-info-list-row">
-            <b>Latest run</b>
-            <span className="muted">{latestRun ? `${runLabel(latestRun)} · ${displayStatus(latestRun.status).label}` : "No runs yet"}</span>
-          </div>
-          <div className="project-info-list-row">
-            <b>Latest report</b>
-            <span className="muted">{latestReport ? `${latestReport.report_type || "Project report"} · ${formatTimestamp(latestReport.created_at)}` : "No reports yet"}</span>
-          </div>
-          {isAdminView ? (
-            <div className="project-info-list-row">
-              <b>Owner</b>
-              <span className="muted">{activeProject.owner_user_id || "-"}</span>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
     </div>
   );
 }
@@ -7800,7 +7954,7 @@ function ProjectsOverviewPanel({
                   </details>
                 </div>
                 <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                  {project.geography ? <>Geography: <b>{project.geography}</b></> : "No geography label set."}
+                  {projectGeographyLabel(project.geography) ? <>Geography: <b>{projectGeographyLabel(project.geography)}</b></> : "No geography label set."}
                 </div>
                 <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
                   Type: <b>{projectTypeLabel(project)}</b>
@@ -7855,13 +8009,26 @@ function ProjectsOverviewPanel({
   );
 }
 
-function ProjectComparePanel({ projectRuns, compareRunIds, onToggleCompareRun }) {
+function ProjectComparePanel({
+  activeProject,
+  projectRuns,
+  projectReports,
+  projectExports,
+  compareRunIds,
+  onToggleCompareRun,
+  isAdminView = false,
+}) {
   // The project-level view reads completed run summaries from persisted artifacts. It
   // does not depend on the live execution queue, so comparisons survive backend
   // restarts once cloud storage/database providers are in place.
-  const successfulRuns = succeededProjectRuns(projectRuns);
+  const runs = projectRuns || [];
+  const successfulRuns = succeededProjectRuns(runs);
   const selectedIds = compareRunIds;
   const selectedRuns = successfulRuns.filter((run) => selectedIds.includes(run.run_id));
+  const sortedRuns = [...runs].sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")));
+  const latestRun = sortedRuns[0] || null;
+  const latestReport = (projectReports || [])[0] || null;
+  const modifiedAt = activeProject && (activeProject.updated_at || activeProject.last_modified_at || activeProject.created_at);
   const [summaries, setSummaries] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -7908,23 +8075,86 @@ function ProjectComparePanel({ projectRuns, compareRunIds, onToggleCompareRun })
   }, [selectedRuns.map((run) => run.run_id).join("|"), JSON.stringify(Object.keys(summaries).sort())]);
 
   return (
-    <div className="card">
-      <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "#8ea4c5" }}>
-        Comparison
-      </div>
-      <h2 style={{ marginTop: 6 }}>Selected run comparison</h2>
-      <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
-        Metrics are read from persisted run summary artifacts. Select completed runs in the project run library above.
-      </div>
-      {error ? <div className="warn">{error}</div> : null}
-      {loading ? <div className="diagram-note">Loading comparison summaries...</div> : null}
-      <div className="dashboard-note">
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Metric comparison</div>
+    <div className="project-home-unified card">
+      <section className="project-home-hero-card" aria-label="Project homepage and comparison overview">
+        <div className="project-home-copy">
+          <div className="run-management-eyebrow">Project workspace</div>
+          <h2>{activeProject ? activeProject.title || "Untitled project" : "No project selected"}</h2>
+          <div className="muted project-home-meta">
+            {activeProject && projectGeographyLabel(activeProject.geography) ? `Geography: ${projectGeographyLabel(activeProject.geography)}` : "No geography"}
+            {activeProject ? ` · ${projectTypeLabel(activeProject)}` : ""}
+            {modifiedAt ? ` · Modified ${formatTimestamp(modifiedAt)}` : ""}
+            {isAdminView && activeProject && activeProject.owner_user_id ? ` · Owner ${activeProject.owner_user_id}` : ""}
+          </div>
+          <p>
+            Use this project page to understand the run inventory, choose completed models for comparison,
+            and read the headline metric differences before opening a specific model run.
+          </p>
+        </div>
+        <div className="project-home-stats" aria-label="Project status summary">
+          <MetricCard label="Runs" value={String(runs.length)} />
+          <MetricCard label="Completed" value={String(successfulRuns.length)} />
+          <MetricCard label="Reports" value={String((projectReports || []).length)} />
+          <MetricCard label="Exports" value={String((projectExports || []).length)} />
+        </div>
+      </section>
+
+      <section className="project-home-activity-strip" aria-label="Latest project activity">
+        <span><b>Latest run</b> {latestRun ? `${runLabel(latestRun)} · ${displayStatus(latestRun.status).label}` : "No runs yet"}</span>
+        <span><b>Latest report</b> {latestReport ? `${latestReport.report_type || "Project report"} · ${formatTimestamp(latestReport.created_at)}` : "No reports yet"}</span>
+      </section>
+
+      <section className="project-comparison-workbench" aria-label="Project run comparison">
+        <div className="project-comparison-header">
+          <div>
+            <div className="run-management-eyebrow">Comparison workbench</div>
+            <h3>Compare completed model runs</h3>
+            <div className="muted">
+              Select completed runs here or in the run library. Metrics are read from persisted summary artifacts.
+            </div>
+          </div>
+          <div className="project-comparison-count">
+            <b>{selectedRuns.length}</b>
+            <span>selected</span>
+          </div>
+        </div>
+
+        <div className="project-compare-run-pills" aria-label="Completed runs available for comparison">
+          {successfulRuns.length ? successfulRuns.map((run) => {
+            const selected = selectedIds.includes(run.run_id);
+            return (
+              <button
+                key={run.run_id}
+                type="button"
+                className={`project-compare-run-pill ${selected ? "selected" : ""}`}
+                onClick={() => onToggleCompareRun(run.run_id)}
+                aria-pressed={selected}
+              >
+                <span>{runLabel(run)}</span>
+                <small>{runMetadataLine(run)}</small>
+              </button>
+            );
+          }) : (
+            <div className="muted" style={{ fontSize: 12 }}>No completed runs are available for comparison yet.</div>
+          )}
+        </div>
+
+        {selectedRuns.length ? (
+          <div className="project-selected-compare-note">
+            Selected comparison set: {selectedRuns.map((run) => runLabel(run)).join(", ")}
+          </div>
+        ) : null}
+
+        {error ? <div className="warn">{error}</div> : null}
+        {loading ? <div className="diagram-note">Loading comparison summaries...</div> : null}
+
+        <div className="project-comparison-table-panel">
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>Headline metric comparison</div>
           {selectedRuns.length < 2 ? (
             <div className="muted" style={{ fontSize: 12 }}>
               {successfulRuns.length
-                ? "Select at least two completed runs in the project run library to compare metrics."
-                : "No completed runs are available for comparison yet."}
+                ? "Select at least two completed runs to compare headline metrics."
+                : "Run and complete at least two models to activate comparison."}
             </div>
           ) : metricRows.length ? (
             <div style={{ overflowX: "auto" }}>
@@ -7952,7 +8182,8 @@ function ProjectComparePanel({ projectRuns, compareRunIds, onToggleCompareRun })
           ) : (
             <div className="muted" style={{ fontSize: 12 }}>Selected run summaries do not expose comparable headline metrics yet.</div>
           )}
-      </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -8009,13 +8240,14 @@ function ArchitectureRunWorkspace({
     <div className={`architecture-run-workspace ${workspaceState}`}>
       {runViewMode === "projects" ? (
         <>
-          {errorMessage ? <div className="warn" style={{ marginTop: 0 }}>{errorMessage}</div> : null}
-          {statusMessage ? <div className="ok" style={{ marginTop: errorMessage ? 8 : 0 }}>{statusMessage}</div> : null}
+          {projectsOverviewPanel}
+          {errorMessage || statusMessage ? (
+            <div className="project-overview-message-stack">
+              {errorMessage ? <div className="warn" style={{ marginTop: 0 }}>{errorMessage}</div> : null}
+              {statusMessage ? <div className="ok" style={{ marginTop: errorMessage ? 8 : 0 }}>{statusMessage}</div> : null}
+            </div>
+          ) : null}
         </>
-      ) : null}
-
-      {runViewMode === "projects" ? (
-        projectsOverviewPanel
       ) : (
         <div className="model-workspace-with-management">
           <main className="model-workspace-primary">
@@ -8132,6 +8364,8 @@ function App() {
   const [runSpatialTechError, setRunSpatialTechError] = useState("");
   const [spatialFilter, setSpatialFilter] = useState(null);
   const [runViewMode, setRunViewMode] = useState("projects");
+  const [methodologyOpen, setMethodologyOpen] = useState(() => window.location.hash === "#/methodology");
+  const [landingOpen, setLandingOpen] = useState(() => window.location.hash !== "#/methodology");
   const [newModelModalOpen, setNewModelModalOpen] = useState(false);
   const locationMapCacheRef = useRef(new Map());
   const runSpatialTechCacheRef = useRef(new Map());
@@ -8143,6 +8377,17 @@ function App() {
     () => (scenarios || []).find((s) => s.key === scenarioKey),
     [scenarios, scenarioKey]
   );
+
+  useEffect(() => {
+    function handleHashChange() {
+      const nextMethodologyOpen = window.location.hash === "#/methodology";
+      setMethodologyOpen(nextMethodologyOpen);
+      if (nextMethodologyOpen) setLandingOpen(false);
+    }
+    handleHashChange();
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
   const defaultRunName = useMemo(() => {
     const baseName = selectedScenario && selectedScenario.title
       ? selectedScenario.title
@@ -8735,7 +8980,7 @@ function App() {
       const architectureId = String((projectPayload && projectPayload.model_architecture_id) || "energy-development");
       const created = await api.createProject({
         title: `EDIM project ${(projects || []).length + 1}`,
-        geography: "Africa-wide",
+        geography: "Africa",
         project_type: projectTypeForArchitecture(architectureId),
         model_architecture_id: architectureId,
         scenario_label: architectureId === "energy-only" ? "Energy model workspace" : "Energy-development model workspace",
@@ -9688,6 +9933,7 @@ function App() {
       onToggleCompareRun={onToggleCompareRun}
       onCreateReport={onCreateProjectReport}
       onCreateRunExport={onCreateRunExport}
+      onNewModel={() => setNewModelModalOpen(true)}
       actionLoading={platformActionLoading}
     />
   );
@@ -9702,16 +9948,6 @@ function App() {
     />
   );
   const projectSelectionPanel = projectPanel;
-  const projectSummaryPanel = (
-    <ProjectInfoRail
-      activeProject={activeProject}
-      projectRuns={projectRuns}
-      projectReports={projectReports}
-      projectExports={projectExports}
-      compareRunIds={compareRunIds}
-      isAdminView={isAdminView}
-    />
-  );
   const projectsOverviewPanel = (
     <ProjectsOverviewPanel
       projects={projects}
@@ -9734,20 +9970,94 @@ function App() {
     />
   );
   const comparePanel = (
-    <div className="project-level-view-stack">
-      {projectSummaryPanel}
-      <ProjectComparePanel
-        projectRuns={projectRuns}
-        compareRunIds={compareRunIds}
-        onToggleCompareRun={onToggleCompareRun}
-      />
-    </div>
+    <ProjectComparePanel
+      activeProject={activeProject}
+      projectRuns={projectRuns}
+      projectReports={projectReports}
+      projectExports={projectExports}
+      compareRunIds={compareRunIds}
+      onToggleCompareRun={onToggleCompareRun}
+      isAdminView={isAdminView}
+    />
   );
   const showRunTabs = runViewMode !== "projects" && Boolean(activeProject);
+  const clearMethodologyRoute = () => {
+    if (window.location.hash === "#/methodology" && window.history && window.history.pushState) {
+      window.history.pushState("", document.title, window.location.pathname + window.location.search);
+    }
+  };
+  const openMethodologyPage = () => {
+    setMethodologyOpen(true);
+    setLandingOpen(false);
+    if (window.location.hash !== "#/methodology") window.location.hash = "/methodology";
+  };
+  const openLandingPage = () => {
+    clearMethodologyRoute();
+    setMethodologyOpen(false);
+    setLandingOpen(true);
+  };
+  const openProjectsPage = () => {
+    clearMethodologyRoute();
+    setMethodologyOpen(false);
+    setLandingOpen(false);
+    setRunViewMode("projects");
+  };
+
+  if (methodologyOpen) {
+    const MethodologyPage = window.EDIMMethodology && window.EDIMMethodology.MethodologyPage;
+    return MethodologyPage ? (
+      <MethodologyPage
+        architectureCatalog={architectureCatalog}
+        header={(
+          <UnifiedHeader
+            currentUserId={currentUserId}
+            availableUsers={availableUsers}
+            onUserChange={handleUserChange}
+            apiTarget={apiTarget}
+            systemCompatibility={systemCompatibility}
+            onApiTargetModeChange={handleApiTargetModeChange}
+            apiTargetLoading={platformActionLoading}
+            onReturnToLanding={openLandingPage}
+          />
+        )}
+        onOpenProjects={openProjectsPage}
+        onStartProject={openProjectsPage}
+        onReturnDashboard={openLandingPage}
+      />
+    ) : (
+      <div className="container">
+        <div className="card">
+          <h2>Explore the methodology</h2>
+          <p className="muted">The methodology page script is not loaded.</p>
+          <button type="button" onClick={openProjectsPage}>Open projects</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (landingOpen) {
+    return (
+      <LandingPage
+        currentUserId={currentUserId}
+        availableUsers={availableUsers}
+        onUserChange={handleUserChange}
+        apiTarget={apiTarget}
+        systemCompatibility={systemCompatibility}
+        onApiTargetModeChange={handleApiTargetModeChange}
+        apiTargetLoading={platformActionLoading}
+        onEnter={() => {
+          openProjectsPage();
+        }}
+        onOpenMethodology={openMethodologyPage}
+        statusMessage={statusMessage}
+        errorMessage={errorMessage}
+      />
+    );
+  }
 
   return (
     <div className="app-shell">
-      <DashboardHeader
+      <UnifiedHeader
         runViewMode={runViewMode}
         currentUserId={currentUserId}
         availableUsers={availableUsers}
@@ -9759,6 +10069,7 @@ function App() {
         systemCompatibility={systemCompatibility}
         onApiTargetModeChange={handleApiTargetModeChange}
         apiTargetLoading={platformActionLoading}
+        onReturnToLanding={openLandingPage}
       />
 
       {newModelModalOpen ? (

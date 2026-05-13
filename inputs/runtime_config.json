@@ -20,7 +20,29 @@
     "analysis_solver_time_limit_seconds": 14400,
     "cors_allow_origins": [
       "http://localhost:8000",
-      "http://127.0.0.1:8000"
+      "http://127.0.0.1:8000",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "http://localhost:4173",
+      "http://127.0.0.1:4173",
+      "http://localhost:4174",
+      "http://127.0.0.1:4174",
+      "http://localhost:4175",
+      "http://127.0.0.1:4175",
+      "http://localhost:4176",
+      "http://127.0.0.1:4176",
+      "http://localhost:4177",
+      "http://127.0.0.1:4177",
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "http://localhost:5174",
+      "http://127.0.0.1:5174",
+      "http://localhost:5175",
+      "http://127.0.0.1:5175",
+      "http://localhost:5176",
+      "http://127.0.0.1:5176",
+      "http://localhost:5177",
+      "http://127.0.0.1:5177"
     ]
   },
   "summary": {
@@ -36,7 +58,7 @@
   "jobs": {
     "history_limit": 200,
     "dedupe_enabled": true,
-    "queue_capacity": 200,
+    "queue_capacity": 12,
     "execution_max_attempts": 1
   },
   "development_engine": {

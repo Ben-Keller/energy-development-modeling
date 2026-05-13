@@ -26,6 +26,9 @@ frontend/runtime-config.local.js
 /dist/
 /static/
 
+# Raw source images are large and not used by the app; keep optimized webp assets instead.
+frontend/assets/photos/
+
 # Superseded generated frontend GIS shards
 frontend/geo/countries_topojson/
 frontend/geo/countries_manifest.json

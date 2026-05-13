@@ -48,7 +48,7 @@ def execute_bundle(
         run_max_dirs=int(raw.get("run_max_dirs", 200)),
         job_history_limit=int(raw.get("job_history_limit", 200)),
         job_dedupe_enabled=bool(raw.get("job_dedupe_enabled", True)),
-        job_queue_capacity=int(raw.get("job_queue_capacity", 200)),
+        job_queue_capacity=int(raw.get("job_queue_capacity", 12)),
         development_engine=str(raw.get("development_engine", "mario")),
         mario_db_path=str(raw.get("mario_db_path", "")),
         mario_timeout_seconds=float(raw.get("mario_timeout_seconds", 120.0)),

@@ -204,7 +204,32 @@ def get_settings() -> Settings:
 
     cors_allow_origins_default = _config_list(
         _cfg(runtime_config, ["runtime", "cors_allow_origins"]),
-        ["http://localhost:8000", "http://127.0.0.1:8000"],
+        [
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+            "http://localhost:4174",
+            "http://127.0.0.1:4174",
+            "http://localhost:4175",
+            "http://127.0.0.1:4175",
+            "http://localhost:4176",
+            "http://127.0.0.1:4176",
+            "http://localhost:4177",
+            "http://127.0.0.1:4177",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+            "http://localhost:5175",
+            "http://127.0.0.1:5175",
+            "http://localhost:5176",
+            "http://127.0.0.1:5176",
+            "http://localhost:5177",
+            "http://127.0.0.1:5177",
+        ],
     )
     cors_allow_origins = _env_csv("EDIM_CORS_ALLOW_ORIGINS", cors_allow_origins_default)
 
@@ -229,7 +254,7 @@ def get_settings() -> Settings:
         run_max_dirs=_env_int("EDIM_RUN_MAX_DIRS", int(_cfg(runtime_config, ["runs", "max_dirs"], 200)), minimum=0),
         job_history_limit=_env_int("EDIM_JOB_HISTORY_LIMIT", int(_cfg(runtime_config, ["jobs", "history_limit"], 200))),
         job_dedupe_enabled=_env_bool("EDIM_JOB_DEDUPE_ENABLED", bool(_cfg(runtime_config, ["jobs", "dedupe_enabled"], True))),
-        job_queue_capacity=_env_int("EDIM_JOB_QUEUE_CAPACITY", int(_cfg(runtime_config, ["jobs", "queue_capacity"], 200))),
+        job_queue_capacity=_env_int("EDIM_JOB_QUEUE_CAPACITY", int(_cfg(runtime_config, ["jobs", "queue_capacity"], 12))),
         development_engine=(os.getenv("EDIM_DEVELOPMENT_ENGINE", str(_cfg(runtime_config, ["development_engine", "engine"], "mario"))) or "mario").strip().lower(),
         mario_db_path=(os.getenv("EDIM_MARIO_DB_PATH", str(_cfg(runtime_config, ["development_engine", "mario_db_path"], ""))) or "").strip(),
         mario_timeout_seconds=_env_float("EDIM_MARIO_TIMEOUT_SECONDS", float(_cfg(runtime_config, ["development_engine", "mario_timeout_seconds"], 120.0)), minimum=1.0),

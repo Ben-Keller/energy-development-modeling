@@ -1,0 +1,820 @@
+.methodology-shell {
+  height: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background:
+    radial-gradient(900px 520px at 12% 0%, rgba(37, 99, 235, 0.13), transparent 65%),
+    linear-gradient(180deg, #f7fbff 0%, #edf4fb 46%, #f9fbfd 100%);
+  color: #0b1728;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+.methodology-shell * {
+  box-sizing: border-box;
+}
+
+.methodology-hero-section {
+  position: relative;
+  min-height: calc(100vh - 76px);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: clamp(48px, 8vw, 104px) 20px;
+  background: #07111f;
+  color: #f8fbff;
+}
+
+.methodology-hero-visual {
+  --methodology-hero-x: 62%;
+  --methodology-hero-y: 38%;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(620px 420px at var(--methodology-hero-x) var(--methodology-hero-y), rgba(34, 211, 238, 0.14), transparent 66%),
+    radial-gradient(860px 520px at 15% 10%, rgba(37, 99, 235, 0.32), transparent 62%),
+    linear-gradient(135deg, #06111f, #0a1728 56%, #07111f);
+}
+
+.methodology-hero-visual::before {
+  content: "";
+  position: absolute;
+  inset: -12%;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(circle at 50% 46%, black 0%, transparent 72%);
+  animation: methodology-grid-drift 22s linear infinite;
+}
+
+.methodology-hero-visual svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.72;
+}
+
+.methodology-hero-visual path {
+  fill: none;
+  stroke: url(#methodologyHeroLine);
+  stroke-width: 1.4;
+}
+
+.methodology-hero-visual circle {
+  fill: #bae6fd;
+  opacity: 0.42;
+}
+
+.methodology-hero-content {
+  position: relative;
+  z-index: 2;
+  width: min(900px, 100%);
+  padding: clamp(34px, 5vw, 64px);
+  border: 1px solid rgba(191, 219, 254, 0.18);
+  border-radius: 34px;
+  background:
+    linear-gradient(135deg, rgba(8, 18, 34, 0.82), rgba(8, 18, 34, 0.46)),
+    radial-gradient(680px 360px at 16% 0%, rgba(37, 99, 235, 0.24), transparent 68%);
+  box-shadow: 0 38px 100px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+}
+
+.methodology-eyebrow {
+  color: #0ea5e9;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.methodology-hero-content .methodology-eyebrow {
+  color: #7dd3fc;
+}
+
+.methodology-hero-content h1,
+.methodology-section h2,
+.methodology-closing-section h2 {
+  margin: 10px 0 14px;
+  font-size: clamp(34px, 5vw, 74px);
+  line-height: 0.94;
+  letter-spacing: -0.065em;
+}
+
+.methodology-hero-content p {
+  width: min(740px, 100%);
+  color: rgba(226, 232, 240, 0.84);
+  font-size: clamp(17px, 2.1vw, 22px);
+  line-height: 1.55;
+}
+
+.methodology-scroll-cta,
+.methodology-closing-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18px;
+  border: 1px solid rgba(125, 211, 252, 0.34);
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.15);
+  color: #f8fbff;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 12px 16px;
+  text-decoration: none;
+}
+
+.methodology-section {
+  width: min(1180px, calc(100vw - 36px));
+  min-height: 76vh;
+  margin: 0 auto;
+  padding: clamp(54px, 9vw, 118px) 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.9fr);
+  gap: clamp(28px, 6vw, 84px);
+  align-items: center;
+}
+
+.methodology-section.reverse {
+  grid-template-columns: minmax(340px, 0.9fr) minmax(0, 1fr);
+}
+
+.methodology-section-copy {
+  max-width: 680px;
+}
+
+.methodology-section-copy-wide {
+  max-width: 980px;
+}
+
+.methodology-section-copy h2,
+.methodology-large-card h2,
+.methodology-closing-section h2 {
+  color: #081421;
+  font-size: clamp(31px, 4.2vw, 56px);
+}
+
+.methodology-section-copy p,
+.methodology-large-card p,
+.methodology-closing-section p {
+  color: #475569;
+  font-size: 16px;
+  line-height: 1.72;
+}
+
+.methodology-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.methodology-insight-card,
+.methodology-channel-card,
+.methodology-large-card {
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(238, 246, 255, 0.78)),
+    radial-gradient(420px 220px at 10% 0%, rgba(14, 165, 233, 0.1), transparent 70%);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+}
+
+.methodology-insight-card {
+  padding: 18px;
+  transform: translateY(10px);
+  animation: methodology-rise 600ms ease forwards;
+}
+
+.methodology-insight-card span,
+.methodology-channel-card span {
+  color: #0ea5e9;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+}
+
+.methodology-insight-card h3,
+.methodology-channel-card h3 {
+  margin: 9px 0 6px;
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.methodology-insight-card p,
+.methodology-channel-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.methodology-placeholder {
+  min-height: 420px;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  border-radius: 32px;
+  display: grid;
+  align-content: end;
+  overflow: hidden;
+  background:
+    radial-gradient(420px 260px at 28% 12%, rgba(37, 99, 235, 0.16), transparent 68%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(226, 238, 250, 0.82));
+  box-shadow: 0 26px 80px rgba(15, 23, 42, 0.1);
+}
+
+.methodology-placeholder-art {
+  min-height: 280px;
+  padding: 24px;
+}
+
+.methodology-placeholder svg {
+  width: 100%;
+  height: 100%;
+  min-height: 245px;
+}
+
+.methodology-placeholder path,
+.methodology-placeholder line {
+  fill: none;
+  stroke: #0284c7;
+  stroke-width: 1.4;
+  opacity: 0.42;
+}
+
+.methodology-placeholder rect,
+.methodology-placeholder polygon {
+  fill: rgba(14, 165, 233, 0.08);
+  stroke: rgba(14, 165, 233, 0.38);
+  stroke-width: 1.2;
+}
+
+.methodology-placeholder circle {
+  fill: rgba(14, 165, 233, 0.42);
+  stroke: rgba(255, 255, 255, 0.9);
+}
+
+.methodology-placeholder-caption {
+  padding: 18px 20px 20px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.methodology-placeholder-caption div {
+  color: #0f172a;
+  font-weight: 900;
+}
+
+.methodology-placeholder-caption p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.methodology-journey-section {
+  align-items: start;
+}
+
+.methodology-section-copy-narrow {
+  max-width: 620px;
+}
+
+.methodology-scroll-steps {
+  display: grid;
+  gap: 18px;
+  margin-top: 34px;
+}
+
+.methodology-scroll-step {
+  padding: 22px 0 22px 24px;
+  border-left: 2px solid rgba(14, 165, 233, 0.18);
+  opacity: 0.62;
+  transition: opacity 260ms ease, border-color 260ms ease, transform 260ms ease;
+}
+
+.methodology-scroll-step.active {
+  border-color: #0ea5e9;
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+.methodology-scroll-step span {
+  color: #0ea5e9;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.methodology-scroll-step h3 {
+  margin: 8px 0 6px;
+  color: #0f172a;
+}
+
+.methodology-scroll-step p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.62;
+}
+
+.methodology-sticky-panel {
+  position: sticky;
+  top: 108px;
+  align-self: start;
+}
+
+.methodology-flow-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  border-radius: 30px;
+  padding: 24px;
+  background: #081421;
+  color: #e2e8f0;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.18);
+}
+
+.methodology-flow-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4px;
+  background: linear-gradient(180deg, #38bdf8, #fbbf24);
+  transition: height 280ms ease;
+}
+
+.methodology-flow-row {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: center;
+  min-height: 54px;
+  opacity: 0.45;
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+
+.methodology-flow-row span {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #7dd3fc;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.methodology-flow-row.active,
+.methodology-flow-row.complete {
+  opacity: 1;
+}
+
+.methodology-flow-row.active {
+  transform: translateX(4px);
+}
+
+.methodology-architecture-section {
+  width: min(1280px, calc(100vw - 36px));
+  grid-template-columns: minmax(320px, 0.72fr) minmax(0, 1.28fr);
+}
+
+.methodology-segmented {
+  display: inline-flex;
+  gap: 6px;
+  padding: 5px;
+  margin-top: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.methodology-segmented button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 10px 14px;
+}
+
+.methodology-segmented button.active {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.methodology-mode-copy {
+  margin-top: 18px;
+}
+
+.methodology-microcopy {
+  padding: 13px 14px;
+  border: 1px solid rgba(14, 165, 233, 0.16);
+  border-radius: 18px;
+  background: rgba(14, 165, 233, 0.08);
+  font-size: 13px !important;
+}
+
+.methodology-architecture-card {
+  min-height: 520px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.11);
+  border-radius: 30px;
+  background: #07111f;
+  box-shadow: 0 30px 86px rgba(15, 23, 42, 0.16);
+}
+
+.methodology-architecture-diagram {
+  position: relative;
+  width: 100%;
+  min-height: 560px;
+  padding: 18px;
+  color: #e2e8f0;
+}
+
+.methodology-architecture-diagram svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.methodology-architecture-diagram path {
+  fill: none;
+  stroke: rgba(103, 232, 249, 0.44);
+  stroke-width: 1.4;
+}
+
+.methodology-architecture-diagram text {
+  fill: rgba(186, 230, 253, 0.56);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.methodology-architecture-node {
+  position: absolute;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  border-radius: 18px;
+  padding: 12px;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.82), rgba(15, 23, 42, 0.54)),
+    radial-gradient(220px 110px at 12% 0%, rgba(14, 165, 233, 0.18), transparent 70%);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.22);
+  transition: opacity 220ms ease, transform 220ms ease, border-color 220ms ease;
+}
+
+.methodology-architecture-node.input {
+  border-color: rgba(96, 165, 250, 0.36);
+}
+
+.methodology-architecture-node.model {
+  border-color: rgba(45, 212, 191, 0.32);
+}
+
+.methodology-architecture-node.output {
+  border-color: rgba(251, 191, 36, 0.36);
+}
+
+.methodology-architecture-node.muted {
+  opacity: 0.28;
+  filter: grayscale(0.4);
+}
+
+.methodology-architecture-node.active {
+  opacity: 1;
+  transform: translateY(-3px);
+  border-color: rgba(251, 191, 36, 0.72);
+}
+
+.methodology-architecture-node-type {
+  color: #67e8f9;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.methodology-architecture-node h3 {
+  margin: 5px 0 4px;
+  color: #f8fafc;
+  font-size: 13px;
+  line-height: 1.16;
+}
+
+.methodology-architecture-node p {
+  margin: 0;
+  color: rgba(203, 213, 225, 0.78);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.methodology-channel-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.methodology-channel-card {
+  padding: 20px;
+  opacity: 0.58;
+  transform: translateY(10px);
+  transition: opacity 260ms ease, transform 260ms ease, border-color 260ms ease;
+}
+
+.methodology-channel-card.active,
+.methodology-channel-card:focus-visible,
+.methodology-channel-card:hover {
+  opacity: 1;
+  transform: translateY(0);
+  border-color: rgba(14, 165, 233, 0.28);
+  outline: none;
+}
+
+.methodology-clean-list {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.methodology-clean-list li {
+  padding: 12px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.58);
+  color: #475569;
+}
+
+.methodology-large-card {
+  padding: clamp(24px, 4vw, 42px);
+}
+
+.methodology-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 24px;
+}
+
+.methodology-chip {
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.08);
+  color: #075985;
+  cursor: help;
+  font-size: 12px;
+  font-weight: 850;
+  padding: 9px 11px;
+}
+
+.methodology-principle-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 24px;
+}
+
+.methodology-principle-list button {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.66);
+  color: #334155;
+  cursor: pointer;
+  font-weight: 760;
+  padding: 12px;
+  text-align: left;
+}
+
+.methodology-principle-list span {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(14, 165, 233, 0.11);
+  color: #0284c7;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.methodology-principle-list button.active,
+.methodology-principle-list button:hover,
+.methodology-principle-list button:focus-visible {
+  border-color: rgba(14, 165, 233, 0.3);
+  background: #fff;
+  outline: none;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+}
+
+.methodology-report-mockup {
+  position: relative;
+  min-height: 520px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  border-radius: 32px;
+  background: linear-gradient(145deg, #ffffff, #eaf3ff);
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.11);
+  padding: 32px;
+}
+
+.methodology-report-header {
+  height: 58px;
+  border-radius: 18px;
+  background: linear-gradient(90deg, #0f172a, #155e75);
+}
+
+.methodology-report-band {
+  height: 72px;
+  margin-top: 20px;
+  border-radius: 18px;
+  background: rgba(14, 165, 233, 0.11);
+  transition: transform 280ms ease, background 280ms ease;
+}
+
+.methodology-report-band.band-1 { background: rgba(251, 191, 36, 0.16); transform: translateY(18px); }
+.methodology-report-band.band-2 { background: rgba(45, 212, 191, 0.14); transform: translateY(36px); }
+.methodology-report-band.band-3 { background: rgba(96, 165, 250, 0.16); transform: translateY(54px); }
+.methodology-report-band.band-4 { background: rgba(14, 165, 233, 0.2); transform: translateY(72px); }
+
+.methodology-report-gridline {
+  height: 1px;
+  margin: 28px 0;
+  background: linear-gradient(90deg, transparent, rgba(15, 23, 42, 0.16), transparent);
+}
+
+.methodology-report-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.methodology-report-cards span {
+  height: 78px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.06);
+  transition: background 200ms ease, transform 200ms ease;
+}
+
+.methodology-report-cards span.active {
+  background: rgba(14, 165, 233, 0.18);
+  transform: translateY(-4px);
+}
+
+.methodology-report-chart {
+  position: absolute;
+  left: 32px;
+  right: 32px;
+  bottom: 96px;
+  height: 120px;
+  display: flex;
+  align-items: end;
+  gap: 10px;
+}
+
+.methodology-report-chart span {
+  flex: 1;
+  border-radius: 12px 12px 0 0;
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.34), rgba(14, 165, 233, 0.1));
+  transition: height 260ms ease;
+}
+
+.methodology-report-mockup .methodology-placeholder-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.methodology-timeline-list {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.methodology-timeline-list li {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 10px;
+  align-items: center;
+  color: #475569;
+}
+
+.methodology-timeline-list span {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.methodology-closing-section {
+  width: min(1180px, calc(100vw - 36px));
+  min-height: 78vh;
+  margin: 0 auto;
+  padding: clamp(54px, 9vw, 118px) 0;
+  display: grid;
+  grid-template-columns: minmax(340px, 0.9fr) minmax(0, 1fr);
+  gap: clamp(28px, 6vw, 84px);
+  align-items: center;
+}
+
+.methodology-closing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.methodology-closing-actions button {
+  margin-top: 0;
+  background: #0f172a;
+}
+
+.methodology-closing-actions button:nth-child(2) {
+  background: #0ea5e9;
+  border-color: rgba(14, 165, 233, 0.5);
+}
+
+.methodology-closing-actions button:nth-child(3) {
+  background: rgba(15, 23, 42, 0.05);
+  color: #0f172a;
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+@keyframes methodology-grid-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(48px, 48px, 0); }
+}
+
+@keyframes methodology-rise {
+  to { transform: translateY(0); }
+}
+
+@media (max-width: 980px) {
+  .methodology-section,
+  .methodology-section.reverse,
+  .methodology-architecture-section,
+  .methodology-closing-section {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .methodology-sticky-panel {
+    position: relative;
+    top: auto;
+  }
+
+  .methodology-channel-grid,
+  .methodology-insight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .methodology-architecture-card,
+  .methodology-architecture-diagram {
+    min-height: 460px;
+  }
+}
+
+@media (max-width: 640px) {
+  .methodology-hero-content {
+    border-radius: 26px;
+    padding: 28px;
+  }
+
+  .methodology-hero-content h1,
+  .methodology-section-copy h2,
+  .methodology-large-card h2,
+  .methodology-closing-section h2 {
+    font-size: 34px;
+  }
+
+  .methodology-placeholder,
+  .methodology-report-mockup {
+    min-height: 360px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .methodology-shell *,
+  .methodology-shell *::before,
+  .methodology-shell *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

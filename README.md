@@ -120,6 +120,7 @@ python3.11 -m venv backend/.venv
 source backend/.venv/bin/activate
 pip3 install -U pip
 pip3 install -r backend/requirements.txt
+pip3 install -r backend/requirements-dev.txt
 pip3 install --no-build-isolation -e ./model_runtime
 ```
 
@@ -224,8 +225,9 @@ keys without changing frontend download URLs.
 
 The handoff structure is intentionally simple. Run `cd frontend && npm run build` to validate and create the compact static bundle in `frontend/dist/` for deployment:
 
-1. **Frontend shell**: renders projects, the graph-centered model workspace, run
-   controls, result panels, compare mode, reports, exports, and dataset versions.
+1. **Frontend shell**: renders the basic landing page, projects, the graph-centered
+   model workspace, run controls, result panels, compare mode, reports, exports,
+   and dataset versions.
 2. **Backend API/orchestration**: owns auth context, project/run/report/export
    records, dataset metadata, artifact access, run queueing, and progress/status.
 3. **Black-box model runtime**: consumes one run bundle, emits progress events,
@@ -614,7 +616,7 @@ rows. Mismatches only block when both sides expose incompatible subnational grou
 ### Unit tests
 
 ```bash
-PYTHONPATH=backend:model_runtime python3 -m pytest backend/tests/test_mvp.py -q
+PYTHONPATH=backend:model_runtime backend/.venv/bin/python -m pytest backend/tests/test_mvp.py -q
 ```
 
 ### Smoke checks

@@ -19,20 +19,41 @@ The active local backend is single-instance and filesystem-backed. Cloud deploym
 
 The complete local user flow is now implemented:
 
-1. User selects a seeded test account.
-2. User selects or creates a project.
-3. User configures a model run in the graph-centered model workspace.
-4. User validates environment setup.
-5. Frontend creates a project run draft.
-6. Frontend submits that project run.
-7. Backend queues an execution and updates the project run record.
-8. Frontend polls by `execution_id`.
-9. User views results from persisted run artifacts.
-10. User compares completed project runs.
-11. User generates project reports and run/project export bundles.
-12. User manages input dataset upload versions.
+1. User lands on the basic UNDP/EDIM entry page.
+2. User selects a seeded test account and runtime target.
+3. User opens the projects workspace.
+4. User selects or creates a project.
+5. User configures a model run in the graph-centered model workspace.
+6. User validates environment setup.
+7. Frontend creates a project run draft.
+8. Frontend submits that project run.
+9. Backend queues an execution and updates the project run record.
+10. Frontend polls by `execution_id`.
+11. User views results from persisted run artifacts.
+12. User compares completed project runs.
+13. User generates project reports and run/project export bundles.
+14. User manages input dataset upload versions.
 
-The frontend should be treated as a platform shell around this flow, not as a model-specific caller. It depends on the consolidated API client boundary in `frontend/app.jsx` for all backend calls and should not infer artifact paths or direct model filenames.
+The frontend should be treated as a platform shell around this flow, not as a model-specific caller. Low-level HTTP transport, runtime target selection, test-user headers, upload calls, and browser-safe download URL behavior live in `frontend/api-client.js`. `frontend/app.jsx` builds the higher-level workspace/project/run methods on top of that transport. Frontend components should not infer artifact paths or direct model filenames.
+
+The current frontend is a static React/Babel shell served by FastAPI for handoff simplicity. This is acceptable for backend contract testing. A later frontend repackaging to Vite or another compiled React setup is allowed, but it must preserve:
+
+- `frontend/api-client.js` transport semantics or an equivalent API-client boundary
+- `EDIM_LOCAL_API_BASE` / `EDIM_BACKEND_API_BASE` runtime configuration
+- `GET /api/system/manifest` compatibility probing before loading hosted backend data
+- descriptor-based artifact/report/export downloads
+- the current hash-route behavior for the landing, projects/workspace, and methodology surfaces
+- no direct model filesystem assumptions in UI components
+
+The frontend currently includes:
+
+- landing page and shared header branding
+- project/workspace shell
+- graph-centered model-run workspace
+- static user-facing methodology page at `#/methodology`
+- optimized landing-page visual assets in `frontend/assets/webp/`
+
+Raw source images in `frontend/assets/photos/` are local-only and ignored; they are not part of the deployed frontend payload.
 
 The frontend header now includes a runtime target switch for backend testing.
 `Local` calls the same origin serving the UI. `Backend` calls the hosted API
@@ -219,6 +240,7 @@ Datasets:
 - `GET /api/input-datasets/{dataset_id}/download`
 - `POST /api/input-datasets/{dataset_id}/upload`
 - `GET /api/input-datasets/{dataset_id}/versions`
+- `GET /api/input-datasets/{dataset_id}/versions/{version_id}/download`
 - `POST /api/input-datasets/{dataset_id}/versions/{version_id}/activate`
 - `DELETE /api/input-datasets/{dataset_id}/versions/{version_id}`
 
@@ -239,6 +261,7 @@ System/catalog:
 - `GET /api/scenarios`
 - `GET /api/system/manifest`
 - `GET /api/model-runtimes`
+- `GET /api/environment-setup`
 - `POST /api/projects/{project_id}/runs/validate`
 
 `GET /api/scenarios` is module-driven. The stable shape is `module_configurations[]` plus `scenario_channels[]`, where each
@@ -248,7 +271,12 @@ top-level selector arrays. New model modules should register new channels throug
 `model_runtime/edim_model/modules/` and `model_runtime/edim_model/model_manifest.json`.
 
 `GET /api/model-runtimes` is the canonical architecture/runtime catalog endpoint. It returns the selected runtime
-manifest, configuration schema, declared outputs, dataset contract, `scenario_catalog`, and `architecture_catalog`.
+manifest, configuration schema, declared outputs, dataset contract, runtime mode, artifact handoff mode, dataset staging
+mode, execution retry policy, model architecture metadata, `architecture_catalog`, and a convenience
+`scenario_catalog` payload for clients that initialize runtime and scenario metadata together.
+`GET /api/scenarios` remains the canonical scenario-catalog endpoint; it returns module-owned `scenario_channels` and
+`module_configurations`. Hosted backends should preserve both surfaces for frontend compatibility, but should avoid
+adding model-specific selector fields outside the module-owned scenario-channel structure.
 The frontend should not ship a separate architecture contract. The architecture catalog
 is model-owned in `model_runtime/edim_model/architecture_catalog.json` and currently loaded through
 `ModelCatalogProvider`, whose local implementation calls the packaged runtime catalog command declared in
@@ -708,6 +736,50 @@ The canonical UI/backend flow is project-owned:
 Run submission is project-owned only; backend platform integrations should keep
 the draft-and-submit flow as the canonical contract.
 
+## Hosted Frontend Compatibility Checklist
+
+A hosted backend used through the frontend `Backend` switch must satisfy this minimum compatibility contract:
+
+- expose the same public route contract as the local backend
+- return compatible OpenAPI schemas for the frontend-facing endpoints
+- serve `GET /api/session`, `GET /api/system/manifest`, `GET /api/model-runtimes`, `GET /api/scenarios`, project, run, dataset, artifact, report, and export endpoints
+- return `schema_version = edim_system_manifest` from `/api/system/manifest`
+- return `ok = true` and no `error` diagnostics from `/api/system/manifest`
+- list all frontend-used API routes in `manifest.public_endpoints`
+- allow the frontend origin through CORS, including required methods, `Content-Type`, and transitional `X-EDIM-User-Id` header if test-user mode is used
+- return artifact/report/export download URLs that are valid from the browser
+- preserve artifact-id based downloads rather than requiring the frontend to infer storage paths
+- preserve user/project/run ownership semantics
+
+Production authenticated downloads should use browser-valid signed URLs or a backend-supported download flow compatible
+with the final auth provider. Local/testing downloads can use the current test-user header/query behavior.
+
+## Local Setup and Validation Commands
+
+Local execution requires Python 3.11 because the packaged Calliope runtime depends on `calliope==0.6.10` and
+`numpy==1.23.5`.
+
+Initial setup:
+
+```bash
+python3.11 -m venv backend/.venv
+source backend/.venv/bin/activate
+pip3 install -r backend/requirements.txt
+pip3 install -r backend/requirements-dev.txt
+pip3 install --no-build-isolation -e ./model_runtime
+cd frontend && npm install && npm run build
+```
+
+Regression checks before handoff or before changing provider seams:
+
+```bash
+cd /path/to/energy-development-modeling
+source backend/.venv/bin/activate
+cd frontend && npm run build
+cd ..
+PYTHONPATH=backend:model_runtime backend/.venv/bin/python -m pytest backend/tests
+```
+
 ## Backend Team First Smoke Test
 
 The executable handoff smoke test is:
@@ -756,6 +828,52 @@ The script validates this minimum cloud-handoff sequence:
 16. `POST /api/projects/{project_id}/exports` and download the project export bundle
 
 If this sequence works in cloud infrastructure, the hosted backend is exercising the same subprocess runtime contract used by local development.
+
+## Current Repository Reference Map
+
+Backend/platform:
+
+- `backend/api_service/main.py`: FastAPI composition root and provider injection point.
+- `backend/api_service/api/dependencies.py`: local auth/session dependency replacement point.
+- `backend/api_service/api/routers/`: public API route layer.
+- `backend/api_service/services/platform_repository.py`: platform metadata repository protocol.
+- `backend/api_service/services/sqlite_platform_repository.py`: local SQLite reference implementation.
+- `backend/api_service/services/dataset_repository.py`: dataset catalog/upload/version boundary.
+- `backend/api_service/services/artifact_storage.py`: artifact/report/export download boundary.
+- `backend/api_service/runtime/`: queue, event, artifact, bundle, and runtime contract types.
+- `backend/api_service/adapters/subprocess_runtime.py`: local subprocess model-runtime adapter.
+- `backend/tools/backend_handoff_smoke.py`: deployment-oriented HTTP acceptance smoke test.
+
+Model runtime:
+
+- `model_runtime/edim_model/model_manifest.json`: black-box runtime manifest.
+- `model_runtime/edim_model/architecture_catalog.json`: model-owned UI/runtime architecture catalog.
+- `model_runtime/edim_model/dataset_manifest.json`: model-owned dataset contract.
+- `model_runtime/edim_model/cli.py`: runtime `preflight`, `catalog`, and `run` command entrypoint.
+- `model_runtime/edim_model/core/orchestration.py`: generic stage orchestration.
+- `model_runtime/edim_model/core/edim_pipeline.py`: EDIM-specific stage composition.
+- `model_runtime/edim_model/modules/`: model-module boundaries for Calliope, MRIO, and planned OSeMOSYS support.
+- `model_runtime/model_modules/calliope/`: packaged Calliope-Africa model assets.
+
+Frontend/static shell:
+
+- `frontend/api-client.js`: low-level API target, auth header, upload, and download transport boundary.
+- `frontend/app.jsx`: project/workspace UI, high-level API wrapper, manifest compatibility check, and run state handling.
+- `frontend/index.html`: static shell, shared styles, script loading, and runtime config loading.
+- `frontend/runtime-config.js`: default frontend runtime-config bridge.
+- `frontend/runtime-config.local.js`: generated local runtime config; ignored by Git.
+- `frontend/scripts/build-static.js`: static bundle validator/builder.
+- `frontend/methodology/`: static user-facing methodology page.
+- `frontend/hero-visual.jsx` and `frontend/hero-defaults.json`: landing-page visualization.
+- `frontend/assets/webp/`: optimized frontend image assets.
+- `frontend/assets/photos/`: raw local photo source folder; ignored and not deployed.
+
+Documentation:
+
+- `docs/handoff/BACKEND_HANDOFF.md`: this backend implementation contract.
+- `docs/system/SYSTEM_DOCUMENTATION.md`: broader system documentation.
+- `docs/model/`: model input/output catalogs.
+- `README.md`: local setup and operator entry points.
 
 ## Still Local-Only
 

@@ -624,14 +624,17 @@ UI file set:
 
 Core UX flow:
 
-1. Select or create a project.
-2. Select a model architecture, then configure scenario setup and lever tuning.
-3. Review environment setup checks.
-4. Queue a project-owned run.
-5. Monitor active execution with stage/progress/heartbeat.
-6. Inspect selected run outputs.
-7. Compare completed project runs.
-8. Generate reports and export bundles.
+1. Land on the basic UNDP/EDIM entry page.
+2. Select the runtime target and provisioned test user.
+3. Open the projects workspace.
+4. Select or create a project.
+5. Select a model architecture, then configure scenario setup and lever tuning.
+6. Review environment setup checks.
+7. Queue a project-owned run.
+8. Monitor active execution with stage/progress/heartbeat.
+9. Inspect selected run outputs.
+10. Compare completed project runs.
+11. Generate reports and export bundles.
 
 Notable UI behaviors:
 
@@ -732,6 +735,7 @@ python3.11 -m venv backend/.venv
 source backend/.venv/bin/activate
 pip3 install -U pip
 pip3 install -r backend/requirements.txt
+pip3 install -r backend/requirements-dev.txt
 pip3 install --no-build-isolation -e ./model_runtime
 python3 scripts/run_local.py --port 8000
 ```
