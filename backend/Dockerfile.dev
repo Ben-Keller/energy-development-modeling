@@ -1,0 +1,26 @@
+# Development Dockerfile for edim-api.
+# Expects the repo root's ./backend directory to be mounted at /app/backend.
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System dependencies required by netCDF4 / Calliope build chain.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libhdf5-dev \
+    libnetcdf-dev \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies.
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install -U pip && pip install -r /tmp/requirements.txt
+
+# Ensure the repo-root packages are importable.
+ENV PYTHONPATH=/app
+
+EXPOSE 8000
+
+# Default command is overridden by docker-compose-dev.yml for hot reload.
+CMD ["uvicorn", "backend.api_service.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/backend"]

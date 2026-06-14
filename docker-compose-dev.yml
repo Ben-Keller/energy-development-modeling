@@ -1,0 +1,287 @@
+# Local development orchestration for EDIM (develop branch).
+# Mirrors the target Azure topology using emulators:
+#   - edim-api      : FastAPI BFF
+#   - edim-worker   : isolated compute daemon
+#   - edim-db       : PostgreSQL metadata store
+#   - azurite       : Azure Blob Storage emulator
+#   - servicebus    : Azure Service Bus emulator (with SQL Edge backend)
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose -f docker-compose-dev.yml up --build
+#
+# The UI is served by the API at http://localhost:8000/ui/
+
+name: edim-dev
+
+services:
+  # ---------------------------------------------------------------------------
+  # Relational metadata store (replaces Azure Database for PostgreSQL)
+  # ---------------------------------------------------------------------------
+  edim-db:
+    image: postgres:16-alpine
+    container_name: edim-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${EDIM_DB_USER:-edim}
+      POSTGRES_PASSWORD: ${EDIM_DB_PASSWORD:-edim}
+      POSTGRES_DB: ${EDIM_DB_NAME:-edim_db_local}
+    volumes:
+      - edim_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${EDIM_DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${EDIM_DB_USER:-edim} -d ${EDIM_DB_NAME:-edim_db_local}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - edim-dev
+
+  # ---------------------------------------------------------------------------
+  # Azure Blob Storage emulator
+  # ---------------------------------------------------------------------------
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: edim-azurite
+    restart: unless-stopped
+    command: >
+      azurite-blob
+      --blobHost 0.0.0.0
+      --blobPort 10000
+      --location /data
+      --skipApiVersionCheck
+      --debug /data/debug.log
+    volumes:
+      - ./__azurite_data__:/data
+    ports:
+      - "${EDIM_AZURITE_BLOB_PORT:-10000}:10000"
+    healthcheck:
+      test: ["CMD-SHELL", "(echo > /dev/tcp/127.0.0.1/10000) || exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - edim-dev
+
+  # ---------------------------------------------------------------------------
+  # Azure Service Bus emulator backend (SQL Edge)
+  # ---------------------------------------------------------------------------
+  servicebus-sql:
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    container_name: edim-servicebus-sql
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${EDIM_SERVICEBUS_SQL_PASSWORD:-StrongPassword123}
+    volumes:
+      - edim_servicebus_sql_data:/var/lib/mssql/data
+    healthcheck:
+      test: ["CMD-SHELL", "(echo > /dev/tcp/127.0.0.1/1433) || exit 0"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+    networks:
+      - edim-dev
+
+  # ---------------------------------------------------------------------------
+  # Azure Service Bus emulator
+  # ---------------------------------------------------------------------------
+  servicebus:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    container_name: edim-servicebus
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      SQL_SERVER: servicebus-sql
+      SQL_PASSWORD: ${EDIM_SERVICEBUS_SQL_PASSWORD:-StrongPassword123}
+      MSSQL_SA_PASSWORD: ${EDIM_SERVICEBUS_SQL_PASSWORD:-StrongPassword123}
+    volumes:
+      - ./servicebus-emulator-config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
+    ports:
+      - "${EDIM_SERVICEBUS_PORT:-5672}:5672"
+    depends_on:
+      servicebus-sql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "(echo > /dev/tcp/127.0.0.1/5672) || exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - edim-dev
+
+  # ---------------------------------------------------------------------------
+  # FastAPI BFF / orchestration layer (replaces Azure App Service)
+  # ---------------------------------------------------------------------------
+  edim-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: edim-api
+    restart: unless-stopped
+    ports:
+      - "${EDIM_API_PORT:-8000}:8000"
+    volumes:
+      # Hot-reload mounts
+      - ./backend:/app/backend:rw
+      - ./frontend:/app/frontend:ro
+      - ./inputs:/app/inputs:rw
+      - ./Calliope-Africa-main:/app/calliope-africa:ro
+      - ./model_runtime:/app/model_runtime:ro
+      # Scenario report (referenced by repo_root in settings)
+      - ./Energy Modelling Scenario Report.docx:/app/Energy Modelling Scenario Report.docx:ro
+      # Persistent runtime outputs
+      - ./outputs/runs:/app/outputs/runs
+      - ./outputs/figures:/app/outputs/figures
+    environment:
+      # Local auth shim used on develop branch only (plan 1.4)
+      EDIM_AUTH_MODE: ${EDIM_AUTH_MODE:-test_header}
+      EDIM_TEST_USER_ID: ${EDIM_TEST_USER_ID:-dev-user-1}
+
+      # Paths
+      EDIM_CALLIOPE_ROOT: /app/calliope-africa
+      EDIM_FRONTEND_DIR: /app/frontend
+      EDIM_RUNS_DIR: /app/outputs/runs
+      EDIM_CONFIG_DIR: /app/inputs
+      EDIM_RUNTIME_CONFIG: /app/inputs/runtime_config.json
+
+      # Runtime tuning
+      EDIM_SOLVER: ${EDIM_SOLVER:-highs}
+      EDIM_ALLOW_FULL_YEAR: ${EDIM_ALLOW_FULL_YEAR:-true}
+      EDIM_DEV_SUBSET_START: ${EDIM_DEV_SUBSET_START:-2019-01-01}
+      EDIM_DEV_SUBSET_END: ${EDIM_DEV_SUBSET_END:-2019-01-14}
+      EDIM_ANALYSIS_SUBSET_START: ${EDIM_ANALYSIS_SUBSET_START:-2019-01-01}
+      EDIM_ANALYSIS_SUBSET_END: ${EDIM_ANALYSIS_SUBSET_END:-2019-03-31}
+      EDIM_DEVELOPMENT_ENGINE: ${EDIM_DEVELOPMENT_ENGINE:-mario}
+      EDIM_MARIO_TIMEOUT_SECONDS: ${EDIM_MARIO_TIMEOUT_SECONDS:-120}
+      EDIM_MARIO_FAIL_ON_ERROR: ${EDIM_MARIO_FAIL_ON_ERROR:-false}
+      EDIM_SUMMARY_DIAGNOSTICS_MAX_ROWS: ${EDIM_SUMMARY_DIAGNOSTICS_MAX_ROWS:-120}
+
+      # CORS for local UI
+      EDIM_CORS_ALLOW_ORIGINS: ${EDIM_CORS_ALLOW_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
+
+      # PostgreSQL
+      EDIM_DATABASE_URL: postgres://${EDIM_DB_USER:-edim}:${EDIM_DB_PASSWORD:-edim}@edim-db:5432/${EDIM_DB_NAME:-edim_db_local}
+
+      # Azure emulators
+      EDIM_AZURITE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+      EDIM_SERVICEBUS_CONNECTION_STRING: Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+      EDIM_SERVICEBUS_QUEUE_NAME: ${EDIM_SERVICEBUS_QUEUE_NAME:-execution-queue-local}
+
+      # OpenAI / Azure OpenAI (optional)
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2025-01-01-preview}
+      OPENAI_FILTER_MODEL: ${OPENAI_FILTER_MODEL:-}
+
+    depends_on:
+      edim-db:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+      servicebus:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "(echo > /dev/tcp/127.0.0.1/8000) || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - edim-dev
+    command:
+      - uvicorn
+      - backend.api_service.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /app/backend
+
+  # ---------------------------------------------------------------------------
+  # Isolated compute worker (replaces Azure VM worker daemon)
+  # ---------------------------------------------------------------------------
+  edim-worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: edim-worker
+    restart: unless-stopped
+    volumes:
+      # Hot-reload mounts for model runtime and worker logic
+      - ./model_runtime:/app/model_runtime:rw
+      - ./worker:/app/worker:rw
+      # Read-only access to backend logic, inputs, and Calliope model
+      - ./backend:/app/backend:ro
+      - ./inputs:/app/inputs:ro
+      - ./Calliope-Africa-main:/app/calliope-africa:ro
+      # Scenario report (referenced by repo_root in settings)
+      - ./Energy Modelling Scenario Report.docx:/app/Energy Modelling Scenario Report.docx:ro
+      # Shared runtime outputs
+      - ./outputs/runs:/app/outputs/runs
+    environment:
+      EDIM_WORKER_ID: ${EDIM_WORKER_ID:-edim-worker-01}
+      EDIM_WORKER_MODE: ${EDIM_WORKER_MODE:-directory}
+
+      # Paths
+      EDIM_CALLIOPE_ROOT: /app/calliope-africa
+      EDIM_RUNS_DIR: /app/outputs/runs
+      EDIM_CONFIG_DIR: /app/inputs
+      EDIM_RUNTIME_CONFIG: /app/inputs/runtime_config.json
+
+      # Runtime tuning
+      EDIM_SOLVER: ${EDIM_SOLVER:-highs}
+      EDIM_ALLOW_FULL_YEAR: ${EDIM_ALLOW_FULL_YEAR:-true}
+      EDIM_DEV_SUBSET_START: ${EDIM_DEV_SUBSET_START:-2019-01-01}
+      EDIM_DEV_SUBSET_END: ${EDIM_DEV_SUBSET_END:-2019-01-14}
+      EDIM_ANALYSIS_SUBSET_START: ${EDIM_ANALYSIS_SUBSET_START:-2019-01-01}
+      EDIM_ANALYSIS_SUBSET_END: ${EDIM_ANALYSIS_SUBSET_END:-2019-03-31}
+      EDIM_DEVELOPMENT_ENGINE: ${EDIM_DEVELOPMENT_ENGINE:-mario}
+      EDIM_MARIO_TIMEOUT_SECONDS: ${EDIM_MARIO_TIMEOUT_SECONDS:-120}
+      EDIM_MARIO_FAIL_ON_ERROR: ${EDIM_MARIO_FAIL_ON_ERROR:-false}
+
+      # PostgreSQL
+      EDIM_DATABASE_URL: postgres://${EDIM_DB_USER:-edim}:${EDIM_DB_PASSWORD:-edim}@edim-db:5432/${EDIM_DB_NAME:-edim_db_local}
+
+      # Azure emulators
+      EDIM_AZURITE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+      EDIM_SERVICEBUS_CONNECTION_STRING: Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+      EDIM_SERVICEBUS_QUEUE_NAME: ${EDIM_SERVICEBUS_QUEUE_NAME:-execution-queue-local}
+
+      # OpenAI / Azure OpenAI (optional)
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2025-01-01-preview}
+      OPENAI_FILTER_MODEL: ${OPENAI_FILTER_MODEL:-}
+
+    depends_on:
+      edim-db:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+      servicebus:
+        condition: service_started
+    networks:
+      - edim-dev
+    command:
+      - python
+      - -m
+      - worker.daemon
+
+networks:
+  edim-dev:
+    driver: bridge
+
+volumes:
+  edim_postgres_data:
+  edim_servicebus_sql_data:

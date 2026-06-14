@@ -15,6 +15,12 @@ frontend/dist/
 
 # Runtime artifacts
 outputs/runs/
+outputs/figures/
+
+# Local Docker/emulator data
+__azurite_data__/
+edim_postgres_data/
+edim_servicebus_sql_data/
 
 # Local environment files
 .env

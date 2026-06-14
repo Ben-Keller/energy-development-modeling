@@ -326,7 +326,7 @@
     }
   ],
   "country_count": 54,
-  "generated_at_utc": "2026-04-10T22:15:16.390476+00:00",
+  "generated_at_utc": "2026-06-14T10:05:47.131863+00:00",
   "scenarios": {
     "S1": {
       "description": "Africa-wide national placeholder scenario. South Africa uses the ZA-S1 report record; all other African countries use Rest-of-Africa WF-S1 assumptions until country-specific expert MRIO scenario records are supplied.",

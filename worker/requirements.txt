@@ -1,0 +1,7 @@
+# Worker-only dependencies for local cloud development.
+# These mirror the Azure SDKs used in staging/production.
+
+azure-servicebus>=7.12.0
+azure-storage-blob>=12.19.0
+azure-identity>=1.15.0
+psycopg2-binary>=2.9.9
