@@ -31,19 +31,27 @@ class LeverValues(BaseModel):
 
 
 class RunRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     energy_model_engine: EnergyModelEngine = Field(default="calliope", description="Energy-model runtime engine. Calliope is executable now; OSeMOSYS is a selectable adapter target pending runtime implementation.")
-    energy_scenario_key: str = Field(..., min_length=1, max_length=200, description="Energy scenario key from the energy model catalog")
-    mrio_scenario_id: str = Field(..., min_length=1, max_length=50, description="Integrated target scenario id, currently S1 for full decarbonization or S2 for national policy target; MRIO shock mapping is fixed to the report A/Z/E/Y adapter for now")
-    target_year: int = Field(..., ge=1900, le=2200, description="Scenario target year used by the integrated package")
+    energy_scenario_key: str = Field(default="", min_length=0, max_length=200, description="Energy scenario key from the energy model catalog")
+    # Legacy alias accepted from smoke test and older clients. Takes effect only when energy_scenario_key is empty.
+    scenario: str = Field(default="", exclude=True, description="Backward-compat alias for energy_scenario_key.")
+    mrio_scenario_id: str = Field(default="ZA-S2", min_length=1, max_length=50, description="Integrated target scenario id")
+    target_year: int = Field(default=2030, ge=1900, le=2200, description="Scenario target year")
     levers: LeverValues = Field(default_factory=LeverValues)
-    run_profile: RunProfile
-    strict_validation: bool
-    allow_placeholder_data: bool
+    run_profile: RunProfile = Field(default="dev")
+    strict_validation: bool = Field(default=False)
+    allow_placeholder_data: bool = Field(default=True)
 
     @model_validator(mode="after")
-    def _normalize_profile(self) -> "RunRequest":
+    def _normalize(self) -> "RunRequest":
+        # Resolve legacy scenario alias → energy_scenario_key.
+        if not self.energy_scenario_key and self.scenario:
+            self.energy_scenario_key = self.scenario
+        if not self.energy_scenario_key:
+            raise ValueError("energy_scenario_key (or scenario) is required.")
+        # Analysis/full profiles force strict validation.
         if self.run_profile in {"analysis", "full"}:
             self.strict_validation = True
         return self

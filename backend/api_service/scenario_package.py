@@ -503,6 +503,8 @@ def build_integrated_scenario_catalog(config_dir: Path, calliope_root: Path, ene
             {"value": "osemosys", "label": "OSeMOSYS", "runtime_status": "adapter_target_pending_runtime"},
         ],
         "energy_scenarios": energy_scenarios,
+        # "scenarios" is a backward-compat alias used by the smoke test and legacy clients.
+        "scenarios": energy_scenarios,
         "target_scenarios": target_scenarios,
         "mrio_shock_mappings": shock_mappings,
         "target_years": sorted(target_years or {2030, 2050}),

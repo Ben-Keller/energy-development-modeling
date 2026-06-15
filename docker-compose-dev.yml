@@ -142,6 +142,10 @@ services:
       EDIM_AUTH_MODE: ${EDIM_AUTH_MODE:-test_header}
       EDIM_TEST_USER_ID: ${EDIM_TEST_USER_ID:-dev-user-1}
 
+      # PYTHONPATH includes /app/model_runtime so 'edim_model' is importable
+      # as a top-level package regardless of the mounted volume layout.
+      PYTHONPATH: /app:/app/model_runtime
+
       # Paths
       EDIM_CALLIOPE_ROOT: /app/calliope-africa
       EDIM_FRONTEND_DIR: /app/frontend
@@ -165,10 +169,14 @@ services:
       EDIM_CORS_ALLOW_ORIGINS: ${EDIM_CORS_ALLOW_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
 
       # PostgreSQL
-      EDIM_DATABASE_URL: postgres://${EDIM_DB_USER:-edim}:${EDIM_DB_PASSWORD:-edim}@edim-db:5432/${EDIM_DB_NAME:-edim_db_local}
+      EDIM_DATABASE_URL: postgresql+psycopg://${EDIM_DB_USER:-edim}:${EDIM_DB_PASSWORD:-edim}@edim-db:5432/${EDIM_DB_NAME:-edim_db_local}
+      EDIM_RUN_MIGRATIONS: ${EDIM_RUN_MIGRATIONS:-true}
+      EDIM_QUEUE_MODE: ${EDIM_QUEUE_MODE:-postgres}
 
       # Azure emulators
       EDIM_AZURITE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+      # Public Azurite URL reachable from the browser host (used for SAS redirects, plan 4.3)
+      EDIM_BLOB_PUBLIC_URL: ${EDIM_BLOB_PUBLIC_URL:-http://localhost:10000}
       EDIM_SERVICEBUS_CONNECTION_STRING: Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
       EDIM_SERVICEBUS_QUEUE_NAME: ${EDIM_SERVICEBUS_QUEUE_NAME:-execution-queue-local}
 
@@ -187,24 +195,8 @@ services:
         condition: service_healthy
       servicebus:
         condition: service_started
-    healthcheck:
-      test: ["CMD-SHELL", "(echo > /dev/tcp/127.0.0.1/8000) || exit 0"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
     networks:
       - edim-dev
-    command:
-      - uvicorn
-      - backend.api_service.main:app
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
-      - --reload
-      - --reload-dir
-      - /app/backend
 
   # ---------------------------------------------------------------------------
   # Isolated compute worker (replaces Azure VM worker daemon)
@@ -219,9 +211,10 @@ services:
       # Hot-reload mounts for model runtime and worker logic
       - ./model_runtime:/app/model_runtime:rw
       - ./worker:/app/worker:rw
-      # Read-only access to backend logic, inputs, and Calliope model
-      - ./backend:/app/backend:ro
-      - ./inputs:/app/inputs:ro
+      # The worker image contains backend/ because the model-logic
+      # black box currently lives there and is loaded by edim_model.cli.
+      # The worker daemon itself does not import backend service code.
+      - ./inputs:/app/inputs:rw
       - ./Calliope-Africa-main:/app/calliope-africa:ro
       # Scenario report (referenced by repo_root in settings)
       - ./Energy Modelling Scenario Report.docx:/app/Energy Modelling Scenario Report.docx:ro
@@ -229,7 +222,10 @@ services:
       - ./outputs/runs:/app/outputs/runs
     environment:
       EDIM_WORKER_ID: ${EDIM_WORKER_ID:-edim-worker-01}
-      EDIM_WORKER_MODE: ${EDIM_WORKER_MODE:-directory}
+
+      # PYTHONPATH must include /app/model_runtime so that 'edim_model'
+      # is importable as a top-level package (model_runtime/edim_model/).
+      PYTHONPATH: /app:/app/model_runtime
 
       # Paths
       EDIM_CALLIOPE_ROOT: /app/calliope-africa
@@ -248,13 +244,14 @@ services:
       EDIM_MARIO_TIMEOUT_SECONDS: ${EDIM_MARIO_TIMEOUT_SECONDS:-120}
       EDIM_MARIO_FAIL_ON_ERROR: ${EDIM_MARIO_FAIL_ON_ERROR:-false}
 
-      # PostgreSQL
-      EDIM_DATABASE_URL: postgres://${EDIM_DB_USER:-edim}:${EDIM_DB_PASSWORD:-edim}@edim-db:5432/${EDIM_DB_NAME:-edim_db_local}
-
       # Azure emulators
       EDIM_AZURITE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
       EDIM_SERVICEBUS_CONNECTION_STRING: Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
       EDIM_SERVICEBUS_QUEUE_NAME: ${EDIM_SERVICEBUS_QUEUE_NAME:-execution-queue-local}
+      EDIM_SERVICEBUS_CANCELLATION_QUEUE_NAME: ${EDIM_SERVICEBUS_CANCELLATION_QUEUE_NAME:-cancellation-queue-local}
+      EDIM_SERVICEBUS_COMPLETION_QUEUE_NAME: ${EDIM_SERVICEBUS_COMPLETION_QUEUE_NAME:-completion-queue-local}
+      # Set to DEBUG to enable Azure Service Bus / AMQP frame tracing
+      EDIM_SB_LOG_LEVEL: ${EDIM_SB_LOG_LEVEL:-WARNING}
 
       # OpenAI / Azure OpenAI (optional)
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}

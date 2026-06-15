@@ -13,6 +13,26 @@
               "MaxDeliveryCount": 3,
               "RequiresSession": false
             }
+          },
+          {
+            "Name": "cancellation-queue-local",
+            "Properties": {
+              "DeadLetteringOnMessageExpiration": true,
+              "DefaultMessageTimeToLive": "PT1H",
+              "LockDuration": "PT1M",
+              "MaxDeliveryCount": 3,
+              "RequiresSession": false
+            }
+          },
+          {
+            "Name": "completion-queue-local",
+            "Properties": {
+              "DeadLetteringOnMessageExpiration": true,
+              "DefaultMessageTimeToLive": "PT1H",
+              "LockDuration": "PT5M",
+              "MaxDeliveryCount": 3,
+              "RequiresSession": false
+            }
           }
         ],
         "Topics": []

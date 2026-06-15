@@ -1,5 +1,6 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+watchfiles==0.21.0
 pydantic==2.8.2
 PyYAML==6.0.2
 python-multipart==0.0.9
@@ -14,3 +15,20 @@ openai>=1.40.0,<3.0.0
 calliope==0.6.10
 pyomo==6.4.4
 highspy>=1.7.2,<2.0
+
+# Azure SDKs (used in staging/prod for App Configuration + Managed Identity;
+# import-guarded in settings.py so local dev works without them installed)
+azure-appconfiguration>=1.6.0
+azure-identity>=1.15.0
+azure-servicebus>=7.12.0
+azure-storage-blob>=12.19.0
+
+# Persistence stack (plan chapters 3, 5, 6, 8: PostgreSQL, Alembic migrations)
+SQLAlchemy>=2.0.30,<2.1
+alembic>=1.13.0
+psycopg[binary]>=3.1.18
+
+# OIDC JWT validation (plan chapter 2.2; import-guarded, used only in oidc auth mode)
+PyJWT[crypto]>=2.8.0
+httpx>=0.27.0
+

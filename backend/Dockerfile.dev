@@ -18,7 +18,9 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip install -U pip && pip install -r /tmp/requirements.txt
 
 # Ensure the repo-root packages are importable.
-ENV PYTHONPATH=/app
+# /app makes 'backend', 'worker', 'model_runtime' importable.
+# /app/model_runtime makes 'edim_model' importable as a top-level package.
+ENV PYTHONPATH=/app:/app/model_runtime
 
 EXPOSE 8000
 

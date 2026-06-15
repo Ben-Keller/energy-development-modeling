@@ -19,7 +19,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# The worker image adds both /app/backend and /app/model_runtime to PYTHONPATH.
+# The worker image adds /app/backend and /app/model_runtime to PYTHONPATH.
+# The CLI delegates to the model logic that lives in backend/api_service;
+# that code is treated as an opaque black box by the worker daemon.
 from backend.api_service.scenarios import build_integrated_catalog
 from backend.api_service.runner import run_calliope_synchronously
 from backend.api_service.schemas import RunRequest

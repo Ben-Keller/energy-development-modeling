@@ -177,11 +177,30 @@ def run_smoke(base_url: str, run_model: bool, run_timeout: float, scenario_overr
 def main() -> int:
     parser = argparse.ArgumentParser(description="EDIM backend/frontend/model smoke checks.")
     parser.add_argument("--port", type=int, default=8010, help="Local port for temporary uvicorn server.")
+    parser.add_argument("--base-url", type=str, default="", help="Target an already-running server (e.g. http://localhost:8000) instead of spawning a local uvicorn process.")
     parser.add_argument("--run-model", action="store_true", help="Execute one real dev-profile model run.")
     parser.add_argument("--run-timeout-seconds", type=float, default=900.0, help="Timeout for model run completion.")
     parser.add_argument("--startup-timeout-seconds", type=float, default=90.0, help="Timeout waiting for backend health.")
     parser.add_argument("--scenario", type=str, default="", help="Scenario key override for model run.")
     args = parser.parse_args()
+
+    # When --base-url is provided, target the running server directly without
+    # spawning a local uvicorn subprocess.
+    external_base_url = str(args.base_url or "").strip().rstrip("/")
+    if external_base_url:
+        try:
+            _wait_for_health(external_base_url, timeout_seconds=float(args.startup_timeout_seconds))
+            run_smoke(
+                base_url=external_base_url,
+                run_model=bool(args.run_model),
+                run_timeout=float(args.run_timeout_seconds),
+                scenario_override=str(args.scenario or "").strip(),
+            )
+            print("[ok] smoke check completed")
+            return 0
+        except Exception as exc:
+            print(f"[error] {exc}")
+            return 1
 
     backend_dir = Path(__file__).resolve().parents[1]
     python_bin = Path(sys.executable)

@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /app/requirements.txt
 RUN pip install -U pip && pip install -r requirements.txt
 
+COPY alembic.ini /app/alembic.ini
+COPY migrations /app/migrations
 COPY api_service /app/api_service
 
 EXPOSE 8000

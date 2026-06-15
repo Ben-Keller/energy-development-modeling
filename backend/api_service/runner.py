@@ -3229,6 +3229,7 @@ def run_calliope_synchronously(
     Returns:
       (run_id, summary_json, warnings, run_dir)
     """
+    logger.info("[run-start] scenario=%s mrio=%s profile=%s", req.energy_scenario_key, req.mrio_scenario_id, getattr(req, 'run_profile', 'dev'))
     _emit_progress(progress_callback, "environment_setup", 0.01, "Validating request")
     _check_cancel(cancel_requested)
 
@@ -3242,6 +3243,7 @@ def run_calliope_synchronously(
 
     run_id, run_dir = _create_run_dir(settings.runs_dir)
     model_yaml = _resolve_model_yaml(settings)
+    logger.info("[run-init] run_id=%s run_dir=%s model_yaml=%s", run_id, run_dir, model_yaml)
 
     _emit_progress(progress_callback, "scenario_prepare", 0.06, "Building integrated scenario package")
     scenario_package = build_scenario_package(
@@ -3288,6 +3290,7 @@ def run_calliope_synchronously(
     _write_yaml(run_dir / "ui_override_patch.yaml", override_patch)
 
     _emit_progress(progress_callback, "build_model", 0.15, "Building Calliope model")
+    logger.info("[build-model-start] scenario=%s solver=%s calliope_root=%s", req.energy_scenario_key, solver_name, settings.calliope_root)
     calliope = _get_calliope_module()
     _patch_calliope_appsi_solver_factory()
     _patch_calliope_highs_warmstart()
@@ -3296,13 +3299,17 @@ def run_calliope_synchronously(
 
     with _pushd(settings.calliope_root):
         model = _build_model_with_overrides(calliope.Model, model_yaml, req.energy_scenario_key, override_patch)
+        logger.info("[build-model-done] model built successfully")
         _apply_demand_multiplier(model, req.levers.demand_multiplier, warnings)
         _check_cancel(cancel_requested)
         _emit_progress(progress_callback, "solve_energy", 0.55, "Solving energy optimization problem")
+        logger.info("[solve-start] calling model.run() — HiGHS solve beginning")
         model.run()
+        logger.info("[solve-done] model.run() returned")
     _check_cancel(cancel_requested)
 
     health = _results_health(model)
+    logger.info("[health-check] termination_condition=%s var_count=%s", health.get('termination_condition'), health.get('var_count'))
     if int(health.get("var_count", 0)) <= 0:
         term = str(health.get("termination_condition", "")).strip() or "unknown"
         if term.lower() in {"maxtimelimit", "timelimit", "max_time_limit"}:
@@ -3409,6 +3416,7 @@ def run_calliope_synchronously(
     _write_text_atomic(run_dir / "report.md", report_markdown)
     create_exchange_bundle_zip(run_dir)
 
+    logger.info("[run-complete] run_id=%s artifacts written", run_id)
     _emit_progress(progress_callback, "complete", 1.0, "Run completed successfully")
     return run_id, summary, warnings, run_dir
 
