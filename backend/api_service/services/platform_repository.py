@@ -37,7 +37,21 @@ class PlatformRepository(RunRepository, Protocol):
 
 
 def create_platform_repository(settings: Settings) -> PlatformRepository:
-    """Create the single local platform metadata repository."""
+    """Create the platform metadata repository.
+
+    Uses PostgresPlatformRepository when EDIM_DATABASE_URL is set (docker-compose-dev
+    and cloud deployments). Falls back to SQLitePlatformRepository for bare-metal dev.
+    """
+    import os
+
+    database_url = os.getenv("EDIM_DATABASE_URL", "").strip()
+    if database_url:
+        from ..db import build_engine, build_session_factory
+        from .postgres_platform_repository import PostgresPlatformRepository
+
+        engine = build_engine()
+        session_factory = build_session_factory(engine)
+        return PostgresPlatformRepository(session_factory, settings)  # type: ignore[return-value]
 
     backend = str(getattr(settings, "platform_store_backend", "sqlite") or "sqlite").strip().lower()
     if backend not in {"sqlite", "sqlite3"}:

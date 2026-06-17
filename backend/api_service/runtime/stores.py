@@ -1,12 +1,36 @@
 ﻿from __future__ import annotations
 
 import queue
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Protocol
+from typing import Any, Dict, List, Optional, Protocol
 
 from .contracts import ExecutionQueueMessage
 from .artifacts import ArtifactRegistry
 from .events import RuntimeEvent, RuntimeEventLog
+
+
+@dataclass
+class QueueMessage:
+    """Service Bus queue message for execution dispatch (develop cloud infra)."""
+
+    execution_id: str
+    run_id: str
+    project_id: str
+    user_id: str
+    request_payload: dict
+    dataset_versions: List[dict] = field(default_factory=list)
+    attempt_count: int = 1
+
+
+@dataclass
+class CompletionMessage:
+    """Service Bus completion message from worker daemon."""
+
+    execution_id: str
+    run_id: str
+    worker_id: str
+    outcome: str  # "succeeded" | "failed" | "cancelled"
 
 
 class RunStore(Protocol):
