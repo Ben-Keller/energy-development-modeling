@@ -69,6 +69,26 @@ def _create_event_store(settings: Settings) -> EventStore:
     return LocalEventStore(settings.runs_dir)
 
 
+def _create_artifact_storage(settings: Settings) -> ArtifactStorageService:
+    """Return BlobArtifactStorageService when Azure Blob Storage credentials are set.
+
+    Dev uses EDIM_AZURITE_CONNECTION_STRING (Storage emulator); staging/production
+    use EDIM_BLOB_ACCOUNT_URL + Managed Identity.
+    """
+    conn_str = os.getenv("EDIM_AZURITE_CONNECTION_STRING", "").strip()
+    account_url = os.getenv("EDIM_BLOB_ACCOUNT_URL", "").strip()
+    if conn_str or account_url:
+        try:
+            from .services.blob_artifact_storage import BlobArtifactStorageService
+
+            return BlobArtifactStorageService(settings)  # type: ignore[return-value]
+        except Exception as exc:
+            logger.warning(
+                "BlobArtifactStorageService unavailable (%s); falling back to local filesystem.", exc
+            )
+    return LocalArtifactStorageService(settings)
+
+
 def _discover_frontend_dir(settings) -> Path | None:
     env_dir = (os.getenv("EDIM_FRONTEND_DIR") or "").strip()
     if env_dir:
@@ -92,13 +112,16 @@ def create_app(
 ) -> FastAPI:
     """Create the FastAPI app with replaceable infrastructure providers.
 
-    When EDIM_DATABASE_URL is set (docker-compose-dev and cloud deployments):
-      - Runs Alembic migrations before accepting traffic
-      - Uses PostgresPlatformRepository for durable project/run metadata
-      - Uses PostgresEventStore for execution event persistence
-      - Artifact storage and dataset repository still use local filesystem
-        (volume-mounted in docker-compose-dev); Azurite-backed implementations
-        are a TODO (injection point is here via artifact_storage= / dataset_repository=).
+    Environment-driven provider selection (docker-compose-dev and cloud):
+      - EDIM_DATABASE_URL  → PostgresPlatformRepository + PostgresEventStore
+      - EDIM_AZURITE_CONNECTION_STRING or EDIM_BLOB_ACCOUNT_URL
+                           → BlobArtifactStorageService (Azure Blob Storage)
+      - Otherwise          → SQLite / local filesystem / in-memory providers
+
+    Models always run in-process via SubprocessModelRuntime (black-box contract
+    preserved).  The isolated worker container (edim-worker) independently
+    consumes Azure Service Bus when deployed; the API's JobManager does not
+    dispatch to Service Bus in the current implementation.
     """
     settings = settings or get_settings()
 
@@ -111,7 +134,7 @@ def create_app(
         dataset_repository = dataset_repository or getattr(job_manager, "_dataset_repository", None)
         event_store = event_store or getattr(job_manager, "_event_store", None)
     platform_repository = platform_repository or create_platform_repository(settings)
-    artifact_storage = artifact_storage or LocalArtifactStorageService(settings)
+    artifact_storage = artifact_storage or _create_artifact_storage(settings)
     dataset_repository = dataset_repository or LocalDatasetRepository(settings)
     event_store = event_store or _create_event_store(settings)
     model_catalog_provider = model_catalog_provider or RuntimeCliModelCatalogProvider()
