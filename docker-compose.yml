@@ -1,15 +1,16 @@
 services:
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
     volumes:
       - ./outputs/runs:/app/outputs/runs
       - ./outputs/figures:/app/outputs/figures
-      - ./Calliope-Africa-main:/app/calliope-africa:ro
+      - ./model_runtime/model_modules/calliope/Calliope-Africa-main:/app/model_runtime/model_modules/calliope/Calliope-Africa-main:ro
       - ./inputs:/app/inputs:ro
       - ./frontend:/app/frontend:ro
     environment:
-      - EDIM_CALLIOPE_ROOT=/app/calliope-africa
+      - EDIM_CALLIOPE_ROOT=/app/model_runtime/model_modules/calliope/Calliope-Africa-main
       - EDIM_FRONTEND_DIR=/app/frontend
       - EDIM_RUNS_DIR=/app/outputs/runs
       - EDIM_CONFIG_DIR=/app/inputs

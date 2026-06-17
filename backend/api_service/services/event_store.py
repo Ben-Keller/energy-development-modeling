@@ -17,7 +17,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db_models import ExecutionEventRecord
-from ..runtime.stores import EventStore, RuntimeEvent
+from ..runtime.stores import EventStore
+from ..runtime.events import RuntimeEvent
 
 logger = logging.getLogger(__name__)
 

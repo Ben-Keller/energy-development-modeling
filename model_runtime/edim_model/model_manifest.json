@@ -1,0 +1,142 @@
+{
+  "schema_version": "model_runtime_manifest_v1",
+  "model_id": "edim-calliope-mrio",
+  "model_version": "0.1.0",
+  "label": "EDIM Calliope + MRIO integrated runtime",
+  "description": "Runs the integrated EDIM energy-development model through an executable black-box boundary.",
+  "entrypoint_type": "subprocess",
+  "entrypoint": ["python", "-m", "edim_model.cli", "run"],
+  "preflight_entrypoint": ["python", "-m", "edim_model.cli", "preflight"],
+  "catalog_entrypoint": ["python", "-m", "edim_model.cli", "catalog"],
+  "architecture_catalog_path": "model_runtime/edim_model/architecture_catalog.json",
+  "supported_schema_versions": {
+    "run_bundle": ["model_run_bundle_v1"],
+    "artifact_manifest": ["artifact_manifest_v1"],
+    "progress_events": ["runtime_event_v1"],
+    "scenario_package": ["integrated_scenario_package_v1"]
+  },
+  "supported_energy_model_engines": ["calliope"],
+  "supported_model_architectures": ["energy-development", "energy-only"],
+  "modules": [
+    {
+      "module_id": "calliope",
+      "kind": "energy",
+      "label": "Calliope energy system model",
+      "implementation_status": "ready",
+      "asset_root": "model_runtime/model_modules/calliope/Calliope-Africa-main",
+      "supported_engines": ["calliope"],
+      "stages": ["energy_input_prepare", "build_model", "solve_energy", "write_artifacts", "build_summary"],
+      "scenario_channels": [
+        {
+          "channel_id": "energy_model_engine",
+          "label": "Energy model engine",
+          "config_key": "energy_model_engine",
+          "value_field": "energy_model_engine",
+          "required": true,
+          "source": "module_runtime"
+        },
+        {
+          "channel_id": "energy_pathway",
+          "label": "Energy pathway",
+          "config_key": "scenario.energy_scenario_key",
+          "value_field": "energy_scenario_key",
+          "required": true,
+          "source": "inputs/scenario_metadata.csv + Calliope overrides.yaml"
+        }
+      ]
+    },
+    {
+      "module_id": "osemosys",
+      "kind": "energy",
+      "label": "OSeMOSYS energy system model",
+      "implementation_status": "planned",
+      "asset_root": "model_runtime/model_modules/osemosys",
+      "supported_engines": [],
+      "stages": ["energy_input_prepare", "build_model", "solve_energy", "write_artifacts", "build_summary"],
+      "scenario_channels": [
+        {
+          "channel_id": "energy_model_engine",
+          "label": "Energy model engine",
+          "config_key": "energy_model_engine",
+          "value_field": "energy_model_engine",
+          "required": true,
+          "source": "module_runtime"
+        }
+      ]
+    },
+    {
+      "module_id": "mrio",
+      "kind": "development",
+      "label": "MRIO development model",
+      "implementation_status": "ready",
+      "supported_modes": ["mario"],
+      "stages": ["bridge_prepare", "mrio_direct_prepare", "development"],
+      "scenario_channels": [
+        {
+          "channel_id": "target_pathway",
+          "label": "Development target pathway",
+          "config_key": "scenario.target_scenario_id",
+          "value_field": "target_scenario_id",
+          "required": true,
+          "source": "inputs/generated/africa_national_mrio_placeholder_scenarios.json"
+        },
+        {
+          "channel_id": "target_year",
+          "label": "Target year",
+          "config_key": "scenario.target_year",
+          "value_field": "target_year",
+          "required": true,
+          "source": "module_scenario_catalog"
+        },
+        {
+          "channel_id": "mrio_shock_mapping",
+          "label": "MRIO shock mapping",
+          "config_key": "scenario.mrio_shock_mapping_id",
+          "value_field": "mrio_shock_mapping_id",
+          "required": false,
+          "source": "inputs/generated/scenario_report_scenarios.json"
+        }
+      ]
+    }
+  ],
+  "required_inputs": [
+    "run_bundle_json",
+    "scenario_package_json",
+    "dataset_manifest_json",
+    "artifact_policy_json"
+  ],
+  "declared_outputs": [
+    "summary_json",
+    "integrated_results_json",
+    "development_impacts_json",
+    "coupling_manifest_json",
+    "results_csv",
+    "report_markdown",
+    "exchange_bundle_zip"
+  ],
+  "progress_stages": [
+    "environment_setup",
+    "cleanup",
+    "scenario_prepare",
+    "energy_input_prepare",
+    "build_model",
+    "solve_energy",
+    "write_artifacts",
+    "build_summary",
+    "bridge_prepare",
+    "mrio_direct_prepare",
+    "development",
+    "build_integrated",
+    "complete"
+  ],
+  "resource_requirements": {
+    "cpu": 4,
+    "memory_gb": 16,
+    "timeout_seconds": 14400
+  },
+  "capabilities": {
+    "emits_jsonl_events": true,
+    "emits_artifact_index": true,
+    "supports_cancellation": false
+  }
+}

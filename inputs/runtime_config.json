@@ -1,9 +1,13 @@
 {
   "paths": {
-    "calliope_root": "./Calliope-Africa-main",
+    "calliope_root": "./model_runtime/model_modules/calliope/Calliope-Africa-main",
     "runs_dir": "./outputs/runs",
     "config_dir": "./inputs",
     "frontend_dir": "./frontend"
+  },
+  "storage": {
+    "platform_store_backend": "sqlite",
+    "platform_sqlite_path": "./outputs/platform/platform.sqlite3"
   },
   "runtime": {
     "solver": "highs",
@@ -14,7 +18,32 @@
     "analysis_subset_end": "2019-03-31",
     "dev_solver_time_limit_seconds": 3600,
     "analysis_solver_time_limit_seconds": 14400,
-    "cors_allow_origins": ["http://localhost:8000", "http://127.0.0.1:8000"]
+    "cors_allow_origins": [
+      "http://localhost:8000",
+      "http://127.0.0.1:8000",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "http://localhost:4173",
+      "http://127.0.0.1:4173",
+      "http://localhost:4174",
+      "http://127.0.0.1:4174",
+      "http://localhost:4175",
+      "http://127.0.0.1:4175",
+      "http://localhost:4176",
+      "http://127.0.0.1:4176",
+      "http://localhost:4177",
+      "http://127.0.0.1:4177",
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "http://localhost:5174",
+      "http://127.0.0.1:5174",
+      "http://localhost:5175",
+      "http://127.0.0.1:5175",
+      "http://localhost:5176",
+      "http://127.0.0.1:5176",
+      "http://localhost:5177",
+      "http://127.0.0.1:5177"
+    ]
   },
   "summary": {
     "max_generation_techs": 40,
@@ -29,7 +58,8 @@
   "jobs": {
     "history_limit": 200,
     "dedupe_enabled": true,
-    "queue_capacity": 200
+    "queue_capacity": 12,
+    "execution_max_attempts": 1
   },
   "development_engine": {
     "engine": "mario",
@@ -37,11 +67,339 @@
     "mario_timeout_seconds": 120,
     "mario_fail_on_error": false
   },
-  "ai": {
-    "provider": "azure_openai",
-    "azure_api_version": "2025-01-01-preview",
-    "model_env": "OPENAI_FILTER_MODEL",
-    "required_secret_env": ["OPENAI_API_KEY"],
-    "optional_secret_env": ["AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_DEPLOYMENT", "AZURE_OPENAI_API_VERSION"]
+  "artifacts": {
+    "manifest": {
+      "request_bundle_json": {
+        "path": "inputs/request_bundle.json",
+        "kind": "input_snapshot",
+        "producer_stage": "scenario_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "scenario_package_json": {
+        "path": "inputs/scenario_package.json",
+        "kind": "input_snapshot",
+        "producer_stage": "scenario_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": true,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": true
+      },
+      "energy_input_manifest_json": {
+        "path": "inputs/scenario/energy_input_manifest.json",
+        "kind": "input_snapshot",
+        "producer_stage": "scenario_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "report_scenario_reference_json": {
+        "path": "inputs/scenario/report_scenario_reference.json",
+        "kind": "input_snapshot",
+        "producer_stage": "scenario_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "geography_alignment_json": {
+        "path": "inputs/scenario/geography_alignment.json",
+        "kind": "input_snapshot",
+        "producer_stage": "scenario_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "mrio_direct_inputs_json": {
+        "path": "artifacts/intermediate/scenario/mrio_direct_inputs.json",
+        "kind": "intermediate",
+        "producer_stage": "mrio_direct_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "mrio_direct_shocks_csv": {
+        "path": "artifacts/intermediate/scenario/mrio_direct_shocks.csv",
+        "kind": "intermediate",
+        "producer_stage": "mrio_direct_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "ui_override_patch_yaml": {
+        "path": "inputs/runtime/ui_override_patch.yaml",
+        "kind": "input_snapshot",
+        "producer_stage": "energy_input_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "results_csv": {
+        "path": "artifacts/final/results.csv",
+        "kind": "final",
+        "producer_stage": "write_artifacts",
+        "retain_on_success": true,
+        "retain_on_failure": false,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": true
+      },
+      "summary_json": {
+        "path": "artifacts/final/summary.json",
+        "kind": "final",
+        "producer_stage": "build_integrated",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": true
+      },
+      "development_impacts_json": {
+        "path": "artifacts/final/development_impacts.json",
+        "kind": "final",
+        "producer_stage": "development",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": true,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": true
+      },
+      "coupling_manifest_json": {
+        "path": "artifacts/final/coupling_manifest.json",
+        "kind": "final",
+        "producer_stage": "development",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": true,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": true
+      },
+      "integrated_results_json": {
+        "path": "artifacts/final/integrated_results.json",
+        "kind": "final",
+        "producer_stage": "build_integrated",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": true,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": true
+      },
+      "energy_service_balance_csv": {
+        "path": "artifacts/intermediate/exchange/energy_service_balance.csv",
+        "kind": "intermediate",
+        "producer_stage": "bridge_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "calliope_component_activity_csv": {
+        "path": "artifacts/intermediate/exchange/calliope_component_activity.csv",
+        "kind": "intermediate",
+        "producer_stage": "bridge_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "investment_shocks_csv": {
+        "path": "artifacts/intermediate/exchange/investment_shocks.csv",
+        "kind": "intermediate",
+        "producer_stage": "bridge_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "operating_shocks_csv": {
+        "path": "artifacts/intermediate/exchange/operating_shocks.csv",
+        "kind": "intermediate",
+        "producer_stage": "bridge_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "prices_and_taxes_csv": {
+        "path": "artifacts/intermediate/exchange/prices_and_taxes.csv",
+        "kind": "intermediate",
+        "producer_stage": "bridge_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "exchange_metadata_json": {
+        "path": "artifacts/intermediate/exchange/metadata.json",
+        "kind": "intermediate",
+        "producer_stage": "bridge_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": false,
+        "expose_download": false,
+        "required_for_report": false
+      },
+      "mario_runner_log": {
+        "path": "logs/mario_runner.log",
+        "kind": "log",
+        "producer_stage": "development",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "report_markdown": {
+        "path": "exports/report.md",
+        "kind": "export",
+        "producer_stage": "build_integrated",
+        "retain_on_success": true,
+        "retain_on_failure": false,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "exchange_bundle_zip": {
+        "path": "exports/exchange_bundle.zip",
+        "kind": "export",
+        "producer_stage": "build_integrated",
+        "retain_on_success": true,
+        "retain_on_failure": false,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": false,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "model_manifest_json": {
+        "path": "inputs/model_manifest.json",
+        "kind": "input_snapshot",
+        "producer_stage": "scenario_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "dataset_manifest_json": {
+        "path": "inputs/dataset_manifest.json",
+        "kind": "input_snapshot",
+        "producer_stage": "scenario_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "artifact_policy_json": {
+        "path": "inputs/artifact_policy.json",
+        "kind": "input_snapshot",
+        "producer_stage": "scenario_prepare",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "runtime_events_jsonl": {
+        "path": "logs/runtime_events.jsonl",
+        "kind": "log",
+        "producer_stage": "runtime",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      },
+      "artifact_index_json": {
+        "path": "artifacts/artifact_index.json",
+        "kind": "final",
+        "producer_stage": "runtime",
+        "retain_on_success": true,
+        "retain_on_failure": true,
+        "embed_in_summary": false,
+        "embed_in_final_results": false,
+        "include_in_project_bundle": true,
+        "expose_download": true,
+        "required_for_report": false
+      }
+    }
+  },
+  "model_runtime": {
+    "mode": "subprocess",
+    "artifact_handoff_mode": "shared_filesystem",
+    "dataset_staging_mode": "copy_to_run",
+    "manifest_path": "./model_runtime/edim_model/model_manifest.json",
+    "dataset_manifest_path": "./model_runtime/edim_model/dataset_manifest.json"
   }
 }

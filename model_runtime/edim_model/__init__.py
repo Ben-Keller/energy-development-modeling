@@ -1,8 +1,9 @@
-"""EDIM model runtime package.
+"""Executable EDIM model runtime package.
 
-This package is the black-box compute runtime invoked by the isolated worker.
-It exposes a stable CLI contract so the worker does not depend on internal
-backend module layout.
+This package is intentionally callable as a process boundary. Backend code should
+launch it through a runtime adapter rather than importing model internals.
 """
 
-__version__ = "0.1.0-dev"
+__all__ = ["__version__"]
+
+__version__ = "0.1.0"

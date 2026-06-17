@@ -100,8 +100,8 @@
       "label": "Full Decarbonization",
       "policy_sources": "",
       "provenance": {
-        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
-        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+        "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+        "source_sha256": "0429c187d1984bb0893cb4873e71aeeb0cd68524186286f4e5dc55bf1bec9fbb"
       },
       "scenario_code": "S1",
       "scenario_id": "BR-S1",
@@ -206,8 +206,8 @@
       "label": "National Policy Target",
       "policy_sources": "",
       "provenance": {
-        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
-        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+        "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+        "source_sha256": "0429c187d1984bb0893cb4873e71aeeb0cd68524186286f4e5dc55bf1bec9fbb"
       },
       "scenario_code": "S2",
       "scenario_id": "BR-S2",
@@ -302,8 +302,8 @@
       "label": "Full Decarbonization",
       "policy_sources": "",
       "provenance": {
-        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
-        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+        "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+        "source_sha256": "0429c187d1984bb0893cb4873e71aeeb0cd68524186286f4e5dc55bf1bec9fbb"
       },
       "scenario_code": "S1",
       "scenario_id": "IN-S1",
@@ -414,8 +414,8 @@
       "label": "National Policy Target",
       "policy_sources": "",
       "provenance": {
-        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
-        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+        "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+        "source_sha256": "0429c187d1984bb0893cb4873e71aeeb0cd68524186286f4e5dc55bf1bec9fbb"
       },
       "scenario_code": "S2",
       "scenario_id": "IN-S2",
@@ -532,8 +532,8 @@
       "label": "Full Decarbonization",
       "policy_sources": "",
       "provenance": {
-        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
-        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+        "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+        "source_sha256": "0429c187d1984bb0893cb4873e71aeeb0cd68524186286f4e5dc55bf1bec9fbb"
       },
       "scenario_code": "S1",
       "scenario_id": "WF-S1",
@@ -643,8 +643,8 @@
       "label": "National Policy Target",
       "policy_sources": "",
       "provenance": {
-        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
-        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+        "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+        "source_sha256": "0429c187d1984bb0893cb4873e71aeeb0cd68524186286f4e5dc55bf1bec9fbb"
       },
       "scenario_code": "S2",
       "scenario_id": "WF-S2",
@@ -755,8 +755,8 @@
       "label": "Full Decarbonization",
       "policy_sources": "",
       "provenance": {
-        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
-        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+        "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+        "source_sha256": "0429c187d1984bb0893cb4873e71aeeb0cd68524186286f4e5dc55bf1bec9fbb"
       },
       "scenario_code": "S1",
       "scenario_id": "WM-S1",
@@ -866,8 +866,8 @@
       "label": "National Policy Target",
       "policy_sources": "",
       "provenance": {
-        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
-        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+        "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+        "source_sha256": "0429c187d1984bb0893cb4873e71aeeb0cd68524186286f4e5dc55bf1bec9fbb"
       },
       "scenario_code": "S2",
       "scenario_id": "WM-S2",
@@ -978,8 +978,8 @@
       "label": "Full Decarbonization",
       "policy_sources": "",
       "provenance": {
-        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
-        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+        "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+        "source_sha256": "0429c187d1984bb0893cb4873e71aeeb0cd68524186286f4e5dc55bf1bec9fbb"
       },
       "scenario_code": "S1",
       "scenario_id": "ZA-S1",
@@ -1089,8 +1089,8 @@
       "label": "National Policy Target",
       "policy_sources": "",
       "provenance": {
-        "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
-        "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+        "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+        "source_sha256": "0429c187d1984bb0893cb4873e71aeeb0cd68524186286f4e5dc55bf1bec9fbb"
       },
       "scenario_code": "S2",
       "scenario_id": "ZA-S2",
@@ -1229,6 +1229,6 @@
       "shock_type": "Fuel use intensity"
     }
   ],
-  "source_file": "/Users/ben/Documents/UNDP/SEH/energy-development-modeling/Energy Modelling Scenario Report.docx",
-  "source_sha256": "86f6479aa8846f72ade3819894b5ec1e5347e66ae7f5cba7ad7e4d59b846a73d"
+  "source_file": "inputs/mario_inputs/scenario_report_scenarios.csv",
+  "source_sha256": "0429c187d1984bb0893cb4873e71aeeb0cd68524186286f4e5dc55bf1bec9fbb"
 }

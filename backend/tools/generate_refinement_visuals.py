@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
 import pandas as pd
-import xarray as xr
 import yaml
 
 
@@ -22,15 +21,10 @@ POOL_LOCATION_FILES = {
 
 
 def _find_latest_run_with_results(runs_dir: Path) -> Path:
-    csv_candidates = [p for p in runs_dir.glob("*/results.csv") if p.is_file()]
+    csv_candidates = [p for p in runs_dir.glob("*/artifacts/final/results.csv") if p.is_file()]
     if csv_candidates:
         return max(csv_candidates, key=lambda p: p.stat().st_mtime)
-
-    nc_candidates = [p for p in runs_dir.glob("*/results.nc") if p.is_file()]
-    if nc_candidates:
-        return max(nc_candidates, key=lambda p: p.stat().st_mtime)
-
-    raise FileNotFoundError(f"No results.csv or results.nc found under {runs_dir}")
+    raise FileNotFoundError(f"No declared results_csv artifact found under {runs_dir}")
 
 
 def _load_pool_mapping(calliope_root: Path) -> Dict[str, str]:
@@ -185,7 +179,9 @@ def _write_diverging_svg(
 
 
 def _load_run_metadata(run_dir: Path) -> Tuple[str, str, str]:
-    summary_path = run_dir / "summary.json"
+    summary_path = run_dir / "artifacts" / "final" / "summary.json"
+    if not summary_path.exists():
+        summary_path = run_dir / "summary.json"
     if not summary_path.exists():
         return "unknown", "unknown", "n/a"
     try:
@@ -272,17 +268,6 @@ def _series_from_results_frame(results: pd.DataFrame, pool_map: Dict[str, str]):
     return generation_by_group, generation_by_pool, capacity_by_group, cost_by_class, net
 
 
-def _series_from_dataset(ds: xr.Dataset, pool_map: Dict[str, str]):
-    frames = []
-    for var_name, da in ds.data_vars.items():
-        table = da.to_dataframe(name="value").reset_index()
-        table.insert(0, "variable", str(var_name))
-        frames.append(table)
-    if not frames:
-        raise ValueError("Dataset has no data variables.")
-    return _series_from_results_frame(pd.concat(frames, ignore_index=True), pool_map)
-
-
 def _rows(df: pd.DataFrame, label_col: str, value_col: str, limit: int = 10) -> List[Tuple[str, float]]:
     if label_col not in df.columns or value_col not in df.columns:
         return []
@@ -294,7 +279,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate EDIM refinement diagnostic SVGs.")
     parser.add_argument("--runs-dir", default="outputs/runs", help="Path to runs directory.")
     parser.add_argument(
-        "--calliope-root", default="Calliope-Africa-main", help="Path to Calliope-Africa root."
+        "--calliope-root",
+        default="model_runtime/model_modules/calliope/Calliope-Africa-main",
+        help="Path to Calliope-Africa root.",
     )
     parser.add_argument(
         "--output-dir", default="outputs/figures", help="Directory where SVG charts will be written."
@@ -307,31 +294,21 @@ def main() -> None:
     output_dir = Path(args.output_dir)
 
     if args.run_id:
-        csv_path = runs_dir / args.run_id / "results.csv"
-        nc_path = runs_dir / args.run_id / "results.nc"
+        csv_path = runs_dir / args.run_id / "artifacts" / "final" / "results.csv"
         if csv_path.exists():
             results_path = csv_path
-        elif nc_path.exists():
-            results_path = nc_path
         else:
-            raise FileNotFoundError(f"No results.csv or results.nc for run_id={args.run_id}")
+            raise FileNotFoundError(f"No declared results_csv artifact for run_id={args.run_id}")
     else:
         results_path = _find_latest_run_with_results(runs_dir)
 
     pool_map = _load_pool_mapping(calliope_root)
-    if results_path.suffix.lower() == ".csv":
-        results_frame = pd.read_csv(results_path)
-        gen_group, gen_pool, cap_group, cost_class, net_pool = _series_from_results_frame(results_frame, pool_map)
-    else:
-        ds = xr.open_dataset(results_path)
-        gen_group, gen_pool, cap_group, cost_class, net_pool = _series_from_dataset(ds, pool_map)
+    results_frame = pd.read_csv(results_path)
+    gen_group, gen_pool, cap_group, cost_class, net_pool = _series_from_results_frame(results_frame, pool_map)
 
-    run_id = results_path.parent.name
-    scenario, solved_at, solution_time = _load_run_metadata(results_path.parent)
-    if results_path.suffix.lower() == ".nc" and scenario == "unknown":
-        scenario = str(ds.attrs.get("scenario", "unknown"))
-        solved_at = str(ds.attrs.get("time_finished", solved_at))
-        solution_time = str(ds.attrs.get("solution_time", solution_time))
+    run_dir = results_path.parents[2]
+    run_id = run_dir.name
+    scenario, solved_at, solution_time = _load_run_metadata(run_dir)
     subtitle = f"run_id={run_id}, scenario={scenario}, solved_at={solved_at}, solution_time={solution_time}s"
 
     _write_hbar_svg(

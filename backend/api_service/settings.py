@@ -137,6 +137,7 @@ class Settings:
     job_history_limit: int
     job_dedupe_enabled: bool
     job_queue_capacity: int
+    job_execution_max_attempts: int
 
     development_engine: str
     mario_db_path: str
@@ -144,23 +145,31 @@ class Settings:
     mario_fail_on_error: bool
     frontend_dir: Path | None = None
     runtime_config: dict | None = None
+    model_runtime_mode: str = "subprocess"
+    runtime_artifact_handoff_mode: str = "shared_filesystem"
+    dataset_staging_mode: str = "copy_to_run"
+    model_manifest_path: Path | None = None
+    dataset_manifest_path: Path | None = None
+    platform_store_backend: str = "sqlite"
+    platform_sqlite_path: Path | None = None
+
+
+def _repo_root() -> Path:
+    here = Path(__file__).resolve()
+    for candidate in (here.parents[2], here.parents[1], Path.cwd()):
+        if (candidate / "inputs" / "runtime_config.json").exists():
+            return candidate
+    return here.parents[2]
 
 
 def get_settings() -> Settings:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = _repo_root()
     runtime_config = _load_runtime_config(repo_root)
 
-    candidates = [
-        repo_root / "Calliope-Africa-main",
-        repo_root.parent / "Calliope-Africa-main",
-        repo_root / "calliope-africa",
-        repo_root.parent / "calliope-africa",
-    ]
-    existing_calliope = next((p for p in candidates if p.exists()), candidates[0])
     calliope_root = _resolve_path(
         repo_root,
         os.getenv("EDIM_CALLIOPE_ROOT") or _cfg(runtime_config, ["paths", "calliope_root"]),
-        existing_calliope,
+        repo_root / "model_runtime" / "model_modules" / "calliope" / "Calliope-Africa-main",
     )
     runs_dir = _resolve_path(
         repo_root,
@@ -177,6 +186,21 @@ def get_settings() -> Settings:
         os.getenv("EDIM_FRONTEND_DIR") or _cfg(runtime_config, ["paths", "frontend_dir"]),
         repo_root / "frontend",
     )
+    model_manifest_path = _resolve_path(
+        repo_root,
+        os.getenv("EDIM_MODEL_MANIFEST_PATH") or _cfg(runtime_config, ["model_runtime", "manifest_path"]),
+        repo_root / "model_runtime" / "edim_model" / "model_manifest.json",
+    )
+    dataset_manifest_path = _resolve_path(
+        repo_root,
+        os.getenv("EDIM_DATASET_MANIFEST_PATH") or _cfg(runtime_config, ["model_runtime", "dataset_manifest_path"]),
+        repo_root / "model_runtime" / "edim_model" / "dataset_manifest.json",
+    )
+    platform_sqlite_path = _resolve_path(
+        repo_root,
+        os.getenv("EDIM_PLATFORM_SQLITE_PATH") or _cfg(runtime_config, ["storage", "platform_sqlite_path"]),
+        repo_root / "outputs" / "platform" / "platform.sqlite3",
+    )
     solver = (
         os.getenv("EDIM_SOLVER")
         or str(_cfg(runtime_config, ["runtime", "solver"], "highs"))
@@ -185,7 +209,32 @@ def get_settings() -> Settings:
 
     cors_allow_origins_default = _config_list(
         _cfg(runtime_config, ["runtime", "cors_allow_origins"]),
-        ["http://localhost:8000", "http://127.0.0.1:8000"],
+        [
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+            "http://localhost:4174",
+            "http://127.0.0.1:4174",
+            "http://localhost:4175",
+            "http://127.0.0.1:4175",
+            "http://localhost:4176",
+            "http://127.0.0.1:4176",
+            "http://localhost:4177",
+            "http://127.0.0.1:4177",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+            "http://localhost:5175",
+            "http://127.0.0.1:5175",
+            "http://localhost:5176",
+            "http://127.0.0.1:5176",
+            "http://localhost:5177",
+            "http://127.0.0.1:5177",
+        ],
     )
     cors_allow_origins = _env_csv("EDIM_CORS_ALLOW_ORIGINS", cors_allow_origins_default)
 
@@ -210,11 +259,65 @@ def get_settings() -> Settings:
         run_max_dirs=_env_int("EDIM_RUN_MAX_DIRS", int(_cfg(runtime_config, ["runs", "max_dirs"], 200)), minimum=0),
         job_history_limit=_env_int("EDIM_JOB_HISTORY_LIMIT", int(_cfg(runtime_config, ["jobs", "history_limit"], 200))),
         job_dedupe_enabled=_env_bool("EDIM_JOB_DEDUPE_ENABLED", bool(_cfg(runtime_config, ["jobs", "dedupe_enabled"], True))),
-        job_queue_capacity=_env_int("EDIM_JOB_QUEUE_CAPACITY", int(_cfg(runtime_config, ["jobs", "queue_capacity"], 200))),
+        job_queue_capacity=_env_int("EDIM_JOB_QUEUE_CAPACITY", int(_cfg(runtime_config, ["jobs", "queue_capacity"], 12))),
+        job_execution_max_attempts=_env_int("EDIM_JOB_EXECUTION_MAX_ATTEMPTS", int(_cfg(runtime_config, ["jobs", "execution_max_attempts"], 1))),
         development_engine=(os.getenv("EDIM_DEVELOPMENT_ENGINE", str(_cfg(runtime_config, ["development_engine", "engine"], "mario"))) or "mario").strip().lower(),
         mario_db_path=(os.getenv("EDIM_MARIO_DB_PATH", str(_cfg(runtime_config, ["development_engine", "mario_db_path"], ""))) or "").strip(),
         mario_timeout_seconds=_env_float("EDIM_MARIO_TIMEOUT_SECONDS", float(_cfg(runtime_config, ["development_engine", "mario_timeout_seconds"], 120.0)), minimum=1.0),
         mario_fail_on_error=_env_bool("EDIM_MARIO_FAIL_ON_ERROR", bool(_cfg(runtime_config, ["development_engine", "mario_fail_on_error"], False))),
         frontend_dir=frontend_dir,
         runtime_config=runtime_config,
+        model_runtime_mode=(os.getenv("EDIM_MODEL_RUNTIME_MODE", str(_cfg(runtime_config, ["model_runtime", "mode"], "subprocess"))) or "subprocess").strip().lower(),
+        runtime_artifact_handoff_mode=_runtime_artifact_handoff_mode(
+            os.getenv("EDIM_RUNTIME_ARTIFACT_HANDOFF_MODE")
+            or str(_cfg(runtime_config, ["model_runtime", "artifact_handoff_mode"], "shared_filesystem"))
+        ),
+        dataset_staging_mode=_dataset_staging_mode(
+            os.getenv("EDIM_DATASET_STAGING_MODE")
+            or str(_cfg(runtime_config, ["model_runtime", "dataset_staging_mode"], "copy_to_run"))
+        ),
+        model_manifest_path=model_manifest_path,
+        dataset_manifest_path=dataset_manifest_path,
+        platform_store_backend=(os.getenv("EDIM_PLATFORM_STORE_BACKEND", str(_cfg(runtime_config, ["storage", "platform_store_backend"], "sqlite"))) or "sqlite").strip().lower(),
+        platform_sqlite_path=platform_sqlite_path,
     )
+
+
+def _runtime_artifact_handoff_mode(value: str | None) -> str:
+    mode = (value or "shared_filesystem").strip().lower().replace("-", "_")
+    aliases = {
+        "shared": "shared_filesystem",
+        "shared_storage": "shared_filesystem",
+        "mounted_storage": "shared_filesystem",
+        "worker_upload": "worker_staged_upload",
+        "staged_upload": "worker_staged_upload",
+        "direct_upload": "runtime_direct_upload",
+    }
+    mode = aliases.get(mode, mode)
+    allowed = {"shared_filesystem", "worker_staged_upload", "runtime_direct_upload"}
+    if mode not in allowed:
+        raise ValueError(
+            "Unsupported EDIM runtime artifact handoff mode "
+            f"{value!r}. Expected one of: {', '.join(sorted(allowed))}."
+        )
+    return mode
+
+
+def _dataset_staging_mode(value: str | None) -> str:
+    mode = (value or "copy_to_run").strip().lower().replace("-", "_")
+    aliases = {
+        "referenced": "reference",
+        "in_place": "reference",
+        "copy": "copy_to_run",
+        "copy_to_inputs": "copy_to_run",
+        "object": "object_reference",
+        "storage_reference": "object_reference",
+    }
+    mode = aliases.get(mode, mode)
+    allowed = {"reference", "copy_to_run", "object_reference"}
+    if mode not in allowed:
+        raise ValueError(
+            "Unsupported EDIM dataset staging mode "
+            f"{value!r}. Expected one of: {', '.join(sorted(allowed))}."
+        )
+    return mode

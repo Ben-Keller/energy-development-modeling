@@ -1,8 +1,10 @@
 const { useEffect, useMemo, useRef, useState } = React;
 
-const API_BASE = String(window.EDIM_API_BASE || "").trim().replace(/\/+$/, "");
+const API_BASE = String(window.EDIM_API_BASE || window.location.origin || "").trim().replace(/\/+$/, "");
 const ACTIVE_STATUSES = new Set(["queued", "running"]);
 const TERMINAL_JOB_STATUSES = new Set(["succeeded", "failed", "cancelled"]);
+const RESET_JOB_STATUSES = new Set(["draft"]);
+const RUN_CONFIG_LOCK_STATUSES = new Set(["queued", "running", "succeeded"]);
 
 const DEFAULT_LEVERS = {
   demand_multiplier: 1.0,
@@ -13,8 +15,75 @@ const DEFAULT_LEVERS = {
 
 const ENERGY_MODEL_OPTIONS = [
   { value: "calliope", label: "Calliope", runtimeStatus: "Executable now" },
-  { value: "osemosys", label: "OSeMOSYS", runtimeStatus: "Adapter target, runtime pending" },
 ];
+
+const PROJECT_TYPE_OPTIONS = [
+  { value: "energy-only", projectType: "energy", label: "Energy" },
+  { value: "energy-development", projectType: "energy-development", label: "Energy-development" },
+];
+
+const PROJECT_GEOGRAPHY_OPTIONS = [
+  "Africa",
+  "North Africa",
+  "West Africa",
+  "Central Africa",
+  "East Africa",
+  "Southern Africa",
+  "South Africa",
+  "India",
+  "Brazil",
+];
+
+const DEFAULT_MODEL_ARCHITECTURE_ID = "energy-development";
+
+const LANDING_HERO_BASE_TUNING = {
+  scale: 1.16,
+  curvature: 1,
+  drift: 1,
+  pulseSpeed: 1,
+  interaction: 1,
+  lines: 1.58,
+  labels: 1,
+  titleStrength: 1.35,
+  pulses: 1,
+  images: 1,
+  contrast: 1.52,
+  glow: 1.25,
+  flashlight: 1.35,
+  flashlightSize: 1,
+};
+
+const LANDING_HERO_DEFAULTS_PATH =
+  String(window.EDIM_HERO_DEFAULTS_PATH || "").trim() || "./hero-defaults.json";
+
+function getFrontendApiBase() {
+  const api = window.EDIM_API_CLIENT || {};
+  return typeof api.getApiBase === "function" ? api.getApiBase() : window.location.origin;
+}
+
+function normalizeLandingHeroTuning(values) {
+  const source = values && typeof values === "object" ? values : {};
+  return Object.keys(LANDING_HERO_BASE_TUNING).reduce((acc, key) => {
+    const fallback = Number(LANDING_HERO_BASE_TUNING[key] || 1);
+    const value = Number(source[key]);
+    acc[key] = Number.isFinite(value) ? value : fallback;
+    return acc;
+  }, {});
+}
+
+function normalizeLandingHeroDefaults(payload) {
+  const source = payload && typeof payload === "object" ? payload : {};
+  const tuningSource = source.tuningDefaults && typeof source.tuningDefaults === "object"
+    ? source.tuningDefaults
+    : source.tuning && typeof source.tuning === "object"
+      ? source.tuning
+      : source;
+  return {
+    schema: "edim_hero_background_defaults",
+    theme: source.theme || "solar",
+    tuningDefaults: normalizeLandingHeroTuning(tuningSource),
+  };
+}
 
 const POLICY_LEVER_TOOLTIPS = {
   renewables_capex_multiplier:
@@ -49,11 +118,11 @@ const LOCATION_MAP_METRICS = [
 const LOCATION_MAP_GEOJSON_PATH =
   String(window.EDIM_GEOJSON_PATH || "").trim() || "./geo/world_fit.geojson";
 
-const LOCATION_MAP_COUNTRIES_MANIFEST_PATH =
-  String(window.EDIM_COUNTRIES_MANIFEST_PATH || "").trim() || "./geo/countries_manifest.json";
+const LOCATION_MAP_COUNTRIES_GEOJSON_PATH =
+  String(window.EDIM_COUNTRIES_GEOJSON_PATH || "").trim() || "./geo/countries.geojson";
 
-const LOCATION_MAP_TOPO_DIR =
-  String(window.EDIM_COUNTRIES_TOPO_DIR || "").trim() || "./geo/countries_topojson";
+const MODEL_ARCHITECTURES_PATH =
+  String(window.EDIM_MODEL_ARCHITECTURES_PATH || "").trim() || "./model_architectures.json";
 
 const RUN_STAGE_ORDER = [
   "queued",
@@ -79,13 +148,6 @@ const ARCHITECTURE_BOXES = [
     stages: ["scenario_prepare"],
   },
   {
-    id: "operations",
-    type: "model",
-    title: "Environment setup",
-    subtitle: "Validation diagnostics, queue state, run controls, and selected job context",
-    stages: ["queued", "scenario_prepare", "complete"],
-  },
-  {
     id: "calliope_data",
     type: "input",
     title: "Energy model input data",
@@ -97,7 +159,7 @@ const ARCHITECTURE_BOXES = [
     id: "mrio_data",
     type: "input",
     title: "MRIO input data",
-    subtitle: "Intensity, sector split, indicator, geography, and report-derived target datasets",
+    subtitle: "Intensity, sector split, indicator, geography, and structured scenario-target datasets",
     datasetLayers: ["mrio", "bridge"],
     stages: ["mrio_direct_prepare", "development"],
   },
@@ -138,42 +200,11 @@ const ARCHITECTURE_BOXES = [
   },
 ];
 
-const DEFAULT_OUTPUT_ARTIFACTS = [
-  { key: "results_csv", label: "Integrated results CSV", url: "csv" },
-  { key: "report_markdown", label: "Run report Markdown", url: "report" },
-  { key: "exchange_bundle_zip", label: "Exchange bundle ZIP", url: "exchange_bundle" },
-  { key: "scenario_package_json", label: "Unified scenario package JSON" },
-  { key: "energy_input_manifest_json", label: "Energy input manifest JSON" },
-  { key: "report_scenario_reference_json", label: "Report scenario reference JSON" },
-  { key: "geography_alignment_json", label: "Geography alignment diagnostics JSON" },
-  { key: "mrio_direct_inputs_json", label: "MRIO-direct inputs JSON" },
-  { key: "mrio_direct_shocks_csv", label: "MRIO-direct shocks CSV" },
-  { key: "energy_service_balance_csv", label: "Energy service balance CSV" },
-  { key: "calliope_component_activity_csv", label: "Calliope component activity CSV" },
-  { key: "investment_shocks_csv", label: "Investment shocks CSV" },
-  { key: "operating_shocks_csv", label: "Operating shocks CSV" },
-  { key: "prices_and_taxes_csv", label: "Prices and taxes CSV" },
-  { key: "coupling_manifest_json", label: "Coupling manifest JSON" },
-];
-
-const ARCHITECTURE_NODE_BOX_MAP = {
-  userParams: "scenario",
-  scenarioData: "scenario",
-  calliopeStaticData: "calliope_data",
-  adapter: "adapter",
-  energyModel: "calliope",
-  bridge: "bridge",
-  mrioInputs: "mrio_data",
-  mario: "mrio",
-  outputs: "outputs",
-};
-
 const DEFAULT_FLOW_NODE_LAYOUT = {
-  scenario: { x: 40, y: 30, w: 900, h: 650 },
-  operations: { x: 990, y: 30, w: 450, h: 650 },
-  calliope_data: { x: 40, y: 820, w: 360, h: 170 },
+  scenario: { x: 40, y: 30, w: 1400, h: 650 },
+  calliope_data: { x: 40, y: 820, w: 176, h: 170 },
   adapter: { x: 505, y: 820, w: 470, h: 150 },
-  mrio_data: { x: 1040, y: 820, w: 390, h: 170 },
+  mrio_data: { x: 1040, y: 820, w: 191, h: 170 },
   calliope: { x: 72, y: 1100, w: 380, h: 150 },
   bridge: { x: 515, y: 1240, w: 390, h: 140 },
   mrio: { x: 1015, y: 1265, w: 410, h: 155 },
@@ -193,8 +224,8 @@ const DEFAULT_FLOW_EDGES = [
 ];
 
 const DEFAULT_FLOW_CANVAS_SIZE = { width: 1480, height: 1740 };
-const DEFAULT_FLOW_NODE_ORDER = ["scenario", "operations", "calliope_data", "adapter", "mrio_data", "calliope", "bridge", "mrio", "outputs"];
-const DEFAULT_FIXED_FLOW_NODES = ["scenario", "operations"];
+const DEFAULT_FLOW_NODE_ORDER = ["scenario", "calliope_data", "adapter", "mrio_data", "calliope", "bridge", "mrio", "outputs"];
+const DEFAULT_FIXED_FLOW_NODES = ["scenario"];
 
 function defaultFlowDefinition() {
   return {
@@ -245,6 +276,168 @@ function normalizeMainUiFlow(flow) {
   };
 }
 
+function normalizeFlowDefinition(flow) {
+  if (flow && Array.isArray(flow.nodes)) return normalizeMainUiFlow(flow);
+  if (flow && flow.nodes && typeof flow.nodes === "object") {
+    const nodes = {};
+    const order = [];
+    Object.entries(flow.nodes).forEach(([id, rect]) => {
+      if (!rect) return;
+      nodes[id] = { ...rect };
+      order.push(id);
+    });
+    return {
+      canvas: flow.canvas || { ...DEFAULT_FLOW_CANVAS_SIZE },
+      nodes,
+      edges: Array.isArray(flow.edges) ? flow.edges.map((edge) => ({ ...edge })) : DEFAULT_FLOW_EDGES.map((edge) => ({ ...edge })),
+      order: Array.isArray(flow.order) && flow.order.length ? [...flow.order] : order,
+      fixedNodes: Array.isArray(flow.fixedNodes) ? flow.fixedNodes.map((id) => String(id)) : [...DEFAULT_FIXED_FLOW_NODES],
+    };
+  }
+  return defaultFlowDefinition();
+}
+
+function defaultArchitectureCatalog() {
+  return {
+    schemaVersion: "edim_model_architecture_catalog",
+    defaultArchitectureId: DEFAULT_MODEL_ARCHITECTURE_ID,
+    architectures: [
+      {
+        id: DEFAULT_MODEL_ARCHITECTURE_ID,
+        label: "Energy-development",
+        shortLabel: "Energy + development",
+        description: "Full EDIM architecture linking the energy model, bridge, and MRIO/development impacts.",
+        requiresMrio: true,
+        requiresBridge: true,
+        resultTabs: ["overview", "system", "development", "method"],
+        enabledDatasetLayers: ["calliope", "scenario", "mrio", "bridge"],
+        boxes: ARCHITECTURE_BOXES.map((box) => ({ ...box })),
+        graph: defaultFlowDefinition(),
+        outputArtifacts: [],
+      },
+    ],
+  };
+}
+
+function normalizeArchitecture(raw) {
+  const baseArchitecture = defaultArchitectureCatalog().architectures[0];
+  const id = String((raw && raw.id) || baseArchitecture.id).trim() || baseArchitecture.id;
+  const boxes = Array.isArray(raw && raw.boxes) && raw.boxes.length
+    ? raw.boxes.map((box) => ({ ...box }))
+    : baseArchitecture.boxes.map((box) => ({ ...box }));
+  return {
+    ...baseArchitecture,
+    ...(raw || {}),
+    id,
+    label: String((raw && raw.label) || baseArchitecture.label),
+    shortLabel: String((raw && raw.shortLabel) || (raw && raw.label) || baseArchitecture.shortLabel),
+    description: String((raw && raw.description) || baseArchitecture.description),
+    requiresMrio: raw && Object.prototype.hasOwnProperty.call(raw, "requiresMrio") ? Boolean(raw.requiresMrio) : true,
+    requiresBridge: raw && Object.prototype.hasOwnProperty.call(raw, "requiresBridge") ? Boolean(raw.requiresBridge) : true,
+    enabledDatasetLayers: Array.isArray(raw && raw.enabledDatasetLayers)
+      ? raw.enabledDatasetLayers.map((layer) => String(layer))
+      : ["calliope", "scenario", "mrio", "bridge"],
+    resultTabs: Array.isArray(raw && raw.resultTabs) && raw.resultTabs.length
+      ? raw.resultTabs.map((tab) => String(tab))
+      : ["overview", "system", "development", "method"],
+    boxes,
+    graph: normalizeFlowDefinition((raw && raw.graph) || (raw && raw.mainUiFlow)),
+    outputArtifacts: Array.isArray(raw && raw.outputArtifacts) ? raw.outputArtifacts.map((row) => ({ ...row })) : [],
+  };
+}
+
+function normalizeArchitectureCatalog(raw) {
+  const baseCatalog = defaultArchitectureCatalog();
+  const architectures = Array.isArray(raw && raw.architectures)
+    ? raw.architectures.map(normalizeArchitecture).filter((row) => row.id)
+    : baseCatalog.architectures.map(normalizeArchitecture);
+  const rows = architectures.length ? architectures : baseCatalog.architectures.map(normalizeArchitecture);
+  const defaultArchitectureId = String((raw && raw.defaultArchitectureId) || baseCatalog.defaultArchitectureId);
+  return {
+    ...(raw || {}),
+    schemaVersion: String((raw && raw.schemaVersion) || baseCatalog.schemaVersion),
+    defaultArchitectureId: rows.some((row) => row.id === defaultArchitectureId) ? defaultArchitectureId : rows[0].id,
+    architectures: rows,
+  };
+}
+
+function architectureById(catalog, architectureId) {
+  const normalized = catalog && Array.isArray(catalog.architectures) ? catalog : defaultArchitectureCatalog();
+  return (
+    normalized.architectures.find((row) => row.id === architectureId) ||
+    normalized.architectures.find((row) => row.id === normalized.defaultArchitectureId) ||
+    normalized.architectures[0] ||
+    normalizeArchitecture(null)
+  );
+}
+
+function architectureIncludesDevelopment(architecture) {
+  return Boolean(architecture && architecture.requiresMrio !== false);
+}
+
+function architectureOutputArtifacts(architecture) {
+  return Array.isArray(architecture && architecture.outputArtifacts) ? architecture.outputArtifacts : [];
+}
+
+function architectureResultTabs(architecture) {
+  const tabs = Array.isArray(architecture && architecture.resultTabs) ? architecture.resultTabs : [];
+  return tabs.length ? tabs : ["overview", "system", "development", "method"];
+}
+
+function scenarioCatalogChannel(catalog, configKey) {
+  const channels = Array.isArray(catalog && catalog.scenario_channels) ? catalog.scenario_channels : [];
+  return channels.find((row) => String(row && row.config_key) === configKey) || null;
+}
+
+function scenarioCatalogOptions(catalog, configKey) {
+  const channel = scenarioCatalogChannel(catalog, configKey);
+  return Array.isArray(channel && channel.options) ? channel.options : [];
+}
+
+function optionMetadata(option, keyName) {
+  const metadata = option && option.metadata && typeof option.metadata === "object" ? { ...option.metadata } : {};
+  const value = option && Object.prototype.hasOwnProperty.call(option, "value") ? option.value : "";
+  if (keyName && value !== "") metadata[keyName] = metadata[keyName] || value;
+  metadata.label = metadata.label || (option && option.label) || value;
+  metadata.description = metadata.description || (option && option.description) || "";
+  return metadata;
+}
+
+function rowsFromScenarioChannel(catalog, configKey, keyName) {
+  return scenarioCatalogOptions(catalog, configKey).map((option) => optionMetadata(option, keyName));
+}
+
+function yearsFromScenarioChannel(catalog) {
+  return scenarioCatalogOptions(catalog, "scenario.target_year")
+    .map((option) => Number(option && Object.prototype.hasOwnProperty.call(option, "value") ? option.value : option))
+    .filter((year) => Number.isFinite(year));
+}
+
+function energyModelCatalogOptions(catalog) {
+  const rows = scenarioCatalogOptions(catalog, "energy_model_engine");
+  return rows.length ? rows : ENERGY_MODEL_OPTIONS;
+}
+
+function projectTypeForArchitecture(architectureId) {
+  const option = PROJECT_TYPE_OPTIONS.find((row) => row.value === architectureId);
+  return option ? option.projectType : "energy-development";
+}
+
+function projectTypeLabel(project) {
+  const architectureId = String((project && project.model_architecture_id) || "").trim();
+  const projectType = String((project && project.project_type) || "").trim();
+  const option =
+    PROJECT_TYPE_OPTIONS.find((row) => row.value === architectureId) ||
+    PROJECT_TYPE_OPTIONS.find((row) => row.projectType === projectType);
+  return option ? option.label : projectType || architectureId || "Energy-development";
+}
+
+function projectGeographyLabel(value) {
+  const label = String(value || "").trim();
+  if (!label) return "";
+  return label === "Africa-wide" ? "Africa" : label;
+}
+
 const LOCATION_MAP_ID_KEYS = [
   "location_id",
   "location",
@@ -277,71 +470,6 @@ const REGION_TO_POOL_HINTS = {
   west_africa: "WAPP",
 };
 
-const AI_REGION_ALIASES = [
-  { aliases: ["west africa", "western africa", "wapp"], region: "west_africa", label: "West Africa", pool: "WAPP" },
-  { aliases: ["east africa", "eastern africa", "eapp"], region: "east_africa", label: "East Africa", pool: "EAPP" },
-  { aliases: ["southern africa", "south africa region", "sapp"], region: "southern_africa", label: "Southern Africa", pool: "SAPP" },
-  { aliases: ["central africa", "middle africa", "capp"], region: "central_africa", label: "Central Africa", pool: "CAPP" },
-  { aliases: ["north africa", "northern africa", "napp"], region: "north_africa", label: "North Africa", pool: "NAPP" },
-];
-
-const AI_COUNTRY_ALIASES = [
-  { iso3: "DZA", label: "Algeria", aliases: ["algeria", "dza"] },
-  { iso3: "AGO", label: "Angola", aliases: ["angola", "ago"] },
-  { iso3: "BEN", label: "Benin", aliases: ["benin"] },
-  { iso3: "BWA", label: "Botswana", aliases: ["botswana", "bwa"] },
-  { iso3: "BFA", label: "Burkina Faso", aliases: ["burkina faso", "burkina", "bfa"] },
-  { iso3: "BDI", label: "Burundi", aliases: ["burundi", "bdi"] },
-  { iso3: "CMR", label: "Cameroon", aliases: ["cameroon", "cmr"] },
-  { iso3: "CPV", label: "Cape Verde", aliases: ["cape verde", "cabo verde", "cpv"] },
-  { iso3: "CAF", label: "Central African Republic", aliases: ["central african republic", "car", "caf"] },
-  { iso3: "TCD", label: "Chad", aliases: ["chad", "tcd"] },
-  { iso3: "COM", label: "Comoros", aliases: ["comoros", "com"] },
-  { iso3: "COG", label: "Republic of the Congo", aliases: ["republic of the congo", "congo brazzaville", "cog"] },
-  { iso3: "COD", label: "Democratic Republic of the Congo", aliases: ["democratic republic of the congo", "dr congo", "drc", "cod"] },
-  { iso3: "CIV", label: "Cote d'Ivoire", aliases: ["cote d ivoire", "ivory coast", "civ"] },
-  { iso3: "DJI", label: "Djibouti", aliases: ["djibouti", "dji"] },
-  { iso3: "EGY", label: "Egypt", aliases: ["egypt", "egy"] },
-  { iso3: "GNQ", label: "Equatorial Guinea", aliases: ["equatorial guinea", "gnq"] },
-  { iso3: "ERI", label: "Eritrea", aliases: ["eritrea", "eri"] },
-  { iso3: "SWZ", label: "Eswatini", aliases: ["eswatini", "swaziland", "swz"] },
-  { iso3: "ETH", label: "Ethiopia", aliases: ["ethiopia", "eth"] },
-  { iso3: "GAB", label: "Gabon", aliases: ["gabon", "gab"] },
-  { iso3: "GMB", label: "Gambia", aliases: ["gambia", "the gambia", "gmb"] },
-  { iso3: "GHA", label: "Ghana", aliases: ["ghana", "gha"] },
-  { iso3: "GIN", label: "Guinea", aliases: ["guinea", "gin"] },
-  { iso3: "GNB", label: "Guinea-Bissau", aliases: ["guinea bissau", "guinea-bissau", "gnb"] },
-  { iso3: "KEN", label: "Kenya", aliases: ["kenya", "ken"] },
-  { iso3: "LSO", label: "Lesotho", aliases: ["lesotho", "lso"] },
-  { iso3: "LBR", label: "Liberia", aliases: ["liberia", "lbr"] },
-  { iso3: "LBY", label: "Libya", aliases: ["libya", "lby"] },
-  { iso3: "MDG", label: "Madagascar", aliases: ["madagascar", "mdg"] },
-  { iso3: "MWI", label: "Malawi", aliases: ["malawi", "mwi"] },
-  { iso3: "MLI", label: "Mali", aliases: ["mali", "mli"] },
-  { iso3: "MRT", label: "Mauritania", aliases: ["mauritania", "mrt"] },
-  { iso3: "MUS", label: "Mauritius", aliases: ["mauritius", "mus"] },
-  { iso3: "MAR", label: "Morocco", aliases: ["morocco", "mar"] },
-  { iso3: "MOZ", label: "Mozambique", aliases: ["mozambique", "moz"] },
-  { iso3: "NAM", label: "Namibia", aliases: ["namibia", "nam"] },
-  { iso3: "NER", label: "Niger", aliases: ["niger", "ner"] },
-  { iso3: "NGA", label: "Nigeria", aliases: ["nigeria", "nga"] },
-  { iso3: "RWA", label: "Rwanda", aliases: ["rwanda", "rwa"] },
-  { iso3: "STP", label: "Sao Tome and Principe", aliases: ["sao tome and principe", "sao tome", "stp"] },
-  { iso3: "SEN", label: "Senegal", aliases: ["senegal", "sen"] },
-  { iso3: "SYC", label: "Seychelles", aliases: ["seychelles", "syc"] },
-  { iso3: "SLE", label: "Sierra Leone", aliases: ["sierra leone", "sle"] },
-  { iso3: "SOM", label: "Somalia", aliases: ["somalia", "som"] },
-  { iso3: "ZAF", label: "South Africa", aliases: ["south africa", "zaf", "za"] },
-  { iso3: "SSD", label: "South Sudan", aliases: ["south sudan", "ssd"] },
-  { iso3: "SDN", label: "Sudan", aliases: ["sudan", "sdn"] },
-  { iso3: "TZA", label: "Tanzania", aliases: ["tanzania", "united republic of tanzania", "tza"] },
-  { iso3: "TGO", label: "Togo", aliases: ["togo", "tgo"] },
-  { iso3: "TUN", label: "Tunisia", aliases: ["tunisia", "tun"] },
-  { iso3: "UGA", label: "Uganda", aliases: ["uganda", "uga"] },
-  { iso3: "ZMB", label: "Zambia", aliases: ["zambia", "zmb"] },
-  { iso3: "ZWE", label: "Zimbabwe", aliases: ["zimbabwe", "zwe"] },
-];
-
 const MAP_COLOR_SCALE_STOPS = [
   { at: 0.0, color: "#132b43" },
   { at: 0.25, color: "#1b5b7a" },
@@ -354,6 +482,7 @@ const STATUS_THEME = {
   queued: { label: "Queued", className: "badge badge-queued" },
   running: { label: "Running", className: "badge badge-running" },
   succeeded: { label: "Succeeded", className: "badge badge-succeeded" },
+  completed: { label: "Succeeded", className: "badge badge-succeeded" },
   failed: { label: "Failed", className: "badge badge-failed" },
   cancelled: { label: "Cancelled", className: "badge badge-cancelled" },
   ok: { label: "OK", className: "badge badge-succeeded" },
@@ -376,20 +505,147 @@ function isTerminalStatus(status) {
   return TERMINAL_JOB_STATUSES.has(normalizeStatus(status));
 }
 
+function isResetStatus(status) {
+  return RESET_JOB_STATUSES.has(normalizeStatus(status));
+}
+
 function displayStatus(status) {
   const key = normalizeStatus(status);
   return STATUS_THEME[key] || { label: status || "Unknown", className: "badge badge-neutral" };
 }
 
-function toNumber(value, fallback = 0) {
+function runExecutionId(row) {
+  return String((row && (row.execution_id || row.run_id)) || "");
+}
+
+function runConfigurationPayload(rowOrPayload) {
+  const source = rowOrPayload && typeof rowOrPayload === "object" ? rowOrPayload : {};
+  const payload =
+    source.configuration && typeof source.configuration === "object"
+      ? source.configuration
+      : source.request && typeof source.request === "object"
+        ? source.request
+        : source;
+  const scenario = payload.scenario && typeof payload.scenario === "object" ? payload.scenario : {};
+  const energyScenarioKey = payload.energy_scenario_key || scenario.energy_scenario_key || "";
+  const mrioScenarioId = payload.mrio_scenario_id || scenario.target_scenario_id || scenario.mrio_scenario_id || "";
+  const targetYear = payload.target_year || scenario.target_year || "";
+  return {
+    project_id: payload.project_id || source.project_id || "",
+    run_name: payload.run_name || source.run_name || "",
+    model_architecture_id: payload.model_architecture_id || "energy-development",
+    energy_model_engine: payload.energy_model_engine || "calliope",
+    energy_scenario_key: energyScenarioKey,
+    mrio_scenario_id: mrioScenarioId,
+    target_year: targetYear,
+    run_profile: payload.run_profile || "dev",
+    levers: payload.levers && typeof payload.levers === "object" ? payload.levers : {},
+  };
+}
+
+function projectRunToDisplayRun(row) {
+  const runId = String((row && row.run_id) || "");
+  const executionId = runExecutionId(row);
+  const status = normalizeStatus(row && row.status) || "draft";
+  const request = runConfigurationPayload(row);
+  return {
+    request,
+    configuration: row && row.configuration ? row.configuration : null,
+    execution_id: executionId,
+    run_id: runId,
+    project_id: String((row && row.project_id) || request.project_id || ""),
+    project_run_number: runProjectNumber(row) || 0,
+    run_name: String((row && row.run_name) || request.run_name || ""),
+    status,
+    stage: String((row && row.stage) || status),
+    progress: toNumber(row && row.progress),
+    message: String((row && row.message) || ""),
+    queue_position: row && row.queue_position != null ? row.queue_position : null,
+    worker_pid: row && row.worker_pid != null ? row.worker_pid : null,
+    worker_id: String((row && row.worker_id) || ""),
+    cancellation_requested: Boolean(row && row.cancellation_requested),
+    created_at: String((row && row.created_at) || ""),
+    updated_at: row && row.updated_at ? row.updated_at : null,
+    started_at: row && row.started_at ? row.started_at : null,
+    finished_at: row && row.finished_at ? row.finished_at : null,
+    summary_available: Boolean(row && row.summary_available),
+    source_run_id: String((row && row.source_run_id) || ""),
+    error: row && row.error ? String(row.error) : null,
+    artifacts:
+      runId && status === "succeeded"
+        ? {
+            run_id: runId,
+            summary_url: `/api/runs/${encodeURIComponent(runId)}/summary`,
+            csv_url: `/api/runs/${encodeURIComponent(runId)}/artifacts/results_csv`,
+          }
+        : null,
+    summary: row && row.summary ? row.summary : null,
+  };
+}
+
+function runProjectNumber(row) {
+  const value = Number(row && (row.project_run_number || row.run_number));
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
+}
+
+function runCustomName(row) {
+  return String((row && (row.run_name || (row.request && row.request.run_name))) || "").trim();
+}
+
+function runLabel(row) {
+  if (!row) return "-";
+  const number = runProjectNumber(row);
+  const base = number ? `Model ${number}` : "Model";
+  const name = runCustomName(row);
+  return name ? `${base}: ${name}` : base;
+}
+
+function runMetadataLine(row) {
+  if (!row) return "-";
+  const parts = [];
+  if (row.request && row.request.energy_scenario_key) parts.push(row.request.energy_scenario_key);
+  if (row.request && row.request.target_year) parts.push(String(row.request.target_year));
+  if (row.created_at) parts.push(formatTimestamp(row.created_at));
+  return parts.length ? parts.join(" · ") : "-";
+}
+
+function succeededProjectRuns(rows) {
+  return (rows || []).filter((row) => normalizeStatus(row && row.status) === "succeeded" && row.run_id);
+}
+
+function extractComparableMetrics(summary) {
+  const integrated = (summary && summary.integrated_results) || {};
+  const metrics = Array.isArray(integrated && integrated.integrated_overview && integrated.integrated_overview.metrics)
+    ? integrated.integrated_overview.metrics
+    : [];
+  const out = {};
+  metrics.forEach((row) => {
+    const key = String((row && row.key) || "").trim();
+    if (!key) return;
+    out[key] = {
+      key,
+      label: String(row.label || key),
+      value: toNumber(row.value, NaN),
+      unit: String(row.unit || ""),
+    };
+  });
+  return out;
+}
+
+function toNumber(value, defaultValue = 0) {
   const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
+  return Number.isFinite(n) ? n : defaultValue;
 }
 
 function toTimestampMs(value) {
   if (!value) return null;
   const ms = Date.parse(String(value));
   return Number.isFinite(ms) ? ms : null;
+}
+
+function formatTimestamp(value) {
+  const ms = toTimestampMs(value);
+  return ms ? new Date(ms).toLocaleString() : "-";
 }
 
 function formatElapsed(totalSeconds) {
@@ -430,6 +686,14 @@ function humanizeResolution(value) {
 
 function normalizeLocationId(value) {
   return String(value || "").trim().toUpperCase();
+}
+
+function canonicalCountryIso3(value) {
+  const token = normalizeLocationId(value);
+  if (!token) return "";
+  const dotTrimmed = token.replace(/\.TOPO$/i, "");
+  const match = dotTrimmed.match(/[A-Z]{3}/);
+  return match ? match[0] : dotTrimmed;
 }
 
 function normalizeRegionKey(value) {
@@ -1127,7 +1391,7 @@ function createSubregionCircleFeature(countryFeature, subregionCode, subregionPo
       display_name: centroidMeta.label || subregionCode,
       country_iso3: centroidMeta.country,
       synthetic_subregion_area: true,
-      synthetic_method: "circle_fallback",
+      synthetic_method: "circle_synthetic",
     },
     geometry: {
       type: "Polygon",
@@ -1213,8 +1477,10 @@ function createVoronoiSubregionFeatures(countryFeature, subregionPoints) {
 
 function extractGeoFeatureLocationId(feature) {
   const props = (feature && feature.properties) || {};
+  const countryIso3 = firstNonEmpty(props, ["iso3cd", "ISO_A3", "adm0_a3"]);
+  if (countryIso3) return canonicalCountryIso3(countryIso3);
   const fromProps = firstNonEmpty(props, LOCATION_MAP_ID_KEYS);
-  if (fromProps) return normalizeLocationId(fromProps);
+  if (fromProps) return /\.TOPO$/i.test(String(fromProps)) ? canonicalCountryIso3(fromProps) : normalizeLocationId(fromProps);
   const fromFeature = feature && feature.id != null ? String(feature.id).trim() : "";
   return normalizeLocationId(fromFeature);
 }
@@ -1243,17 +1509,6 @@ function getGeoFeatureLabel(feature) {
   return extractGeoFeatureLocationId(feature) || "Unnamed area";
 }
 
-function resolvedGeoUrl(basePath, relativePath) {
-  const candidate = String(relativePath || "").trim();
-  if (!candidate) return "";
-  if (/^https?:\/\//i.test(candidate)) return candidate;
-  try {
-    return new URL(candidate, new URL(basePath, window.location.href)).toString();
-  } catch (_) {
-    return candidate;
-  }
-}
-
 function buildLocationRowsFromCsvTexts(capexCsvText, opexCsvText) {
   const capexRows = parseCsvRows(capexCsvText);
   const opexRows = parseCsvRows(opexCsvText);
@@ -1262,10 +1517,17 @@ function buildLocationRowsFromCsvTexts(capexCsvText, opexCsvText) {
 
 function normalizeCountryFeatureFeature(countryIso3, feature) {
   if (!feature || feature.type !== "Feature" || !feature.geometry) return null;
+  const iso3 = canonicalCountryIso3(countryIso3);
+  if (!iso3) return null;
   const props = { ...((feature && feature.properties) || {}) };
-  if (!props.location_id) props.location_id = countryIso3;
-  if (!props.country_iso3) props.country_iso3 = countryIso3;
-  if (!props.display_name) props.display_name = String(props.nam_en || props.name || countryIso3);
+  props.source_location_id = props.location_id || props.id || "";
+  props.source_country_iso3 = props.country_iso3 || props.iso3 || "";
+  props.location_id = iso3;
+  props.country_iso3 = iso3;
+  props.iso3 = iso3;
+  if (!props.display_name || /\.TOPO$/i.test(String(props.display_name))) {
+    props.display_name = String(props.nam_en || props.name || iso3);
+  }
   return {
     type: "Feature",
     properties: props,
@@ -1273,34 +1535,35 @@ function normalizeCountryFeatureFeature(countryIso3, feature) {
   };
 }
 
-async function loadCountryFeatureFromTopo(countryIso3, manifest) {
-  if (!manifest || typeof manifest !== "object") return null;
-  const countries = manifest.countries || {};
-  const countryMeta = countries[countryIso3];
-  if (!countryMeta || countryMeta.has_file === false) return null;
-  const explicitTopoPath = String(countryMeta.file || "").trim();
-  const inferredPath = `${LOCATION_MAP_TOPO_DIR.replace(/\/+$/, "")}/${countryIso3}.topo.json`;
-  const topoUrl = explicitTopoPath
-    ? resolvedGeoUrl(LOCATION_MAP_COUNTRIES_MANIFEST_PATH, explicitTopoPath)
-    : resolvedGeoUrl(window.location.href, inferredPath);
-  const resp = await fetch(topoUrl);
-  if (!resp.ok) throw new Error(`Failed to load country topology for ${countryIso3}`);
-  const topo = await resp.json();
-  const objects = topo && topo.objects ? topo.objects : {};
-  const objectName =
-    String(countryMeta.object || manifest.topo_object_default || Object.keys(objects)[0] || "").trim() || "data";
-  const object = objects[objectName];
-  if (!object) return null;
-  if (!window.topojson || typeof window.topojson.feature !== "function") {
-    throw new Error("topojson-client library is not loaded.");
+function countryFeatureIso3(feature) {
+  const props = (feature && feature.properties) || {};
+  return canonicalCountryIso3(
+    firstNonEmpty(props, ["iso3cd", "ISO_A3", "adm0_a3", "country_iso3", "iso3", "location_id", "id"])
+  );
+}
+
+async function loadCountryFeatureMap() {
+  const resp = await fetch(LOCATION_MAP_COUNTRIES_GEOJSON_PATH);
+  if (!resp.ok) {
+    throw new Error(`Failed to load country boundaries: ${LOCATION_MAP_COUNTRIES_GEOJSON_PATH}`);
   }
-  const converted = window.topojson.feature(topo, object);
-  if (!converted) return null;
-  if (converted.type === "FeatureCollection") {
-    const first = Array.isArray(converted.features) ? converted.features[0] : null;
-    return normalizeCountryFeatureFeature(countryIso3, first);
+  const geojson = await resp.json();
+  const features = Array.isArray(geojson && geojson.features) ? geojson.features : [];
+  const out = new Map();
+  features.forEach((feature) => {
+    const iso3 = countryFeatureIso3(feature);
+    const normalized = normalizeCountryFeatureFeature(iso3, feature);
+    if (iso3 && normalized && !out.has(iso3)) out.set(iso3, normalized);
+  });
+  return out;
+}
+
+async function loadBundledArchitectureCatalog() {
+  const resp = await fetch(MODEL_ARCHITECTURES_PATH);
+  if (!resp.ok) {
+    throw new Error(`Failed to load bundled model architecture catalog: ${MODEL_ARCHITECTURES_PATH}`);
   }
-  return normalizeCountryFeatureFeature(countryIso3, converted);
+  return resp.json();
 }
 
 function sourceFeaturesByLocationId(sourceGeojson) {
@@ -1332,24 +1595,9 @@ async function buildLocationGeojsonFromCountryAssets(locationRows, sourceGeojson
       : { type: "FeatureCollection", features: [] };
   }
 
-  const manifestResp = await fetch(LOCATION_MAP_COUNTRIES_MANIFEST_PATH);
-  if (!manifestResp.ok) {
-    throw new Error(`Failed to load countries manifest: ${LOCATION_MAP_COUNTRIES_MANIFEST_PATH}`);
-  }
-  const manifest = await manifestResp.json();
-
   const neededCountries = Array.from(new Set(missing.map((location) => locationToParentCountry(location)).filter(Boolean)));
-  const countryFeaturePairs = await Promise.all(
-    neededCountries.map(async (iso3) => {
-      try {
-        const feature = await loadCountryFeatureFromTopo(iso3, manifest);
-        return [iso3, feature];
-      } catch (_) {
-        return [iso3, null];
-      }
-    })
-  );
-  const countryFeatures = new Map(countryFeaturePairs);
+  const allCountryFeatures = await loadCountryFeatureMap();
+  const countryFeatures = new Map(neededCountries.map((iso3) => [iso3, allCountryFeatures.get(iso3) || null]));
 
   const features = [];
   const seenLocations = new Set();
@@ -1795,102 +2043,557 @@ function resolveScenarioKey(selectorModel, selections) {
   return selectorModel.firstPathwayScenarioKey || selectorModel.firstScenarioKey || "";
 }
 
-function toErrorMessage(err, fallback) {
+function toErrorMessage(err, defaultMessage) {
   if (err && typeof err.message === "string" && err.message.trim()) {
     return err.message;
   }
-  return fallback;
+  return defaultMessage;
 }
 
 function toApiUrl(pathOrUrl) {
-  if (!pathOrUrl) return API_BASE || "";
+  const activeBase =
+    window.EDIM_API_CLIENT && typeof window.EDIM_API_CLIENT.getApiBase === "function"
+      ? window.EDIM_API_CLIENT.getApiBase()
+      : API_BASE || "";
+  if (!pathOrUrl) return activeBase;
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-  return `${API_BASE}${pathOrUrl}`;
-}
-
-async function parseApiError(res, fallback) {
-  const text = await res.text();
-  try {
-    const parsed = JSON.parse(text);
-    if (parsed && typeof parsed.detail === "string" && parsed.detail.trim()) {
-      return `${fallback}: ${parsed.detail}`;
-    }
-  } catch (_) {
-    // Non-JSON response.
+  if (window.EDIM_API_CLIENT && typeof window.EDIM_API_CLIENT.downloadUrl === "function") {
+    return window.EDIM_API_CLIENT.downloadUrl(pathOrUrl);
   }
-  if (text.trim()) return `${fallback}: ${text}`;
-  return `${fallback}: HTTP ${res.status}`;
+  return `${activeBase}${pathOrUrl}`;
 }
 
-async function apiGet(path, fallback) {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) throw new Error(await parseApiError(res, fallback));
-  return res.json();
-}
+const SYSTEM_MANIFEST_SCHEMA = "edim_system_manifest";
+const FRONTEND_REQUIRED_ENDPOINTS = [
+  "GET /api/session",
+  "GET /api/projects",
+  "POST /api/projects",
+  "PATCH /api/projects/{project_id}",
+  "DELETE /api/projects/{project_id}",
+  "GET /api/projects/{project_id}/runs",
+  "POST /api/projects/{project_id}/runs",
+  "PATCH /api/projects/{project_id}/runs/{run_id}",
+  "POST /api/projects/{project_id}/runs/{run_id}/submit",
+  "POST /api/projects/{project_id}/runs/{run_id}/duplicate",
+  "DELETE /api/projects/{project_id}/runs/{run_id}",
+  "GET /api/runs",
+  "GET /api/executions/{execution_id}/status",
+  "POST /api/executions/{execution_id}/cancel",
+  "GET /api/executions/{execution_id}/events",
+  "GET /api/runs/{run_id}/summary",
+  "GET /api/runs/{run_id}/integrated",
+  "GET /api/runs/{run_id}/artifacts",
+  "GET /api/runs/{run_id}/artifacts/{artifact_id}",
+  "GET /api/runs/{run_id}/logs",
+  "POST /api/runs/{run_id}/export",
+  "GET /api/input-datasets",
+  "GET /api/input-datasets/{dataset_id}/download",
+  "POST /api/input-datasets/{dataset_id}/upload",
+  "GET /api/input-datasets/{dataset_id}/versions",
+  "GET /api/input-datasets/{dataset_id}/versions/{version_id}/download",
+  "POST /api/input-datasets/{dataset_id}/versions/{version_id}/activate",
+  "DELETE /api/input-datasets/{dataset_id}/versions/{version_id}",
+  "GET /api/scenarios",
+  "GET /api/model-runtimes",
+  "POST /api/projects/{project_id}/runs/validate",
+  "GET /api/projects/{project_id}/reports",
+  "POST /api/projects/{project_id}/reports",
+  "GET /api/projects/{project_id}/reports/{report_id}/download",
+  "GET /api/projects/{project_id}/reports/{report_id}/data",
+  "GET /api/projects/{project_id}/exports",
+  "POST /api/projects/{project_id}/exports",
+  "GET /api/projects/{project_id}/exports/{export_id}/download",
+  "GET /api/system/manifest",
+];
 
-async function apiGetText(path, fallback) {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) throw new Error(await parseApiError(res, fallback));
-  return res.text();
-}
-
-async function apiPost(path, body, fallback) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: body == null ? undefined : JSON.stringify(body),
+function flattenManifestEndpoints(manifest) {
+  const endpointGroups = (manifest && manifest.public_endpoints) || {};
+  const endpoints = new Set();
+  Object.values(endpointGroups).forEach((group) => {
+    if (Array.isArray(group)) {
+      group.forEach((endpoint) => endpoints.add(String(endpoint || "").trim()));
+    }
   });
-  if (!res.ok) throw new Error(await parseApiError(res, fallback));
-  return res.json();
+  return endpoints;
 }
 
-const api = {
-  fetchScenarioCatalog: async () => apiGet("/api/scenarios", "Failed to load scenarios"),
-  fetchInputDatasets: async () =>
-    (await apiGet("/api/input-datasets", "Failed to load input datasets")).datasets || [],
-  inputDatasetDownloadUrl: (datasetId) =>
-    `${API_BASE}/api/input-datasets/${encodeURIComponent(datasetId)}/download`,
-  uploadInputDataset: async (datasetId, file) => {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch(`${API_BASE}/api/input-datasets/${encodeURIComponent(datasetId)}/upload`, {
-      method: "POST",
-      body: form,
+function evaluateSystemManifest(manifest, target) {
+  const endpointSet = flattenManifestEndpoints(manifest);
+  const missingEndpoints = FRONTEND_REQUIRED_ENDPOINTS.filter((endpoint) => !endpointSet.has(endpoint));
+  const schemaVersion = String((manifest && manifest.schema_version) || "");
+  const schemaOk = schemaVersion === SYSTEM_MANIFEST_SCHEMA;
+  const manifestOk = Boolean(manifest && manifest.ok !== false);
+  const manifestDiagnostics = Array.isArray(manifest && manifest.diagnostics) ? manifest.diagnostics : [];
+  const errorDiagnostics = manifestDiagnostics.filter((row) => String(row && row.status) === "error");
+  const status = !schemaOk || !manifestOk || errorDiagnostics.length
+    ? "error"
+    : missingEndpoints.length
+      ? "warning"
+      : "ok";
+  const apiBase = target && target.apiBase ? target.apiBase : "";
+  const mode = target && target.mode ? target.mode : "local";
+  const message = status === "ok"
+    ? `Contract ok: ${mode} API is compatible.`
+    : status === "warning"
+      ? `Contract warning: ${missingEndpoints.length} frontend endpoint${missingEndpoints.length === 1 ? "" : "s"} not listed.`
+      : !schemaOk
+        ? `Contract error: expected ${SYSTEM_MANIFEST_SCHEMA}, received ${schemaVersion || "missing schema"}.`
+        : errorDiagnostics.length
+          ? `Contract error: ${errorDiagnostics.length} manifest diagnostic${errorDiagnostics.length === 1 ? "" : "s"} failed.`
+          : "Contract error: system manifest reports not ready.";
+  return {
+    status,
+    message,
+    apiBase,
+    mode,
+    schemaVersion,
+    missingEndpoints,
+    diagnostics: manifestDiagnostics,
+    checkedAt: new Date().toISOString(),
+    manifest,
+  };
+}
+
+/* Consolidated frontend API and artifact helpers. */
+
+/* API client */
+(function () {
+  const http = window.EDIM_HTTP_CLIENT;
+  if (!http) {
+    throw new Error("EDIM_HTTP_CLIENT must be loaded before app.jsx");
+  }
+  const {
+    apiGet,
+    apiGetText,
+    apiPost,
+    apiPatch,
+    apiDelete,
+    uploadInputDataset,
+    downloadUrl,
+  } = http;
+
+  window.EDIM_API_CLIENT = {
+    API_BASE: http.getApiBase(),
+    getApiBase: http.getApiBase,
+    getApiTarget: http.getApiTarget,
+    setApiTarget: http.setApiTarget,
+    parseApiError: http.parseApiError,
+    apiGet,
+    apiGetText,
+    apiPost,
+    apiPatch,
+    apiDelete,
+    downloadUrl,
+    getAuthProvider: http.getAuthProvider,
+    setAuthProvider: http.setAuthProvider,
+    getActiveUserId: http.getActiveUserId,
+    setActiveUserId: http.setActiveUserId,
+    fetchSystemManifest: async () => apiGet("/api/system/manifest", "Failed to load system manifest"),
+    fetchSession: async () => apiGet("/api/session", "Failed to load local session"),
+    fetchProjects: async () => (await apiGet("/api/projects", "Failed to load projects")).projects || [],
+    createProject: async (payload) => (await apiPost("/api/projects", payload, "Failed to create project")).project,
+    updateProject: async (projectId, payload) => (await apiPatch(`/api/projects/${encodeURIComponent(projectId)}`, payload, "Failed to update project")).project,
+    deleteProject: async (projectId, options) => {
+      const qs = new URLSearchParams();
+      if (options && typeof options.deleteFiles === "boolean") qs.set("delete_files", options.deleteFiles ? "true" : "false");
+      const suffix = qs.toString() ? `?${qs.toString()}` : "";
+      return apiDelete(`/api/projects/${encodeURIComponent(projectId)}${suffix}`, "Failed to delete project");
+    },
+    fetchProjectRuns: async (projectId, options) => {
+      const qs = new URLSearchParams();
+      if (options && typeof options.includeDrafts === "boolean") qs.set("include_drafts", options.includeDrafts ? "true" : "false");
+      if (options && options.limit) qs.set("limit", String(options.limit));
+      const suffix = qs.toString() ? `?${qs.toString()}` : "";
+      return (await apiGet(`/api/projects/${encodeURIComponent(projectId)}/runs${suffix}`, "Failed to load project runs")).runs || [];
+    },
+    createRunDraft: async (projectId, req) => projectRunToDisplayRun((await apiPost(`/api/projects/${encodeURIComponent(projectId)}/runs`, req, "Failed to save run draft")).run),
+    updateRunDraft: async (projectId, runId, payload) => projectRunToDisplayRun((await apiPatch(`/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}`, payload, "Failed to update run draft")).run),
+    submitProjectRun: async (projectId, runId) => {
+      const payload = await apiPost(`/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/submit`, null, "Failed to submit project run");
+      return projectRunToDisplayRun(payload.run);
+    },
+    duplicateProjectRun: async (projectId, runId) => projectRunToDisplayRun((await apiPost(`/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/duplicate`, null, "Failed to duplicate run")).run),
+    deleteProjectRun: async (projectId, runId, options) => {
+      const qs = new URLSearchParams();
+      if (options && typeof options.deleteFiles === "boolean") qs.set("delete_files", options.deleteFiles ? "true" : "false");
+      const suffix = qs.toString() ? `?${qs.toString()}` : "";
+      return apiDelete(`/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}${suffix}`, "Failed to delete run");
+    },
+    fetchRunLogs: async (runId) => apiGet(`/api/runs/${encodeURIComponent(runId)}/logs`, "Failed to load run logs"),
+    createProjectReport: async (projectId, payload) => (await apiPost(`/api/projects/${encodeURIComponent(projectId)}/reports`, payload || {}, "Failed to create report")).report,
+    fetchProjectReports: async (projectId) => (await apiGet(`/api/projects/${encodeURIComponent(projectId)}/reports`, "Failed to load reports")).reports || [],
+    createProjectExport: async (projectId, payload) => (await apiPost(`/api/projects/${encodeURIComponent(projectId)}/exports`, payload || {}, "Failed to create project export")).export,
+    fetchProjectExports: async (projectId) => (await apiGet(`/api/projects/${encodeURIComponent(projectId)}/exports`, "Failed to load exports")).exports || [],
+    createRunExport: async (runId) => (await apiPost(`/api/runs/${encodeURIComponent(runId)}/export`, null, "Failed to export run")).export,
+    fetchScenarioCatalog: async () => apiGet("/api/scenarios", "Failed to load scenarios"),
+    fetchModelRuntimes: async () => apiGet("/api/model-runtimes", "Failed to load model runtime catalog"),
+    fetchInputDatasets: async (filters) => {
+      const qs = new URLSearchParams();
+      if (filters && filters.layer) qs.set("layer", filters.layer);
+      if (filters && filters.role) qs.set("role", filters.role);
+      if (filters && filters.inputProperty) qs.set("input_property", filters.inputProperty);
+      const suffix = qs.toString() ? `?${qs.toString()}` : "";
+      return (await apiGet(`/api/input-datasets${suffix}`, "Failed to load input datasets")).datasets || [];
+    },
+    inputDatasetDownloadUrl: (datasetId) => downloadUrl(`/api/input-datasets/${encodeURIComponent(datasetId)}/download`),
+    inputDatasetVersionDownloadUrl: (datasetId, versionId) => downloadUrl(`/api/input-datasets/${encodeURIComponent(datasetId)}/versions/${encodeURIComponent(versionId)}/download`),
+    fetchInputDatasetVersions: async (datasetId) => {
+      return (await apiGet(`/api/input-datasets/${encodeURIComponent(datasetId)}/versions`, "Failed to load dataset versions")).versions || [];
+    },
+    activateInputDatasetVersion: async (datasetId, versionId) => {
+      return apiPost(`/api/input-datasets/${encodeURIComponent(datasetId)}/versions/${encodeURIComponent(versionId)}/activate`, null, "Failed to activate dataset version");
+    },
+    deleteInputDatasetVersion: async (datasetId, versionId) => {
+      return apiDelete(`/api/input-datasets/${encodeURIComponent(datasetId)}/versions/${encodeURIComponent(versionId)}`, "Failed to delete dataset version");
+    },
+    uploadInputDataset,
+    fetchEnvironmentSetup: async (energyScenarioKey, mrioScenarioId, targetYear, runProfile, projectId, configuration) => {
+      const id = projectId || "default";
+      const config = configuration && typeof configuration === "object" ? configuration : {};
+      return apiPost(
+        `/api/projects/${encodeURIComponent(id)}/runs/validate`,
+        {
+          configuration: {
+            model_architecture_id: config.model_architecture_id || DEFAULT_MODEL_ARCHITECTURE_ID,
+            energy_model_engine: config.energy_model_engine || "calliope",
+            scenario: {
+              energy_scenario_key: energyScenarioKey || "new_links",
+              target_scenario_id: mrioScenarioId || "S2",
+              target_year: Number(targetYear || 2030),
+            },
+            run_profile: runProfile || "dev",
+            levers: config.levers || {},
+          },
+        },
+        "Failed to run environment setup checks"
+      );
+    },
+    fetchJobs: async (limit) => {
+      const payload = await apiGet(`/api/runs?limit=${limit || 30}`, "Failed to load runs");
+      return (payload.runs || []).map(projectRunToDisplayRun);
+    },
+    fetchJob: async (jobId) => projectRunToDisplayRun(await apiGet(`/api/executions/${encodeURIComponent(jobId)}/status`, "Failed to load run")),
+    cancelJob: async (jobId) => projectRunToDisplayRun(await apiPost(`/api/executions/${encodeURIComponent(jobId)}/cancel`, null, "Failed to cancel run")),
+    fetchRunEvents: async (jobId) => (await apiGet(`/api/executions/${encodeURIComponent(jobId)}/events`, "Failed to load run events")).events || [],
+    fetchSummary: async (runId) => apiGet(`/api/runs/${encodeURIComponent(runId)}/summary`, "Failed to load run summary"),
+    fetchIntegrated: async (runId) => apiGet(`/api/runs/${encodeURIComponent(runId)}/integrated`, "Failed to load integrated results"),
+    fetchArtifactText: async (runId, artifactId) => apiGetText(`/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`, `Failed to load ${artifactId}`),
+    fetchRunCsv: async (runId) => apiGetText(`/api/runs/${encodeURIComponent(runId)}/artifacts/results_csv`, "Failed to load run results CSV"),
+    fetchRunArtifacts: async (runId) => (await apiGet(`/api/runs/${encodeURIComponent(runId)}/artifacts`, "Failed to load run artifacts")).artifacts || [],
+    projectReportDownloadUrl: (projectId, reportId) => downloadUrl(`/api/projects/${encodeURIComponent(projectId)}/reports/${encodeURIComponent(reportId)}/download`),
+    projectReportDataUrl: (projectId, reportId) => downloadUrl(`/api/projects/${encodeURIComponent(projectId)}/reports/${encodeURIComponent(reportId)}/data`),
+    projectExportDownloadUrl: (projectId, exportId) => downloadUrl(`/api/projects/${encodeURIComponent(projectId)}/exports/${encodeURIComponent(exportId)}/download`)
+  };
+})();
+
+
+/* Workspace artifact contracts */
+(function () {
+  function artifactHref(runId, artifact) {
+    if (!artifact || !runId) return "";
+    const api = window.EDIM_API_CLIENT || {};
+    if (artifact.download_url) {
+      const href = /^https?:\/\//i.test(artifact.download_url) ? artifact.download_url : `${getFrontendApiBase()}${artifact.download_url}`;
+      return typeof api.downloadUrl === "function" ? api.downloadUrl(artifact.download_url) : href;
+    }
+    if (artifact.path) {
+      const artifactId = artifact.artifact_id || "";
+      if (artifactId) {
+        const path = `/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`;
+        return typeof api.downloadUrl === "function" ? api.downloadUrl(path) : `${getFrontendApiBase()}${path}`;
+      }
+    }
+    return "";
+  }
+
+  function normalizeArtifactCatalog(runId, summary) {
+    const catalog = Array.isArray(summary && summary.artifact_catalog) ? summary.artifact_catalog : [];
+    return catalog.map((artifact) => ({ ...artifact, href: artifactHref(runId, artifact) }));
+  }
+
+  window.EDIM_WORKSPACE_CONTRACTS = {
+    artifactHref,
+    normalizeArtifactCatalog,
+  };
+})();
+
+
+/* Result artifact helpers */
+(function () {
+  const contracts = window.EDIM_WORKSPACE_CONTRACTS || {};
+
+  function buildArtifactIndex(runId, summary) {
+    const catalog = typeof contracts.normalizeArtifactCatalog === "function"
+      ? contracts.normalizeArtifactCatalog(runId, summary)
+      : [];
+    return catalog.reduce((acc, artifact) => {
+      acc[artifact.artifact_id] = artifact;
+      return acc;
+    }, {});
+  }
+
+  function getArtifactHref(runId, summary, artifactId) {
+    const artifactIndex = buildArtifactIndex(runId, summary);
+    return artifactIndex[artifactId] && artifactIndex[artifactId].href ? artifactIndex[artifactId].href : "";
+  }
+
+  function getSummaryArtifactHref(runId, summary, artifactId) {
+    return getArtifactHref(runId, summary, artifactId);
+  }
+
+  window.EDIM_RESULT_ARTIFACTS = {
+    buildArtifactIndex,
+    getArtifactHref,
+    getSummaryArtifactHref,
+  };
+})();
+
+
+/* Result artifact catalog */
+(function () {
+  const resultArtifacts = window.EDIM_RESULT_ARTIFACTS || {};
+
+  const DEFAULT_OUTPUT_ARTIFACTS = [
+    { key: "results_csv", label: "Integrated results CSV" },
+    { key: "report_markdown", label: "Run report Markdown" },
+    { key: "exchange_bundle_zip", label: "Exchange bundle ZIP" },
+    { key: "scenario_package_json", label: "Unified scenario package JSON" },
+    { key: "energy_input_manifest_json", label: "Energy input manifest JSON" },
+    { key: "report_scenario_reference_json", label: "Report scenario reference JSON" },
+    { key: "geography_alignment_json", label: "Geography alignment diagnostics JSON" },
+    { key: "mrio_direct_inputs_json", label: "MRIO-direct inputs JSON" },
+    { key: "mrio_direct_shocks_csv", label: "MRIO-direct shocks CSV" },
+    { key: "energy_service_balance_csv", label: "Energy service balance CSV" },
+    { key: "calliope_component_activity_csv", label: "Calliope component activity CSV" },
+    { key: "investment_shocks_csv", label: "Investment shocks CSV" },
+    { key: "operating_shocks_csv", label: "Operating shocks CSV" },
+    { key: "prices_and_taxes_csv", label: "Prices and taxes CSV" },
+  ];
+
+  function buildOutputArtifactRows(runId, summary, requestedArtifacts) {
+    const rows = Array.isArray(requestedArtifacts) && requestedArtifacts.length ? requestedArtifacts : DEFAULT_OUTPUT_ARTIFACTS;
+    return rows.map((row) => {
+      const href = typeof resultArtifacts.getArtifactHref === "function"
+        ? resultArtifacts.getArtifactHref(runId, summary, row.key)
+        : "";
+      if (href) return { ...row, href };
+      if (!runId) return { ...row, href: "" };
+      const path = `/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(row.key)}`;
+      const api = window.EDIM_API_CLIENT || {};
+      return { ...row, href: typeof api.downloadUrl === "function" ? api.downloadUrl(path) : `${getFrontendApiBase()}${path}` };
     });
-    if (!res.ok) throw new Error(await parseApiError(res, "Failed to upload input dataset"));
-    return res.json();
-  },
-  planScenarioQuery: async (payload) =>
-    apiPost("/api/ai/scenario-query", payload, "Failed to run AI scenario query"),
-  fetchEnvironmentSetup: async (energyScenarioKey, mrioScenarioId, targetYear, runProfile, strictValidation, allowPlaceholderData) => {
-    const qs = new URLSearchParams();
-    if (energyScenarioKey) qs.set("energy_scenario_key", energyScenarioKey);
-    if (mrioScenarioId) qs.set("mrio_scenario_id", mrioScenarioId);
-    if (targetYear) qs.set("target_year", String(targetYear));
-    if (runProfile) qs.set("run_profile", runProfile);
-    if (typeof strictValidation === "boolean") {
-      qs.set("strict_validation", strictValidation ? "true" : "false");
+  }
+
+  window.EDIM_RESULT_CATALOG = {
+    DEFAULT_OUTPUT_ARTIFACTS,
+    buildOutputArtifactRows,
+  };
+})();
+
+
+/* Result components */
+const ResultsModule = (() => {
+  const resultCatalog = window.EDIM_RESULT_CATALOG || {
+    buildOutputArtifactRows: () => [],
+  };
+
+  function OutputRows({ runId, summary, artifacts }) {
+    const requestedArtifacts = artifacts && artifacts.length ? artifacts : null;
+    const outputArtifacts = resultCatalog.buildOutputArtifactRows(runId, summary, requestedArtifacts);
+    return (
+      <div className="diagram-dataset-list">
+        {outputArtifacts.map((artifact) => (
+          <div key={artifact.key} className="diagram-output-row">
+            <div>
+              <div style={{ fontWeight: 700 }}>{artifact.label}</div>
+              <div className="muted" style={{ fontSize: 11 }}>{artifact.key}</div>
+            </div>
+            {artifact.href ? (
+              <a href={artifact.href} download>Download</a>
+            ) : (
+              <span className="muted" style={{ fontSize: 12 }}>Available after run</span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return { OutputRows };
+})();
+
+window.EDIM_RESULTS_COMPONENTS = ResultsModule;
+
+
+/* Workspace data components */
+const WorkspaceDataComponents = (() => {
+  const api = window.EDIM_API_CLIENT || {
+    inputDatasetDownloadUrl: (datasetId) => `/api/input-datasets/${encodeURIComponent(datasetId)}/download`,
+  };
+
+  function DatasetRows({ datasets, onUpload, onDatasetVersionChange, disabled = false, disabledMessage = "" }) {
+    // Dataset versions are user-scoped backend records. The UI only activates
+    // or deletes versions through API descriptors; it never overwrites source
+    // input files or assumes where uploaded files are stored.
+    const [expandedDatasetId, setExpandedDatasetId] = React.useState("");
+    const [versionsByDataset, setVersionsByDataset] = React.useState({});
+    const [loadingDatasetId, setLoadingDatasetId] = React.useState("");
+    const [datasetMessage, setDatasetMessage] = React.useState("");
+
+    async function toggleVersions(datasetId) {
+      const nextId = expandedDatasetId === datasetId ? "" : datasetId;
+      setExpandedDatasetId(nextId);
+      setDatasetMessage("");
+      if (!nextId || versionsByDataset[nextId]) return;
+      setLoadingDatasetId(nextId);
+      try {
+        const rows = typeof api.fetchInputDatasetVersions === "function"
+          ? await api.fetchInputDatasetVersions(nextId)
+          : [];
+        setVersionsByDataset((prev) => ({ ...prev, [nextId]: rows }));
+      } catch (err) {
+        setDatasetMessage(err && err.message ? err.message : "Failed to load dataset versions.");
+      } finally {
+        setLoadingDatasetId("");
+      }
     }
-    if (typeof allowPlaceholderData === "boolean") {
-      qs.set("allow_placeholder_data", allowPlaceholderData ? "true" : "false");
+
+    async function refreshVersions(datasetId) {
+      if (typeof api.fetchInputDatasetVersions !== "function") return;
+      const rows = await api.fetchInputDatasetVersions(datasetId);
+      setVersionsByDataset((prev) => ({ ...prev, [datasetId]: rows }));
+      if (typeof onDatasetVersionChange === "function") onDatasetVersionChange();
     }
-    const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return apiGet(`/api/environment-setup${suffix}`, "Failed to run environment setup checks");
-  },
-  fetchJobs: async (limit) => (await apiGet(`/api/jobs?limit=${limit || 30}`, "Failed to load jobs")).jobs || [],
-  fetchJob: async (jobId) => apiGet(`/api/jobs/${encodeURIComponent(jobId)}`, "Failed to load job"),
-  submitJob: async (req) => (await apiPost("/api/jobs", req, "Failed to submit job")).job,
-  cancelJob: async (jobId) => apiPost(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, null, "Failed to cancel job"),
-  fetchIntegrated: async (runId) =>
-    apiGet(`/api/run/${encodeURIComponent(runId)}/integrated`, "Failed to load integrated results"),
-  fetchRunCsv: async (runId) =>
-    apiGetText(`/api/run/${encodeURIComponent(runId)}/download/csv`, "Failed to load run results CSV"),
-  fetchExchangeCsv: async (runId, filename) =>
-    apiGetText(
-      `/api/run/${encodeURIComponent(runId)}/download/exchange/${encodeURIComponent(filename)}`,
-      `Failed to load ${filename}`
-    ),
+
+    async function activateVersion(datasetId, versionId) {
+      setDatasetMessage("");
+      setLoadingDatasetId(datasetId);
+      try {
+        await api.activateInputDatasetVersion(datasetId, versionId);
+        await refreshVersions(datasetId);
+        setDatasetMessage(`Activated version ${versionId}.`);
+      } catch (err) {
+        setDatasetMessage(err && err.message ? err.message : "Failed to activate dataset version.");
+      } finally {
+        setLoadingDatasetId("");
+      }
+    }
+
+    async function deleteVersion(datasetId, versionId) {
+      setDatasetMessage("");
+      setLoadingDatasetId(datasetId);
+      try {
+        await api.deleteInputDatasetVersion(datasetId, versionId);
+        await refreshVersions(datasetId);
+        setDatasetMessage(`Deleted inactive version ${versionId}.`);
+      } catch (err) {
+        setDatasetMessage(err && err.message ? err.message : "Failed to delete dataset version.");
+      } finally {
+        setLoadingDatasetId("");
+      }
+    }
+
+    if (!datasets || !datasets.length) {
+      return <div className="muted" style={{ fontSize: 12 }}>No datasets are registered for this layer.</div>;
+    }
+    return (
+      <div className="diagram-dataset-list">
+        {disabled ? (
+          <div className="diagram-note" style={{ marginBottom: 8 }}>
+            {disabledMessage || "Inputs are locked for this selected run. Duplicate the configuration to edit dataset versions."}
+          </div>
+        ) : null}
+        {datasetMessage ? <div className="diagram-note" style={{ marginBottom: 8 }}>{datasetMessage}</div> : null}
+        {datasets.map((dataset) => (
+          <div key={dataset.id} className="diagram-dataset-row">
+            <div>
+              <div style={{ fontWeight: 700 }}>{dataset.label}</div>
+              <div className="muted" style={{ fontSize: 11 }}>
+                {dataset.filename} · {dataset.exists ? "available" : "missing"}
+              </div>
+              <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+                {dataset.role}
+                {dataset.active_version_id ? <> · active version <code>{dataset.active_version_id}</code></> : null}
+              </div>
+            </div>
+            <div className="diagram-dataset-actions">
+              <a href={api.inputDatasetDownloadUrl(dataset.id)} download>Download</a>
+              <button type="button" onClick={() => toggleVersions(dataset.id)}>
+                {expandedDatasetId === dataset.id ? "Hide versions" : "Versions"}
+              </button>
+              <label className="dataset-upload-button" style={disabled ? { opacity: 0.55, pointerEvents: "none" } : null}>
+                Upload
+                <input
+                  type="file"
+                  disabled={disabled}
+                  onChange={(event) => {
+                    const file = event.target.files && event.target.files[0];
+                    if (file && !disabled) onUpload(dataset.id, file);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            {expandedDatasetId === dataset.id ? (
+              <div className="diagram-dataset-version-list">
+                {loadingDatasetId === dataset.id ? (
+                  <div className="muted" style={{ fontSize: 12 }}>Loading versions...</div>
+                ) : (versionsByDataset[dataset.id] || []).length ? (
+                  (versionsByDataset[dataset.id] || []).map((version) => {
+                    const active = dataset.active_version_id && dataset.active_version_id === version.version_id;
+                    return (
+                      <div key={version.version_id} className="diagram-dataset-version-row">
+                        <div>
+                          <div><b>{version.filename || version.version_id}</b> {active ? <span className="badge badge-succeeded">Active</span> : null}</div>
+                          <div className="muted" style={{ fontSize: 11 }}>
+                            <code>{version.version_id}</code> · {version.size_bytes || 0} bytes · {version.created_at || "-"}
+                          </div>
+                        </div>
+                        <div className="diagram-dataset-actions">
+                          {typeof api.inputDatasetVersionDownloadUrl === "function" ? (
+                            <a href={api.inputDatasetVersionDownloadUrl(dataset.id, version.version_id)} download>Download</a>
+                          ) : null}
+                          {!active ? (
+                            <button type="button" onClick={() => activateVersion(dataset.id, version.version_id)} disabled={disabled}>Activate</button>
+                          ) : null}
+                          {!active ? (
+                            <button type="button" onClick={() => deleteVersion(dataset.id, version.version_id)} disabled={disabled}>Delete</button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="muted" style={{ fontSize: 12 }}>No uploaded override versions for this dataset.</div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return { DatasetRows };
+})();
+
+window.EDIM_WORKSPACE_DATA_COMPONENTS = WorkspaceDataComponents;
+
+/* End consolidated frontend helpers. */
+
+const api = window.EDIM_API_CLIENT;
+if (!api) {
+  throw new Error("EDIM_API_CLIENT must be loaded before app.jsx");
+}
+const resultArtifacts = window.EDIM_RESULT_ARTIFACTS || {
+  buildArtifactIndex: () => ({}),
+  getArtifactHref: () => "",
+  getSummaryArtifactHref: () => "",
 };
+const resultComponents = window.EDIM_RESULTS_COMPONENTS || {};
+const OutputRows = resultComponents.OutputRows || function OutputRowsFallback() { return null; };
+const workspaceDataComponents = window.EDIM_WORKSPACE_DATA_COMPONENTS || {};
+const DatasetRows = workspaceDataComponents.DatasetRows || function DatasetRowsFallback() { return null; };
 
 function MetricCard({ label, value }) {
   return (
@@ -2092,7 +2795,7 @@ function ValidationDiagnosticsSummary({ environmentSetup, loading = false, compa
   );
 }
 
-function LeverControl({ label, value, min, max, step, onChange, tooltip = "" }) {
+function LeverControl({ label, value, min, max, step, onChange, tooltip = "", disabled = false }) {
   const clamp = (v) => Math.min(max, Math.max(min, v));
   const apply = (raw) => {
     const parsed = Number.parseFloat(raw);
@@ -2123,6 +2826,7 @@ function LeverControl({ label, value, min, max, step, onChange, tooltip = "" }) 
           max={max}
           step={step}
           value={value}
+          disabled={disabled}
           onChange={(e) => apply(e.target.value)}
           style={{ flex: 1, minWidth: 220 }}
         />
@@ -2132,6 +2836,7 @@ function LeverControl({ label, value, min, max, step, onChange, tooltip = "" }) 
           max={max}
           step={step}
           value={value}
+          disabled={disabled}
           onChange={(e) => apply(e.target.value)}
           style={{ width: 110 }}
         />
@@ -2170,7 +2875,7 @@ function ModelStructurePanel({ style = null, columns = "1fr 1fr 1fr" }) {
       <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
         Current runtime architecture: user-defined run parameters and scenario source data are separate input
         streams into one unified adapter layer. The adapter outputs directly to the selected Energy Model and to the MRIO runtime,
-        while the Energy Model also feeds integrated results directly for energy-side metrics. Calliope is executable now; OSeMOSYS is represented as the next adapter target.
+        while the Energy Model also feeds integrated results directly for energy-side metrics. Calliope is the active executable energy model.
       </div>
       <div className="grid" style={{ gridTemplateColumns: columns }}>
         <div>
@@ -2200,7 +2905,7 @@ function ModelStructurePanel({ style = null, columns = "1fr 1fr 1fr" }) {
                 </tr>
                 <tr>
                   <td>Scenario data</td>
-                  <td>Energy metadata, engine scenario key, parsed report assumptions</td>
+                  <td>Energy metadata, engine scenario key, structured scenario-target assumptions</td>
                   <td>Unified adapter layer and scenario catalog</td>
                 </tr>
                 <tr>
@@ -2388,10 +3093,6 @@ function ScenarioSetupPanel({
   environmentSetupLoading,
   running,
   queueSubmitting,
-  aiPrompt,
-  setAiPrompt,
-  onApplyAiPrompt,
-  aiQueryResult,
   onScenarioChange,
   onMrioScenarioChange,
   onTargetYearChange,
@@ -2646,7 +3347,7 @@ function ScenarioSetupPanel({
               <div className="dashboard-note" style={{ marginTop: 8 }}>
                 <div style={{ fontWeight: 700 }}>{shockMapping.label || "A/Z, E, and Y heuristic shock mapping"}</div>
                 <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                  Method: <code>{shockMapping.mapping_id || "mrio_direct_heuristic_v1"}</code>. Quality ceiling:{" "}
+                  Method: <code>{shockMapping.mapping_id || "mrio_direct_heuristic"}</code>. Quality ceiling:{" "}
                   <code>{shockMapping.model_quality_ceiling || "analyst_review"}</code>.
                 </div>
               </div>
@@ -2737,7 +3438,7 @@ function ActiveJobPanel({ activeJob, onCancel, style = null }) {
   }, []);
 
   const checkpointSignature = activeJob
-    ? `${activeJob.job_id}|${activeJob.stage}|${Math.round(toNumber(activeJob.progress) * 1000)}|${activeJob.message}`
+    ? `${runExecutionId(activeJob)}|${activeJob.stage}|${Math.round(toNumber(activeJob.progress) * 1000)}|${activeJob.message}`
     : "";
 
   useEffect(() => {
@@ -2780,7 +3481,7 @@ function ActiveJobPanel({ activeJob, onCancel, style = null }) {
     <div className="card" style={{ marginTop: 14, ...(style || {}) }}>
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>
-          <b>Active job:</b> <code>{activeJob.job_id}</code> <StatusBadge status={activeJob.status} />
+          <b>Active execution:</b> <code>{runExecutionId(activeJob)}</code> <StatusBadge status={activeJob.status} />
           {activeJob.queue_position ? <span className="muted"> - queue position {activeJob.queue_position}</span> : null}
         </div>
         <div className="row">
@@ -2791,7 +3492,7 @@ function ActiveJobPanel({ activeJob, onCancel, style = null }) {
             onClick={onCancel}
             disabled={!canCancel}
           >
-            Cancel job
+            Cancel execution
           </button>
         </div>
       </div>
@@ -2824,14 +3525,15 @@ function SelectedJobDetailsPanel({ job, style = null }) {
   if (!job) return null;
   const isActive = isActiveStatus(job.status);
   const summary = job.summary || null;
-  const exchangeArtifacts = (summary && summary.exchange_artifacts) || {};
   const hasOutputs = Boolean(job.artifacts && (job.artifacts.csv_url || job.artifacts.summary_url));
+  const reportHref = summary ? resultArtifacts.getSummaryArtifactHref(job.run_id || (summary && summary.run_id) || "", summary, "report_markdown") : "";
+  const exchangeBundleHref = summary ? resultArtifacts.getSummaryArtifactHref(job.run_id || (summary && summary.run_id) || "", summary, "exchange_bundle_zip") : "";
 
   return (
     <div className="card" style={{ marginTop: 14, ...(style || {}) }}>
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>
-          <b>Selected job:</b> <code>{job.job_id}</code> <StatusBadge status={job.status} />
+          <b>Selected model:</b> {runLabel(job)} <StatusBadge status={job.status} />
         </div>
         <div className="muted" style={{ fontSize: 12 }}>
           {job.created_at ? new Date(job.created_at).toLocaleString() : "-"}
@@ -2876,16 +3578,16 @@ function SelectedJobDetailsPanel({ job, style = null }) {
           {job.artifacts && job.artifacts.summary_url ? (
             <a href={toApiUrl(job.artifacts.summary_url)} target="_blank" rel="noreferrer">Summary JSON</a>
           ) : null}
-          {exchangeArtifacts.report_markdown ? (
-            <a href={toApiUrl(exchangeArtifacts.report_markdown)} target="_blank" rel="noreferrer">Run report</a>
+          {reportHref ? (
+            <a href={reportHref} target="_blank" rel="noreferrer">Run report</a>
           ) : null}
-          {exchangeArtifacts.exchange_bundle_zip ? (
-            <a href={toApiUrl(exchangeArtifacts.exchange_bundle_zip)} target="_blank" rel="noreferrer">Exchange bundle ZIP</a>
+          {exchangeBundleHref ? (
+            <a href={exchangeBundleHref} target="_blank" rel="noreferrer">Exchange bundle ZIP</a>
           ) : null}
         </div>
       ) : (
         <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-          Outputs will appear here when this job reaches <code>succeeded</code>.
+          Outputs will appear here when this run reaches <code>succeeded</code>.
         </div>
       )}
     </div>
@@ -2895,15 +3597,20 @@ function SelectedJobDetailsPanel({ job, style = null }) {
 function EnvironmentSetupPanel({
   environmentSetup,
   loading,
-  onRefresh,
   onRun = null,
+  runName = "",
+  defaultRunName = "",
+  onRunNameChange = null,
   runDisabled = false,
+  runDisabledReason = "",
   queueSubmitting = false,
   running = false,
   style = null,
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [validationOpen, setValidationOpen] = useState(false);
+  const [runNameEditing, setRunNameEditing] = useState(false);
+  const [runNameDraft, setRunNameDraft] = useState("");
 
   const setupSummary = environmentSetupSummary(environmentSetup);
   const checks = setupSummary.checks;
@@ -2926,6 +3633,26 @@ function EnvironmentSetupPanel({
       : environmentSetup
         ? { border: "1px solid #6f4d2c", background: "#2b2015", color: "#ffd7b0" }
         : { border: "1px solid #33466a", background: "#101827", color: "#bfd4f5" };
+  const displayRunName = String(runName || "").trim() || defaultRunName || "Optional run name";
+
+  useEffect(() => {
+    if (!runNameEditing) setRunNameDraft(String(runName || ""));
+  }, [runName, runNameEditing]);
+
+  function startRunNameEdit() {
+    setRunNameDraft(String(runName || ""));
+    setRunNameEditing(true);
+  }
+
+  function saveRunNameEdit() {
+    if (typeof onRunNameChange === "function") onRunNameChange(String(runNameDraft || "").trim());
+    setRunNameEditing(false);
+  }
+
+  function cancelRunNameEdit() {
+    setRunNameDraft(String(runName || ""));
+    setRunNameEditing(false);
+  }
 
   return (
     <div className="card" style={{ marginTop: 14, ...(style || {}) }}>
@@ -2941,14 +3668,46 @@ function EnvironmentSetupPanel({
           <button type="button" onClick={() => setDetailsOpen(true)} style={{ background: "#22304c", fontSize: 12, padding: "6px 10px" }}>
             Open details
           </button>
-          <button type="button" onClick={onRefresh} style={{ background: "#22304c", fontSize: 12, padding: "6px 10px" }}>
-            Refresh
-          </button>
         </div>
       </div>
       <div style={{ ...statusStyle, borderRadius: 10, padding: "8px 10px", marginTop: 8, fontSize: 13 }}>
         {statusLabel}
       </div>
+      {onRunNameChange ? (
+        <div className="run-name-control">
+          <div className="scenario-readonly-label">Run name</div>
+          {runNameEditing ? (
+            <div className="project-title-edit-row run-name-edit-row">
+              <input
+                type="text"
+                value={runNameDraft}
+                maxLength={200}
+                placeholder={defaultRunName || "Optional run name"}
+                onChange={(event) => setRunNameDraft(event.target.value)}
+                autoFocus
+              />
+              <button type="button" onClick={saveRunNameEdit}>Save</button>
+              <button type="button" onClick={cancelRunNameEdit}>Cancel</button>
+            </div>
+          ) : (
+            <div className="run-name-display-row">
+              <div className="run-name-display">
+                <span>{displayRunName}</span>
+                {!String(runName || "").trim() && defaultRunName ? <span className="muted">Default</span> : null}
+              </div>
+              <button
+                type="button"
+                className="project-edit-icon"
+                aria-label="Edit run name"
+                title="Edit run name"
+                onClick={startRunNameEdit}
+              >
+                ✎
+              </button>
+            </div>
+          )}
+        </div>
+      ) : null}
       <div className="muted environment-inline-summary">
         <span>{cleanCheckLine}</span>
         {environmentSetup && environmentSetup.queue ? (
@@ -2962,6 +3721,11 @@ function EnvironmentSetupPanel({
       {setupSummary.errors.length ? (
         <div className="warn" style={{ marginTop: 10, marginBottom: 0 }}>
           {setupSummary.errors[0]}
+        </div>
+      ) : null}
+      {runDisabled && runDisabledReason ? (
+        <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+          {runDisabledReason}
         </div>
       ) : null}
       <div className="validation-expander">
@@ -3029,12 +3793,67 @@ function EnvironmentSetupPanel({
   );
 }
 
+function DuplicateConfigurationPanel({
+  selectedJob,
+  onDuplicateConfiguration,
+  onDeleteRun,
+  actionLoading = false,
+  style = null,
+}) {
+  if (!selectedJob) return null;
+  const status = normalizeStatus(selectedJob.status);
+  const isComplete = status === "succeeded";
+  const isActive = status === "queued" || status === "running";
+  const canDelete = !isActive && typeof onDeleteRun === "function";
+  return (
+    <div className="card" style={{ marginTop: 14, ...(style || {}) }}>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+        <div>
+          <h3 style={{ marginTop: 0, marginBottom: 4, fontSize: 16 }}>Configuration locked</h3>
+          <div className="muted" style={{ fontSize: 12 }}>
+            {isActive
+              ? "This run is already queued or running from an immutable input snapshot."
+              : isComplete
+                ? "This completed run is preserved as an immutable result record."
+                : "This run record is immutable."}
+          </div>
+          <div className="muted" style={{ fontSize: 11, marginTop: 5 }}>
+            Selected: <code>{runLabel(selectedJob)}</code> <StatusBadge status={selectedJob.status} />
+          </div>
+        </div>
+        <div className="run-record-action-row">
+          <button
+            type="button"
+            className="run-play-button"
+            onClick={onDuplicateConfiguration}
+            disabled={actionLoading}
+          >
+            Duplicate this configuration
+          </button>
+          <button
+            type="button"
+            className="danger-outline-button"
+            onClick={onDeleteRun}
+            disabled={actionLoading || !canDelete}
+            title={isActive ? "Cancel the active execution before deleting this run." : "Delete this run and its generated files."}
+          >
+            Delete run
+          </button>
+        </div>
+      </div>
+      <div className="diagram-note" style={{ marginTop: 10 }}>
+        {isActive
+          ? "Cancel the active execution before deleting this run. Duplicating creates a new editable draft without changing the active run."
+          : "The duplicate becomes a new draft while the original run and its artifacts remain unchanged. Delete removes this run record and generated files."}
+      </div>
+    </div>
+  );
+}
+
 function RunDiagnosticsCard({ confidence }) {
   const placeholderInputFiles = Array.isArray(confidence && confidence.placeholder_input_files)
     ? confidence.placeholder_input_files
     : [];
-  const fallbackExchangeUsed = Boolean(confidence && confidence.fallback_exchange_used);
-  const surrogateFallbackUsed = Boolean(confidence && confidence.surrogate_fallback_used);
   return (
     <div className="card">
       <h3 style={{ marginTop: 0, fontSize: 15 }}>Run-level diagnostics</h3>
@@ -3044,9 +3863,7 @@ function RunDiagnosticsCard({ confidence }) {
       <div className="row muted" style={{ marginTop: 8, fontSize: 12 }}>
         <span>Coupling mode: <code>{String((confidence && confidence.coupling_mode) || "unknown")}</code></span>
         <span>Mapping coverage: {formatSharePercent(toNumber(confidence && confidence.mapping_coverage_share), 1)}</span>
-        <span>Fallback mapping: {formatSharePercent(toNumber(confidence && confidence.fallback_mapping_share), 1)}</span>
-        <span>Fallback exchange: <code>{fallbackExchangeUsed ? "yes" : "no"}</code></span>
-        <span>Surrogate fallback: <code>{surrogateFallbackUsed ? "yes" : "no"}</code></span>
+        <span>Unmapped technologies: {formatSharePercent(toNumber(confidence && confidence.unmapped_mapping_share), 1)}</span>
         <span>Placeholder rows: <code>{toNumber(confidence && confidence.placeholder_input_row_count, 0)}</code></span>
         <span>Reliability penalty method: <code>{String((confidence && confidence.reliability_penalty_method) || "-")}</code></span>
         <span>VOLL: <code>{compact(confidence && confidence.value_of_lost_load_usd_per_mwh)}</code></span>
@@ -3061,16 +3878,6 @@ function RunDiagnosticsCard({ confidence }) {
           No placeholder expert input files are listed in this run diagnostic payload.
         </div>
       )}
-      {fallbackExchangeUsed && confidence && confidence.fallback_exchange_source ? (
-        <div className="warn" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
-          Exchange shocks used fallback allocation from <code>{String(confidence.fallback_exchange_source)}</code>.
-        </div>
-      ) : null}
-      {surrogateFallbackUsed && confidence && confidence.surrogate_fallback_reason ? (
-        <div className="warn" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
-          Development outputs fell back to surrogate mode: {String(confidence.surrogate_fallback_reason)}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -3355,6 +4162,7 @@ function SpatialResultsMapPanel({
   mapData,
   mapMetric,
   setMapMetric,
+  includeDevelopment,
   loading,
   loadError,
   developmentByRegionRecords,
@@ -3366,7 +4174,14 @@ function SpatialResultsMapPanel({
   const layerRef = useRef(null);
   const fittedRunRef = useRef("");
 
-  const metricMeta = LOCATION_MAP_METRICS.find((item) => item.key === mapMetric) || LOCATION_MAP_METRICS[0];
+  const availableMapMetrics = useMemo(
+    () => LOCATION_MAP_METRICS.filter((item) => includeDevelopment || item.scope !== "region"),
+    [includeDevelopment]
+  );
+  const metricMeta = availableMapMetrics.find((item) => item.key === mapMetric) || availableMapMetrics[0] || LOCATION_MAP_METRICS[0];
+  useEffect(() => {
+    if (metricMeta && mapMetric !== metricMeta.key) setMapMetric(metricMeta.key);
+  }, [metricMeta && metricMeta.key, mapMetric]);
   const regionLookup = useMemo(
     () => buildRegionLookup(developmentByRegionRecords),
     [developmentByRegionRecords]
@@ -3624,7 +4439,7 @@ function SpatialResultsMapPanel({
         const sourceLabel = info.resolved.source === "location"
           ? "Matched by location ID"
           : info.resolved.source === "region"
-            ? "Matched by region fallback"
+            ? "Matched by region context"
             : "No matched model value";
         const jobs = toNumber(info.regionRow && info.regionRow.jobs_total, NaN);
         const gva = toNumber(info.regionRow && info.regionRow.gva_total_musd, NaN);
@@ -3725,13 +4540,13 @@ function SpatialResultsMapPanel({
           <h3 style={{ marginTop: 0, marginBottom: 2, fontSize: 15 }}>Spatial results map</h3>
           <div className="muted" style={{ fontSize: 12 }}>
             Location metrics are built from <code>investment_shocks.csv</code> and <code>operating_shocks.csv</code>.
-            Regional development metrics are joined by region.
+            {includeDevelopment ? "Regional development metrics are joined by region." : "Energy-only mode hides region-level MRIO/development metrics."}
           </div>
         </div>
         <div>
           <label>Map metric</label>
           <select value={mapMetric} onChange={(e) => setMapMetric(e.target.value)} style={{ maxWidth: "100%" }}>
-            {LOCATION_MAP_METRICS.map((option) => (
+            {availableMapMetrics.map((option) => (
               <option key={option.key} value={option.key}>
                 {option.label}
               </option>
@@ -3771,7 +4586,7 @@ function SpatialResultsMapPanel({
         <span>Model locations: <code>{locationCount}</code></span>
         <span>GeoJSON location IDs: <code>{geoFeatureLocationCount}</code></span>
         <span>Matched by location: <code>{mapSummary.matchedByLocation}</code></span>
-        <span>Matched by region fallback: <code>{mapSummary.matchedByRegion}</code></span>
+        <span>Matched by region context: <code>{mapSummary.matchedByRegion}</code></span>
         <span>Unmatched features: <code>{mapSummary.unmatched}</code></span>
         <span>Synthetic subregions: <code>{syntheticSubregionLocationIds.length}</code></span>
         <span>Placeholder geometries: <code>{placeholderGeometryLocationIds.length}</code></span>
@@ -3958,7 +4773,7 @@ function SpatialResultsMapPanel({
         <code>window.EDIM_GEOJSON_PATH</code> before loading the app.
       </div>
       <div className="muted" style={{ marginTop: 4, fontSize: 11 }}>
-        Country topology manifest: <code>{LOCATION_MAP_COUNTRIES_MANIFEST_PATH}</code>. Subregions are synthesized from
+        Country boundary source: <code>{LOCATION_MAP_COUNTRIES_GEOJSON_PATH}</code>. Subregions are synthesized from
         model centroid points inside parent-country boundaries.
       </div>
       <div className="muted" style={{ marginTop: 4, fontSize: 11 }}>
@@ -3970,9 +4785,9 @@ function SpatialResultsMapPanel({
 
 function RunResultsPanel({
   result,
+  architecture,
   selectedRunLabel,
   runMetadata,
-  exchangeArtifacts,
   integratedMetrics,
   developmentDrivers,
   confidence,
@@ -4010,6 +4825,24 @@ function RunResultsPanel({
   const [activeSection, setActiveSection] = useState("overview");
   const [barFilter, setBarFilter] = useState("");
   const [barLimit, setBarLimit] = useState("20");
+  const includesDevelopment = architectureIncludesDevelopment(architecture);
+  const visibleTabKeys = architectureResultTabs(architecture);
+  const developmentMetricKeys = new Set([
+    "jobs_total",
+    "gva_total_musd",
+    "household_income_proxy_musd",
+    "import_leakage_musd",
+  ]);
+  const displayIntegratedMetrics = useMemo(
+    () =>
+      includesDevelopment
+        ? (integratedMetrics || [])
+        : (integratedMetrics || []).filter((metric) => !developmentMetricKeys.has(String(metric && metric.key))),
+    [includesDevelopment, integratedMetrics]
+  );
+  useEffect(() => {
+    if (!visibleTabKeys.includes(activeSection)) setActiveSection(visibleTabKeys[0] || "overview");
+  }, [activeSection, visibleTabKeys.join("|")]);
 
   const uncertaintyBounds =
     developmentUncertainty &&
@@ -4222,7 +5055,7 @@ function RunResultsPanel({
   const canApplyImportLeakage =
     Boolean(spatialFilter) && canFilterRegionRows && filteredDevelopmentByRegionSupplierRows.length > 0;
   const resolvedIntegratedMetrics = useMemo(() => {
-    const rows = Array.isArray(integratedMetrics) ? integratedMetrics : [];
+    const rows = Array.isArray(displayIntegratedMetrics) ? displayIntegratedMetrics : [];
     return rows.map((metric) => {
       const key = String((metric && metric.key) || "");
       let value = toNumber(metric && metric.value, 0);
@@ -4244,7 +5077,7 @@ function RunResultsPanel({
       return { ...(metric || {}), value };
     });
   }, [
-    integratedMetrics,
+    displayIntegratedMetrics,
     spatialFilter,
     filteredMonetaryCost,
     filteredEmissionsTotal,
@@ -4318,8 +5151,6 @@ function RunResultsPanel({
   const resolutionRows = Array.isArray(metricResolution && metricResolution.records)
     ? metricResolution.records
     : [];
-  const fallbackExchangeUsed = Boolean(confidence && confidence.fallback_exchange_used);
-  const surrogateFallbackUsed = Boolean(confidence && confidence.surrogate_fallback_used);
   const assumptionsCount = toNumber(confidence && confidence.scenario_assumptions_applied_count, 0);
   const indicatorAvailableCount = toNumber(confidence && confidence.development_indicators_available_count, 0);
   const indicatorUnavailableCount = toNumber(confidence && confidence.development_indicators_unavailable_count, 0);
@@ -4329,12 +5160,14 @@ function RunResultsPanel({
   const developmentIndicatorRows = Array.isArray(developmentIndicators && developmentIndicators.records)
     ? developmentIndicators.records
     : [];
+  const reportHref = resultArtifacts.getSummaryArtifactHref(result.artifacts.run_id, result.summary, "report_markdown");
+  const exchangeBundleHref = resultArtifacts.getSummaryArtifactHref(result.artifacts.run_id, result.summary, "exchange_bundle_zip");
   const sectionTabs = [
     { key: "overview", label: "Overview" },
     { key: "system", label: "Energy system" },
     { key: "development", label: "Development" },
     { key: "method", label: "Method" },
-  ];
+  ].filter((tab) => visibleTabKeys.includes(tab.key));
 
   if (!result) return null;
 
@@ -4347,16 +5180,16 @@ function RunResultsPanel({
               Run results workspace
             </div>
             <div style={{ marginTop: 4, fontWeight: 700, fontSize: 18 }}>
-              {selectedRunLabel || "Selected run"} <code>{result.artifacts.run_id}</code>
+              {selectedRunLabel || "Selected model"}
             </div>
           </div>
           <div className="row">
             <a href={toApiUrl(result.artifacts.csv_url)} target="_blank" rel="noreferrer">Results CSV</a>
-            {exchangeArtifacts.report_markdown ? (
-              <a href={toApiUrl(exchangeArtifacts.report_markdown)} target="_blank" rel="noreferrer">Run report</a>
+            {reportHref ? (
+              <a href={reportHref} target="_blank" rel="noreferrer">Run report</a>
             ) : null}
-            {exchangeArtifacts.exchange_bundle_zip ? (
-              <a href={toApiUrl(exchangeArtifacts.exchange_bundle_zip)} target="_blank" rel="noreferrer">Exchange bundle ZIP</a>
+            {exchangeBundleHref ? (
+              <a href={exchangeBundleHref} target="_blank" rel="noreferrer">Exchange bundle ZIP</a>
             ) : null}
           </div>
         </div>
@@ -4423,6 +5256,7 @@ function RunResultsPanel({
                   mapData={locationMapData}
                   mapMetric={locationMapMetric}
                   setMapMetric={setLocationMapMetric}
+                  includeDevelopment={includesDevelopment}
                   loading={locationMapLoading}
                   loadError={locationMapError}
                   developmentByRegionRecords={developmentByRegion}
@@ -4458,9 +5292,9 @@ function RunResultsPanel({
                     <h3 style={{ marginTop: 0, fontSize: 15, marginBottom: 0 }}>Global final results</h3>
                     <span className="muted" style={{ fontSize: 11 }}>Run-wide</span>
                   </div>
-                  {integratedMetrics.length ? (
+                  {displayIntegratedMetrics.length ? (
                     <div className="row" style={{ gap: 12 }}>
-                      {integratedMetrics.map((m) => (
+                      {displayIntegratedMetrics.map((m) => (
                         <MetricCard
                           key={String(m.key)}
                           label={`${String(m.label)} (${String(m.unit)})`}
@@ -4517,6 +5351,7 @@ function RunResultsPanel({
                   ) : null}
                 </div>
 
+	                {includesDevelopment ? (
 	                <div className="card">
 	                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
 	                    <h3 style={{ marginTop: 0, fontSize: 15, marginBottom: 0 }}>Global development drivers</h3>
@@ -4531,7 +5366,9 @@ function RunResultsPanel({
 	                    Global development drivers are derived from the full run summary. Import leakage is reported with final results.
 	                  </div>
 	                </div>
+	                ) : null}
 
+                {includesDevelopment ? (
                 <div
                   className="card"
                   style={{
@@ -4561,6 +5398,7 @@ function RunResultsPanel({
                     <div className="muted">Select a country, subcountry, or region on the map to compare scoped drivers against the global run.</div>
                   )}
                 </div>
+                ) : null}
               </div>
             </div>
 
@@ -4569,7 +5407,7 @@ function RunResultsPanel({
               <ModelQualityCard modelQuality={modelQuality} confidence={confidence} />
             </div>
 
-            <DevelopmentUncertaintyCard developmentUncertainty={developmentUncertainty} />
+            {includesDevelopment ? <DevelopmentUncertaintyCard developmentUncertainty={developmentUncertainty} /> : null}
           </div>
         ) : null}
 
@@ -4740,7 +5578,7 @@ function RunResultsPanel({
           </div>
         ) : null}
 
-        {activeSection === "development" ? (
+        {includesDevelopment && activeSection === "development" ? (
           <div className="dashboard-stack">
             <div className="workspace-grid-2">
               <div className="card">
@@ -4827,7 +5665,17 @@ function RunResultsPanel({
           <div className="dashboard-stack">
             <div className="workspace-grid-2">
               <ScenarioProvenanceCard scenarioPackage={scenarioPackage} confidence={confidence} />
-              <SourceChannelsCard sourceChannels={sourceChannels} />
+              {includesDevelopment ? (
+                <SourceChannelsCard sourceChannels={sourceChannels} />
+              ) : (
+                <div className="card">
+                  <h3 style={{ marginTop: 0, fontSize: 15 }}>Architecture scope</h3>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    This run is displayed with the energy-only architecture. MRIO source-channel comparison,
+                    development indicators, and MRIO-direct shock artifacts are intentionally hidden.
+                  </div>
+                </div>
+              )}
             </div>
             <div className="workspace-grid-2">
               <MetricResolutionCard metricResolution={metricResolution} />
@@ -4858,36 +5706,37 @@ function RunResultsPanel({
 function RecentJobsPanel({ jobs, selectedJobId, onSelectJob, style = null, limit = 12 }) {
   return (
     <div className="card" style={{ marginTop: 14, ...(style || {}) }}>
-      <h3 style={{ marginTop: 0, fontSize: 16 }}>Recent jobs</h3>
+      <h3 style={{ marginTop: 0, fontSize: 16 }}>Recent runs</h3>
       {!jobs.length ? (
-        <div className="muted">No jobs yet.</div>
+        <div className="muted">No runs yet.</div>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table className="panel-table">
             <thead>
               <tr>
-                <th>Job</th>
+                <th>Model</th>
                 <th>Status</th>
                 <th>Progress</th>
                 <th>Energy scenario</th>
-                <th>Run ID</th>
+                <th>Target year</th>
                 <th>Created</th>
               </tr>
             </thead>
             <tbody>
               {jobs.slice(0, limit).map((j) => {
+                const id = runExecutionId(j);
                 return (
                 <tr
-                  key={j.job_id}
-                  className={selectedJobId && j.job_id === selectedJobId ? "row-selected" : ""}
+                  key={id || j.run_id}
+                  className={selectedJobId && id === selectedJobId ? "row-selected" : ""}
                   onClick={() => onSelectJob(j)}
                   style={{ cursor: "pointer" }}
                 >
-                  <td><code>{j.job_id}</code></td>
+                  <td>{runLabel(j)}</td>
                   <td><StatusBadge status={j.status} /></td>
                   <td>{Math.round(toNumber(j.progress) * 100)}%</td>
                   <td>{(j.request && j.request.energy_scenario_key) || "-"}</td>
-                  <td>{(j.artifacts && j.artifacts.run_id) || "-"}</td>
+                  <td>{(j.request && j.request.target_year) || "-"}</td>
                   <td>{new Date(j.created_at).toLocaleString()}</td>
                 </tr>
                 );
@@ -4905,8 +5754,9 @@ function AnalysisCanvasInfoModal({ onClose }) {
     <Modal title="Analysis canvas" subtitle="Mission control guide" onClose={onClose} wide={true}>
       <div className="dashboard-stack">
         <div className="muted" style={{ fontSize: 13 }}>
-          The analysis canvas is the center results workspace. It stays separate from the command rail and operations
-          rail so users can configure, run, monitor, and interpret without scrolling through a single long page.
+          The analysis canvas is the center results workspace. It stays separate from the scenario command area and the
+          model run management pane so users can configure, run, monitor, and interpret without scrolling through a
+          single long page.
         </div>
         <div className="workspace-grid-3">
           <div className="dashboard-note">
@@ -4945,39 +5795,378 @@ function AnalysisCanvasInfoModal({ onClose }) {
   );
 }
 
-function DashboardHeader({
-  runViewMode,
-  onRunViewModeChange,
-  hasResult,
+function BackendTargetSwitch({
+  apiTarget,
+  compatibility,
+  onApiTargetModeChange,
+  disabled,
 }) {
+  const target = apiTarget || {};
+  const contract = compatibility || {};
+  const backendMode = String(target.mode || "local") === "backend";
+  const backendConfigured = Boolean(target.hasBackendApiBase);
+  const apiBase = String(target.apiBase || target.localApiBase || "").replace(/^https?:\/\//, "");
+  const backendBase = String(target.backendApiBase || "").replace(/^https?:\/\//, "");
+  const contractStatus = String(contract.status || "").trim();
+  const contractMessage = String(contract.message || "").trim();
+  const contractLabel = contractStatus
+    ? contractStatus === "checking"
+      ? "Checking contract"
+      : contractMessage || `Contract ${contractStatus}`
+    : "Contract not checked";
   return (
-    <div className="app-header">
-      <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.09em", color: "#8ea4c5" }}>
-        Modeling Dashboard
-      </div>
-      <h1 className="header-title">Integrated energy-development dashboard</h1>
-      <div className="muted" style={{ marginTop: 6, fontSize: 13, maxWidth: 760 }}>
-        United Nations Development Programme
-      </div>
-      <div className="app-nav-row">
-        <div className="app-nav segmented-control">
+    <div className={`runtime-target-control ${backendMode ? "is-backend" : "is-local"}`}>
+      <div className="runtime-target-row">
+        <span className="runtime-target-label">Runtime</span>
+        <label className="runtime-switch-control">
+          <span className={`runtime-switch-label ${!backendMode ? "is-active" : ""}`}>Local</span>
+          <span className="runtime-toggle-shell">
+            <input
+              className="runtime-toggle-input"
+              type="checkbox"
+              checked={backendMode}
+              onChange={(event) => onApiTargetModeChange(event.target.checked ? "backend" : "local")}
+              disabled={disabled || (!backendConfigured && !backendMode)}
+              aria-label="Switch between local and hosted backend runtime"
+            />
+            <span className="runtime-toggle-track" aria-hidden="true">
+              <span className="runtime-toggle-thumb" />
+            </span>
+          </span>
+          <span className={`runtime-switch-label ${backendMode ? "is-active" : ""}`}>Backend</span>
+        </label>
+        <span className="runtime-info-slot">
           <button
             type="button"
-            className={runViewMode === "setup" ? "seg-button active" : "seg-button"}
-            onClick={() => onRunViewModeChange("setup")}
+            className={`runtime-info-button ${contractStatus || (backendConfigured ? "idle" : "warning")}`}
+            aria-label="Runtime backend details"
           >
-            Diagram setup
+            i
           </button>
-          <button
-            type="button"
-            className={runViewMode === "results" ? "seg-button active" : "seg-button"}
-            onClick={() => onRunViewModeChange("results")}
-            disabled={!hasResult}
-          >
-            Results mode
-          </button>
+          <span className="runtime-info-panel">
+            <span><b>Active:</b> {backendMode ? "Backend" : "Local"}</span>
+            <span><b>API:</b> {backendMode && backendConfigured ? (backendBase || "configured backend") : (apiBase || "current origin")}</span>
+            <span><b>Backend env:</b> {backendConfigured ? "Set" : "Not set"}</span>
+            <span><b>Contract:</b> {contractLabel}</span>
+          </span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ProductBrand({ onClick = null }) {
+  const clickable = typeof onClick === "function";
+  const className = `edim-brand${clickable ? " brand-home-button" : ""}`;
+  const content = (
+    <>
+      <img
+        className="edim-logo"
+        src="./assets/undp-logo.svg?v=edim"
+        alt="UNDP"
+      />
+      <span className="edim-brand-copy">
+        <strong>Energy Development Modeling</strong>
+        <small>United Nations Development Programme</small>
+      </span>
+    </>
+  );
+  if (clickable) {
+    return (
+      <button type="button" className={className} onClick={onClick} aria-label="Return to landing page">
+        {content}
+      </button>
+    );
+  }
+  return (
+    <div className={className}>
+      {content}
+    </div>
+  );
+}
+
+function UnifiedHeader({
+  runViewMode,
+  currentUserId,
+  availableUsers,
+  onUserChange,
+  projects,
+  activeProjectId,
+  onReturnToProjects,
+  apiTarget,
+  systemCompatibility,
+  onApiTargetModeChange,
+  apiTargetLoading,
+  onReturnToLanding,
+}) {
+  const activeProject = (projects || []).find((project) => project.project_id === activeProjectId) || null;
+  const inProjectWorkspace = runViewMode !== "projects" && activeProject;
+  const projectTitle = runViewMode
+    ? (inProjectWorkspace ? activeProject.title || "Untitled project" : "Projects overview")
+    : "";
+  return (
+    <header className="edim-topbar">
+      <ProductBrand onClick={onReturnToLanding} />
+
+      {projectTitle ? (
+        <div className={`header-project-area ${inProjectWorkspace ? "in-project" : ""}`}>
+          {inProjectWorkspace ? (
+            <>
+              <div className="header-project-title">{projectTitle}</div>
+              <button type="button" className="header-back-button" onClick={onReturnToProjects}>
+                <span aria-hidden="true">↩</span>
+                <span>Back to projects</span>
+              </button>
+            </>
+          ) : (
+            <div className="header-project-title">{projectTitle}</div>
+          )}
         </div>
+      ) : (
+        <div className="header-project-area" aria-hidden="true" />
+      )}
+
+      <div className="header-right-controls">
+        <BackendTargetSwitch
+          apiTarget={apiTarget}
+          compatibility={systemCompatibility}
+          onApiTargetModeChange={onApiTargetModeChange}
+          disabled={apiTargetLoading}
+        />
+        <label className="header-user-select">
+          <span>User</span>
+          <select value={currentUserId || ""} onChange={(e) => onUserChange(e.target.value)} disabled={apiTargetLoading}>
+            {(availableUsers || []).map((user) => (
+              <option key={user.user_id} value={user.user_id}>
+                {user.display_name || user.user_id}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+    </header>
+  );
+}
+
+function LandingHeroVisualSlot({ tuning }) {
+  const HeroBackground = window.EDIMHeroBackground && window.EDIMHeroBackground.HeroBackground;
+  const resolvedTuning = {
+    ...LANDING_HERO_BASE_TUNING,
+    ...(tuning || {}),
+  };
+  return (
+    <div className="landing-hero-visual-slot" aria-hidden="true">
+      <div id="landing-hero-d3-root" className="landing-hero-d3-root" data-visual-slot="landing-hero-d3">
+        {HeroBackground ? (
+          <HeroBackground
+            theme="solar"
+            intensity={1.12}
+            seed={31}
+            tuning={resolvedTuning}
+            style={{ zIndex: 0 }}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function LandingCardVisual({ type }) {
+  const visualClass = `landing-card-visual ${type}`;
+  if (type === "country") {
+    return (
+      <div className={visualClass} aria-hidden="true">
+        <svg viewBox="0 0 240 140">
+          <path d="M24 98 C48 48, 86 78, 112 38 C148 -8, 192 34, 214 82" />
+          <circle cx="66" cy="76" r="14" />
+          <circle cx="122" cy="50" r="22" />
+          <circle cx="184" cy="72" r="16" />
+          <line x1="66" y1="76" x2="122" y2="50" />
+          <line x1="122" y1="50" x2="184" y2="72" />
+        </svg>
+      </div>
+    );
+  }
+  if (type === "evidence") {
+    return (
+      <div className={visualClass} aria-hidden="true">
+        <svg viewBox="0 0 240 140">
+          <rect x="28" y="88" width="28" height="24" />
+          <rect x="70" y="64" width="28" height="48" />
+          <rect x="112" y="42" width="28" height="70" />
+          <rect x="154" y="72" width="28" height="40" />
+          <path d="M36 48 L86 58 L126 28 L178 48 L210 30" />
+          <circle cx="126" cy="28" r="8" />
+        </svg>
+      </div>
+    );
+  }
+  return (
+    <div className={visualClass} aria-hidden="true">
+      <svg viewBox="0 0 240 140">
+        <polygon points="54,34 90,54 90,96 54,116 18,96 18,54" />
+        <polygon points="132,20 178,46 178,98 132,124 86,98 86,46" />
+        <polygon points="204,42 232,58 232,90 204,106 176,90 176,58" />
+        <line x1="90" y1="76" x2="86" y2="76" />
+        <line x1="178" y1="74" x2="176" y2="74" />
+      </svg>
+    </div>
+  );
+}
+
+function LandingPage({
+  currentUserId,
+  availableUsers,
+  onUserChange,
+  apiTarget,
+  systemCompatibility,
+  onApiTargetModeChange,
+  apiTargetLoading,
+  onEnter,
+  onOpenMethodology,
+  statusMessage,
+  errorMessage,
+}) {
+  const currentUser = (availableUsers || []).find((user) => user.user_id === currentUserId) || null;
+  const canEnter = Boolean(currentUserId) && !apiTargetLoading;
+  const landingVideoSrc = String(window.EDIM_LANDING_VIDEO_SRC || "").trim();
+  const [heroDefaults, setHeroDefaults] = useState(normalizeLandingHeroTuning(LANDING_HERO_BASE_TUNING));
+  const heroFlashlightRef = useRef(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadHeroDefaults() {
+      try {
+        const response = await fetch(LANDING_HERO_DEFAULTS_PATH, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = normalizeLandingHeroDefaults(await response.json());
+        if (cancelled) return;
+        setHeroDefaults(payload.tuningDefaults);
+      } catch (err) {
+        // The built-in base tuning remains the fallback if the static config is unavailable.
+      }
+    }
+    loadHeroDefaults();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    const overlay = heroFlashlightRef.current;
+    if (!overlay) return undefined;
+    const clearFlashlight = () => {
+      overlay.style.setProperty("--landing-hero-flashlight-opacity", "0");
+    };
+    window.addEventListener("blur", clearFlashlight);
+    return () => window.removeEventListener("blur", clearFlashlight);
+  }, []);
+  function updateHeroFlashlight(event) {
+    const overlay = heroFlashlightRef.current;
+    if (!overlay) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 100;
+    const y = ((event.clientY - rect.top) / Math.max(rect.height, 1)) * 100;
+    overlay.style.setProperty("--landing-hero-flashlight-x", `${Math.max(0, Math.min(100, x)).toFixed(2)}%`);
+    overlay.style.setProperty("--landing-hero-flashlight-y", `${Math.max(0, Math.min(100, y)).toFixed(2)}%`);
+    const textAreaMultiplier = x < 48 ? 0.18 + (Math.max(0, x) / 48) * 0.38 : 0.62;
+    overlay.style.setProperty("--landing-hero-flashlight-opacity", textAreaMultiplier.toFixed(3));
+  }
+  function clearHeroFlashlight() {
+    const overlay = heroFlashlightRef.current;
+    if (overlay) overlay.style.setProperty("--landing-hero-flashlight-opacity", "0");
+  }
+  return (
+    <div className="landing-shell">
+      <UnifiedHeader
+        currentUserId={currentUserId}
+        availableUsers={availableUsers}
+        onUserChange={onUserChange}
+        apiTarget={apiTarget}
+        systemCompatibility={systemCompatibility}
+        onApiTargetModeChange={onApiTargetModeChange}
+        apiTargetLoading={apiTargetLoading}
+        onReturnToLanding={null}
+      />
+
+      <main className="landing-main">
+        <section className="landing-hero-section" onPointerMove={updateHeroFlashlight} onPointerLeave={clearHeroFlashlight}>
+          <LandingHeroVisualSlot tuning={heroDefaults} />
+          <div className="landing-hero-scrim" aria-hidden="true" />
+          <div ref={heroFlashlightRef} className="landing-hero-flashlight" aria-hidden="true" />
+          <div className="landing-hero-card">
+            <h1>Model development outcomes from energy transition pathways.</h1>
+            <p>
+              Help countries connect energy-system choices to jobs, growth, emissions, affordability, and service delivery
+              so transition planning can support development priorities and investment decisions.
+            </p>
+            <div className="landing-actions">
+              <button type="button" className="landing-primary-action" onClick={onEnter} disabled={!canEnter}>
+                Open projects
+              </button>
+              <button type="button" className="landing-secondary-action" onClick={onOpenMethodology}>
+                Explore the methodology
+              </button>
+            </div>
+            {errorMessage ? <div className="warn landing-message">{errorMessage}</div> : null}
+            {statusMessage ? <div className="ok landing-message">{statusMessage}</div> : null}
+          </div>
+        </section>
+
+        <section className="landing-video-section">
+          <div className="landing-section-heading">
+            <div className="landing-section-kicker">Platform overview</div>
+            <h2>From energy pathways to development evidence.</h2>
+            <p>
+              The workspace is structured around projects, model architectures, scenario packages, model runs, exports,
+              and comparison views so country teams can move from question to evidence without losing provenance.
+            </p>
+          </div>
+          <div className="landing-video-frame">
+            {landingVideoSrc ? (
+              <video controls playsInline preload="metadata" src={landingVideoSrc}>
+                Platform overview video.
+              </video>
+            ) : (
+              <div className="landing-video-placeholder">
+                <div className="landing-video-play" aria-hidden="true">▶</div>
+                <div>
+                  <div className="landing-video-title">Platform overview video</div>
+                  <div className="landing-video-copy">Set <code>EDIM_LANDING_VIDEO_SRC</code> to replace this preview with a hosted or local video asset.</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="landing-feature-section">
+          <div className="landing-section-heading compact">
+            <div className="landing-section-kicker">What the platform supports</div>
+            <h2>Clean workflows for country energy-transition decisions.</h2>
+          </div>
+          <div className="landing-feature-grid">
+            <article className="landing-feature-card">
+              <LandingCardVisual type="energy" />
+              <h3>Energy for development</h3>
+              <p>Assess how power-sector pathways shape employment, value creation, emissions, reliability, and access outcomes.</p>
+            </article>
+            <article className="landing-feature-card">
+              <LandingCardVisual type="country" />
+              <h3>Country decision support</h3>
+              <p>Organize scenarios around national planning questions, compare alternatives, and maintain traceable evidence for partners.</p>
+            </article>
+            <article className="landing-feature-card">
+              <LandingCardVisual type="evidence" />
+              <h3>Investment-ready outputs</h3>
+              <p>Translate model runs into downloadable artifacts, reports, and comparison views that support prioritization and financing dialogue.</p>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <footer className="landing-footer">
+        <div>United Nations Development Programme</div>
+        <div>Energy Development Modeling</div>
+        <div>Decision support for sustainable energy transitions.</div>
+      </footer>
     </div>
   );
 }
@@ -5001,7 +6190,7 @@ function EmptyAnalysisWorkspace({
           </h2>
           <div className="muted" style={{ fontSize: 13, maxWidth: 720 }}>
             This workspace is designed around one loop: choose a scenario, validate readiness, queue a run, then inspect
-            global and spatial outputs in the center canvas while keeping operations visible.
+            global and spatial outputs in the center canvas while keeping run management visible.
           </div>
           <div className="workspace-grid-3" style={{ marginTop: 12 }}>
             <div className="dashboard-note">
@@ -5038,7 +6227,7 @@ function EmptyAnalysisWorkspace({
                 value={environmentSetup ? (environmentSetup.ok ? "Ready" : "Needs action") : "Checking"}
               />
               <MetricCard
-                label="Active job"
+                label="Active run"
                 value={activeJob ? displayStatus(activeJob.status).label : "Idle"}
               />
             </div>
@@ -5143,63 +6332,6 @@ function ArchitectureBox({ box, activeJob, result, children, featured = false })
   );
 }
 
-function buildArchitectureNodeStatuses(activeJob, result) {
-  const boxById = new Map(ARCHITECTURE_BOXES.map((box) => [box.id, box]));
-  const nodeStatuses = {};
-  Object.entries(ARCHITECTURE_NODE_BOX_MAP).forEach(([nodeId, boxId]) => {
-    const box = boxById.get(boxId);
-    if (!box) return;
-    const status = architectureBoxStatus(box, activeJob, result);
-    nodeStatuses[nodeId] = status;
-  });
-  return {
-    overallStatus: activeJob ? "Run in progress" : result ? "Final results ready" : "Ready to run",
-    nodeStatuses,
-  };
-}
-
-function D3ArchitectureCore({ activeJob, result, children }) {
-  const iframeRef = useRef(null);
-  const architectureState = useMemo(
-    () => buildArchitectureNodeStatuses(activeJob, result),
-    [activeJob && activeJob.status, activeJob && activeJob.stage, result && result.artifacts && result.artifacts.run_id]
-  );
-
-  function postState() {
-    const frame = iframeRef.current;
-    if (!frame || !frame.contentWindow) return;
-    frame.contentWindow.postMessage({ type: "EDIM_ARCHITECTURE_STATE", state: architectureState }, "*");
-  }
-
-  useEffect(() => {
-    postState();
-    const timer = window.setTimeout(postState, 160);
-    return () => window.clearTimeout(timer);
-  }, [architectureState]);
-
-  return (
-    <div className="d3-architecture-core">
-      <iframe
-        ref={iframeRef}
-        className="d3-architecture-frame"
-        title="EDIM D3 system architecture diagram"
-        src="./architecture.html"
-        onLoad={postState}
-      />
-      <div className="d3-architecture-control-layer">{children}</div>
-    </div>
-  );
-}
-
-function D3OverlayPanel({ area, title, children }) {
-  return (
-    <section className={`d3-overlay-panel ${area}`}>
-      {title ? <div className="d3-overlay-title">{title}</div> : null}
-      {children}
-    </section>
-  );
-}
-
 function flowSlotOffset(index, total, spacing = 28) {
   if (!Number.isFinite(index) || !Number.isFinite(total) || total <= 1) return 0;
   return (index - (total - 1) / 2) * spacing;
@@ -5292,6 +6424,90 @@ function FlowEdgeLayer({ positions, edges, canvas }) {
   );
 }
 
+function MethodologyArchitectureDiagram({
+  selectedArchitecture = DEFAULT_MODEL_ARCHITECTURE_ID,
+  architectureCatalog,
+  activeNodeIds = [],
+}) {
+  const architecture = architectureById(
+    architectureCatalog || normalizeArchitectureCatalog(null),
+    selectedArchitecture
+  );
+  const flowDefinition = normalizeFlowDefinition(architecture && architecture.graph);
+  const boxes = ((architecture && architecture.boxes) || ARCHITECTURE_BOXES).map((box) => ({ ...box }));
+  const boxById = new Map(boxes.map((box) => [box.id, box]));
+  const orderedNodeIds = flowDefinition.order || DEFAULT_FLOW_NODE_ORDER;
+  const positions = flowDefinition.nodes || {};
+  const canvas = flowDefinition.canvas || DEFAULT_FLOW_CANVAS_SIZE;
+  const activeSet = new Set(activeNodeIds || []);
+  const developmentMuted = selectedArchitecture === "energy-only" && architectureIncludesDevelopment(architecture);
+  const mutedSet = new Set(developmentMuted ? ["bridge", "mrio", "mrio_data"] : []);
+  const edges = (flowDefinition.edges || DEFAULT_FLOW_EDGES).filter((edge) => {
+    if (!positions[edge.from] || !positions[edge.to]) return false;
+    return !mutedSet.has(edge.from) && !mutedSet.has(edge.to);
+  });
+
+  return (
+    <div className="methodology-architecture-diagram" aria-label={`${architecture.shortLabel || architecture.label} model architecture`}>
+      <svg
+        viewBox={`0 0 ${canvas.width} ${canvas.height}`}
+        preserveAspectRatio="xMidYMid meet"
+        aria-hidden="true"
+      >
+        <defs>
+          <marker id="methodology-flow-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+            <path d="M 0 0 L 12 6 L 0 12 z" fill="#67e8f9" opacity="0.82" />
+          </marker>
+        </defs>
+        {edges.map((edge) => {
+          const from = positions[edge.from];
+          const to = positions[edge.to];
+          const sourceSide = flowSideFor(from, to);
+          const targetSide = flowSideFor(to, from);
+          const edgeRows = edges;
+          const outgoing = edgeRows.filter((row) => row.from === edge.from && flowSideFor(positions[row.from], positions[row.to]) === sourceSide);
+          const incoming = edgeRows.filter((row) => row.to === edge.to && flowSideFor(positions[row.to], positions[row.from]) === targetSide);
+          const sourceOffset = flowSlotOffset(outgoing.indexOf(edge), outgoing.length, 36);
+          const targetOffset = flowSlotOffset(incoming.indexOf(edge), incoming.length, 36);
+          const start = flowAnchor(from, sourceSide, sourceOffset);
+          const end = flowAnchor(to, targetSide, targetOffset);
+          return (
+            <g key={`${edge.from}-${edge.to}`}>
+              <path d={flowEdgePath(from, to, sourceSide, targetSide, sourceOffset, targetOffset)} markerEnd="url(#methodology-flow-arrow)" />
+              <text x={(start.x + end.x) / 2} y={(start.y + end.y) / 2 - 10}>{edge.label}</text>
+            </g>
+          );
+        })}
+      </svg>
+      {orderedNodeIds.map((id) => {
+        const box = boxById.get(id);
+        const rect = positions[id];
+        if (!box || !rect) return null;
+        const isMuted = mutedSet.has(id);
+        const isActive = activeSet.has(id) || (!activeSet.size && !isMuted);
+        return (
+          <article
+            key={id}
+            className={`methodology-architecture-node ${box.type} ${isMuted ? "muted" : ""} ${isActive ? "active" : ""}`}
+            style={{
+              left: `${(rect.x / canvas.width) * 100}%`,
+              top: `${(rect.y / canvas.height) * 100}%`,
+              width: `${(rect.w / canvas.width) * 100}%`,
+              minHeight: `${Math.max(82, (rect.h / canvas.height) * 420)}px`,
+            }}
+          >
+            <div className="methodology-architecture-node-type">{box.type}</div>
+            <h3>{box.title}</h3>
+            <p>{box.subtitle}</p>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+window.EDIMMethodologyArchitectureDiagram = MethodologyArchitectureDiagram;
+
 function FlowNode({
   box,
   rect,
@@ -5366,26 +6582,32 @@ function FlowNode({
 function FlowModelCanvas({
   activeJob,
   result,
+  architecture,
   scenarioControls,
-  operationsPanel,
   calliopeDatasets,
   mrioDatasets,
+  datasetsByNode,
   selectedRunId,
-  exchangeArtifacts,
+  inputsLocked = false,
+  lockReason = "",
   onUploadDataset,
+  onDatasetVersionChange,
   statusMessage,
 }) {
-  const [flowDefinition, setFlowDefinition] = useState(() => defaultFlowDefinition());
-  const [positions, setPositions] = useState(() => defaultFlowDefinition().nodes);
+  const initialFlow = normalizeFlowDefinition(architecture && architecture.graph);
+  const [flowDefinition, setFlowDefinition] = useState(() => initialFlow);
+  const [positions, setPositions] = useState(() => initialFlow.nodes);
   const [measuredNodes, setMeasuredNodes] = useState({});
-  const [expandedNodes, setExpandedNodes] = useState({ scenario: true, operations: true });
+  const [expandedNodes, setExpandedNodes] = useState({ scenario: true });
   const [draggingId, setDraggingId] = useState("");
   const dragRef = useRef(null);
+  const includesDevelopment = architectureIncludesDevelopment(architecture);
+  const outputArtifacts = architectureOutputArtifacts(architecture);
   const fixedNodeSet = useMemo(() => new Set(flowDefinition.fixedNodes || []), [flowDefinition.fixedNodes]);
   const boxById = useMemo(() => {
-    const rows = ARCHITECTURE_BOXES.map((box) => [box.id, box]);
+    const rows = ((architecture && architecture.boxes) || ARCHITECTURE_BOXES).map((box) => [box.id, box]);
     return new Map(rows);
-  }, []);
+  }, [architecture]);
 
   const orderedNodeIds = flowDefinition.order || DEFAULT_FLOW_NODE_ORDER;
   const edgePositions = useMemo(() => {
@@ -5396,27 +6618,33 @@ function FlowModelCanvas({
     });
     return rows;
   }, [orderedNodeIds, positions, measuredNodes]);
+  const dynamicCanvas = useMemo(() => {
+    const baseCanvas = flowDefinition.canvas || DEFAULT_FLOW_CANVAS_SIZE;
+    const padding = 96;
+    let width = Number(baseCanvas.width) || DEFAULT_FLOW_CANVAS_SIZE.width;
+    let height = Number(baseCanvas.height) || DEFAULT_FLOW_CANVAS_SIZE.height;
+    orderedNodeIds.forEach((id) => {
+      const rect = positions[id];
+      if (!rect) return;
+      const measured = measuredNodes[id] || {};
+      const nodeWidth = Number(measured.w || rect.w || 0);
+      const nodeHeight = Number(measured.h || rect.h || 0);
+      if (Number.isFinite(nodeWidth)) width = Math.max(width, rect.x + nodeWidth + padding);
+      if (Number.isFinite(nodeHeight)) height = Math.max(height, rect.y + nodeHeight + padding);
+    });
+    return {
+      width: Math.ceil(width),
+      height: Math.ceil(height),
+    };
+  }, [flowDefinition.canvas, measuredNodes, orderedNodeIds, positions]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadFlowDefinition() {
-      try {
-        const response = await fetch("./architecture.spec.json", { cache: "no-store" });
-        if (!response.ok) return;
-        const spec = await response.json();
-        const nextDefinition = normalizeMainUiFlow(spec && spec.mainUiFlow);
-        if (cancelled) return;
-        setFlowDefinition(nextDefinition);
-        setPositions(nextDefinition.nodes);
-      } catch (_) {
-        // The default definition keeps the UI usable if the spec file cannot be fetched.
-      }
-    }
-    loadFlowDefinition();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    const nextDefinition = normalizeFlowDefinition(architecture && architecture.graph);
+    setFlowDefinition(nextDefinition);
+    setPositions(nextDefinition.nodes);
+    setMeasuredNodes({});
+    setExpandedNodes({ scenario: true });
+  }, [architecture && architecture.id]);
 
   function toggleNode(id) {
     setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -5452,7 +6680,7 @@ function FlowModelCanvas({
   function moveDrag(event) {
     const drag = dragRef.current;
     if (!drag) return;
-    const canvas = flowDefinition.canvas || DEFAULT_FLOW_CANVAS_SIZE;
+    const canvas = dynamicCanvas || flowDefinition.canvas || DEFAULT_FLOW_CANVAS_SIZE;
     const nextX = Math.max(12, Math.min(canvas.width - 280, drag.originX + event.clientX - drag.startX));
     const nextY = Math.max(12, Math.min(canvas.height - 110, drag.originY + event.clientY - drag.startY));
     setPositions((prev) => ({
@@ -5471,8 +6699,8 @@ function FlowModelCanvas({
   }
 
   function renderNodeBody(id) {
+    const box = boxById.get(id) || {};
     if (id === "scenario") return scenarioControls;
-    if (id === "operations") return operationsPanel;
     if (id === "calliope_data") {
       return (
         <>
@@ -5480,7 +6708,13 @@ function FlowModelCanvas({
             Static energy-model data includes technology definitions, network/topology files, demand and resource time
             series, and model metadata. These datasets go directly into the Energy Model rather than through the adapter.
           </div>
-          <DatasetRows datasets={calliopeDatasets} onUpload={onUploadDataset} />
+          <DatasetRows
+            datasets={(datasetsByNode && datasetsByNode[id]) || calliopeDatasets}
+            onUpload={onUploadDataset}
+            onDatasetVersionChange={onDatasetVersionChange}
+            disabled={inputsLocked}
+            disabledMessage={lockReason}
+          />
         </>
       );
     }
@@ -5491,7 +6725,13 @@ function FlowModelCanvas({
             Core MRIO inputs include employment, GVA, supplier-sector coefficients, uncertainty parameters, geography
             mappings, and other development-accounting datasets used directly by the MRIO runtime.
           </div>
-          <DatasetRows datasets={mrioDatasets} onUpload={onUploadDataset} />
+          <DatasetRows
+            datasets={(datasetsByNode && datasetsByNode[id]) || mrioDatasets}
+            onUpload={onUploadDataset}
+            onDatasetVersionChange={onDatasetVersionChange}
+            disabled={inputsLocked}
+            disabledMessage={lockReason}
+          />
         </>
       );
     }
@@ -5499,10 +6739,15 @@ function FlowModelCanvas({
       return (
         <>
           <div className="diagram-note" style={{ marginBottom: 10 }}>
-            <div><b>Downloadables:</b> integrated results, scenario package, manifests, shock files, bridge artifacts, and diagnostics.</div>
-            <div style={{ marginTop: 6 }}><b>Displayed results:</b> the results workspace separates global outputs from spatially filterable outputs and keeps source-channel provenance visible.</div>
+            <div><b>Downloadables:</b> artifacts listed here come from the selected architecture definition.</div>
+            <div style={{ marginTop: 6 }}>
+              <b>Displayed results:</b>{" "}
+              {includesDevelopment
+                ? "energy outputs, development outputs, source-channel diagnostics, and spatial filters."
+                : "energy-system outputs only; MRIO/development artifacts and tabs are hidden."}
+            </div>
           </div>
-          <OutputRows runId={selectedRunId} exchangeArtifacts={exchangeArtifacts} />
+          <OutputRows runId={selectedRunId} summary={result && result.summary} artifacts={outputArtifacts} />
         </>
       );
     }
@@ -5511,7 +6756,9 @@ function FlowModelCanvas({
         <div className="diagram-note">
           <div><b>Role:</b> Resolves user selections against scenario source data, then writes model-specific run inputs.</div>
           <div style={{ marginTop: 6 }}><b>Energy outputs:</b> runtime patch, resolved scenario key, lever mappings, and <code>scenario/energy_input_manifest.json</code>.</div>
-          <div style={{ marginTop: 6 }}><b>MRIO outputs:</b> direct shock payloads plus <code>scenario/mrio_direct_inputs.json</code> and <code>scenario/mrio_direct_shocks.csv</code>.</div>
+          {includesDevelopment ? (
+            <div style={{ marginTop: 6 }}><b>MRIO outputs:</b> direct shock payloads plus <code>scenario/mrio_direct_inputs.json</code> and <code>scenario/mrio_direct_shocks.csv</code>.</div>
+          ) : null}
           <div style={{ marginTop: 6 }}><b>Audit artifact:</b> <code>scenario_package.json</code> persists both user-defined parameters and source scenario references.</div>
         </div>
       );
@@ -5522,7 +6769,7 @@ function FlowModelCanvas({
           <div><b>Inputs:</b> static technology/topology/time-series data plus the adapter-resolved runtime patch.</div>
           <div style={{ marginTop: 6 }}><b>Outputs:</b> capacity, generation, cost, reliability, emissions, trade, and spatial energy balances.</div>
           <div style={{ marginTop: 6 }}><b>Routing:</b> solved outputs feed both the bridge and integrated results directly for energy-side headline metrics.</div>
-          <div style={{ marginTop: 6 }}><b>Engine status:</b> Calliope is executable now; OSeMOSYS remains selectable but not runnable yet.</div>
+          <div style={{ marginTop: 6 }}><b>Engine status:</b> Calliope is the active executable energy model.</div>
         </div>
       );
     }
@@ -5544,15 +6791,28 @@ function FlowModelCanvas({
         </div>
       );
     }
+    if (Array.isArray(box.datasetLayers) && box.datasetLayers.length) {
+      return (
+        <DatasetRows
+          datasets={(datasetsByNode && datasetsByNode[id]) || []}
+          onUpload={onUploadDataset}
+          onDatasetVersionChange={onDatasetVersionChange}
+          disabled={inputsLocked}
+          disabledMessage={lockReason}
+        />
+      );
+    }
     return null;
   }
 
   return (
     <div className="flow-model-shell">
       <div className="flow-model-toolbar">
-        <div>
+        <div className="flow-model-heading">
           <div className="flow-model-eyebrow">Draggable model graph</div>
-          <div className="flow-model-title">Configure the run inside the data-flow diagram</div>
+          <div className="flow-model-title">
+            Configure the run inside the {architecture ? architecture.shortLabel || architecture.label : "selected"} data-flow diagram
+          </div>
         </div>
         <div className="row flow-model-controls">
           {statusMessage ? <div className="flow-inline-status ok">{statusMessage}</div> : null}
@@ -5569,8 +6829,8 @@ function FlowModelCanvas({
         </div>
       </div>
       <div className="flow-model-viewport">
-        <div className="flow-model-canvas" style={{ width: flowDefinition.canvas.width, height: flowDefinition.canvas.height }}>
-          <FlowEdgeLayer positions={edgePositions} edges={flowDefinition.edges} canvas={flowDefinition.canvas} />
+        <div className="flow-model-canvas" style={{ width: dynamicCanvas.width, height: dynamicCanvas.height }}>
+          <FlowEdgeLayer positions={edgePositions} edges={flowDefinition.edges} canvas={dynamicCanvas} />
           {orderedNodeIds.map((id) => {
             const box = boxById.get(id);
             const rect = positions[id];
@@ -5602,6 +6862,10 @@ function FlowModelCanvas({
 }
 
 function DiagramScenarioControls({
+  architectureCatalog,
+  selectedArchitectureId,
+  selectedArchitecture,
+  energyModelOptions = ENERGY_MODEL_OPTIONS,
   scenarios,
   scenarioKey,
   targetScenarios,
@@ -5619,10 +6883,7 @@ function DiagramScenarioControls({
   environmentSetupLoading,
   running,
   queueSubmitting,
-  aiPrompt,
-  setAiPrompt,
-  onApplyAiPrompt,
-  aiQueryResult,
+  onArchitectureChange,
   onScenarioChange,
   onMrioScenarioChange,
   onTargetYearChange,
@@ -5633,6 +6894,8 @@ function DiagramScenarioControls({
   onApplyTemplateLevers,
   onRun,
   onResetLevers,
+  inputsLocked = false,
+  lockReason = "",
 }) {
   const showStructuredSelector = Boolean(
     selectorModel && (selectorModel.hasTransmissionOnly || selectorModel.hasPathway2040)
@@ -5661,47 +6924,65 @@ function DiagramScenarioControls({
   );
   const selectedTargetScenario = (targetScenarios || []).find((s) => s.scenario_id === mrioScenarioId) || null;
   const shockMapping = (mrioShockMappings || [])[0] || {};
-  const selectedEnergyModel = ENERGY_MODEL_OPTIONS.find((option) => option.value === energyModelEngine) || ENERGY_MODEL_OPTIONS[0];
-  const energyModelExecutable = selectedEnergyModel.value === "calliope";
-  const [aiCommandOpen, setAiCommandOpen] = useState(false);
+  const normalizedEnergyModelOptions = (Array.isArray(energyModelOptions) && energyModelOptions.length ? energyModelOptions : ENERGY_MODEL_OPTIONS)
+    .map((option) => ({
+      value: String(option && option.value ? option.value : ""),
+      label: String((option && option.label) || (option && option.value) || ""),
+      runtimeStatus: String((option && (option.runtimeStatus || option.runtime_status)) || ""),
+      disabled: Boolean(option && option.disabled),
+    }))
+    .filter((option) => option.value);
+  const selectedEnergyModel = normalizedEnergyModelOptions.find((option) => option.value === energyModelEngine) || normalizedEnergyModelOptions[0] || ENERGY_MODEL_OPTIONS[0];
+  const architectureOptions = Array.isArray(architectureCatalog && architectureCatalog.architectures)
+    ? architectureCatalog.architectures
+    : defaultArchitectureCatalog().architectures;
+  const requiresMrio = architectureIncludesDevelopment(selectedArchitecture);
+  if (inputsLocked) {
+    return (
+      <LockedScenarioSummary
+        lockReason={lockReason}
+        selectedArchitecture={selectedArchitecture}
+        selectedEnergyModel={selectedEnergyModel}
+        selectedScenario={selectedScenario}
+        scenarioKey={scenarioKey}
+        selectedTargetScenario={selectedTargetScenario}
+        mrioScenarioId={mrioScenarioId}
+        targetYear={targetYear}
+        runProfile={runProfile}
+        scenarioSelections={scenarioSelections}
+        activePackage={activePackage}
+        policyAvailable={policyAvailable}
+        requiresMrio={requiresMrio}
+        shockMapping={shockMapping}
+        levers={levers}
+      />
+    );
+  }
 
   return (
     <div className="diagram-scenario-controls">
-      <div className={`ai-command scenario-ai-command ${aiCommandOpen ? "open" : "collapsed"}`}>
-        <div className="ai-command-header">
-          <div>
-            <label>AI scenario command</label>
-          </div>
-          <button type="button" className="ai-command-toggle" onClick={() => setAiCommandOpen((prev) => !prev)}>
-            {aiCommandOpen ? "Hide details" : "Expand"}
-          </button>
-        </div>
-        <div className="ai-command-row">
-          <input
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            placeholder="Example: 2050 full decarbonization with high demand and a strong carbon price"
-          />
-          <button type="button" onClick={onApplyAiPrompt}>Configure</button>
-        </div>
-        {aiCommandOpen ? (
-          <>
-            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-              The planner infers scenario controls, policy levers, and geography focus from the query, then reports what changed and why.
-            </div>
-            <AiQueryResultPanel result={aiQueryResult} />
-          </>
-        ) : null}
-      </div>
       <div className="diagram-scenario-layout">
         <div className="diagram-selector-stack">
           <div className="diagram-section-label">Scenario selectors</div>
           <div className="diagram-control-grid">
             <div>
+              <label>Model architecture</label>
+              <select value={selectedArchitectureId || DEFAULT_MODEL_ARCHITECTURE_ID} onChange={(e) => onArchitectureChange(e.target.value)}>
+                {architectureOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.shortLabel || option.label}
+                  </option>
+                ))}
+              </select>
+              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                {selectedArchitecture && selectedArchitecture.description ? selectedArchitecture.description : "Select the visible model graph and result surface."}
+              </div>
+            </div>
+            <div>
               <label>Energy model engine</label>
               <select value={selectedEnergyModel.value} onChange={(e) => onEnergyModelEngineChange(e.target.value)}>
-                {ENERGY_MODEL_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
+                {normalizedEnergyModelOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
                     {option.label} - {option.runtimeStatus}
                   </option>
                 ))}
@@ -5723,16 +7004,18 @@ function DiagramScenarioControls({
                     ) : null}
                   </select>
                 </div>
-                <div>
-                  <label>Target pathway</label>
-                  <select value={mrioScenarioId || ""} onChange={(e) => onMrioScenarioChange(e.target.value)}>
-                    {(targetScenarios || []).map((s) => (
-                      <option key={s.scenario_id} value={s.scenario_id}>
-                        {s.scenario_id} - {s.short_label || s.label || s.scenario_type || "Target pathway"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {requiresMrio ? (
+                  <div>
+                    <label>Target pathway</label>
+                    <select value={mrioScenarioId || ""} onChange={(e) => onMrioScenarioChange(e.target.value)}>
+                      {(targetScenarios || []).map((s) => (
+                        <option key={s.scenario_id} value={s.scenario_id}>
+                          {s.scenario_id} - {s.short_label || s.label || s.scenario_type || "Target pathway"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
                 <div>
                   <label>Target year</label>
                   <select value={Number(targetYear || 2030)} onChange={(e) => onTargetYearChange(Number(e.target.value))}>
@@ -5800,16 +7083,17 @@ function DiagramScenarioControls({
           </div>
 
           <div className="diagram-note">
-            <div><b>Resolved package:</b> <code>{selectedEnergyModel.label}</code> / <code>{scenarioKey || "-"}</code> + target <code>{mrioScenarioId || "-"}</code> @ <code>{Number(targetYear || 2030)}</code></div>
-            <div className="muted" style={{ marginTop: 4 }}>
-              MRIO shock mapping: <code>{shockMapping.mapping_id || "mrio_direct_heuristic_v1"}</code>.{" "}
-              {selectedTargetScenario ? selectedTargetScenario.label || selectedTargetScenario.short_label || "" : ""}
-            </div>
-            {!energyModelExecutable ? (
-              <div className="warn" style={{ marginTop: 8 }}>
-                OSeMOSYS is selectable for scenario design/provenance, but the executable runtime adapter is not implemented yet. Select Calliope to run the model now.
+            <div><b>Resolved package:</b> <code>{selectedArchitecture ? selectedArchitecture.shortLabel || selectedArchitecture.label : "-"}</code> / <code>{selectedEnergyModel.label}</code> / <code>{scenarioKey || "-"}</code>{requiresMrio ? <> + target <code>{mrioScenarioId || "-"}</code></> : null} @ <code>{Number(targetYear || 2030)}</code></div>
+            {requiresMrio ? (
+              <div className="muted" style={{ marginTop: 4 }}>
+                MRIO shock mapping: <code>{shockMapping.mapping_id || "mrio_direct_heuristic"}</code>.{" "}
+                {selectedTargetScenario ? selectedTargetScenario.label || selectedTargetScenario.short_label || "" : ""}
               </div>
-            ) : null}
+            ) : (
+              <div className="muted" style={{ marginTop: 4 }}>
+                Energy-only mode hides MRIO input boxes, bridge/MRIO graph nodes, development tabs, and MRIO output artifacts.
+              </div>
+            )}
           </div>
         </div>
 
@@ -5859,597 +7143,1072 @@ function DiagramScenarioControls({
   );
 }
 
-function DatasetRows({ datasets, onUpload }) {
-  if (!datasets || !datasets.length) {
-    return <div className="muted" style={{ fontSize: 12 }}>No datasets are registered for this layer.</div>;
-  }
-  return (
-    <div className="diagram-dataset-list">
-      {datasets.map((dataset) => (
-        <div key={dataset.id} className="diagram-dataset-row">
-          <div>
-            <div style={{ fontWeight: 700 }}>{dataset.label}</div>
-            <div className="muted" style={{ fontSize: 11 }}>
-              {dataset.filename} · {dataset.exists ? "available" : "missing"}
-            </div>
-            <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{dataset.role}</div>
-          </div>
-          <div className="diagram-dataset-actions">
-            <a href={api.inputDatasetDownloadUrl(dataset.id)} download>Download</a>
-            <label className="dataset-upload-button">
-              Upload
-              <input
-                type="file"
-                onChange={(event) => {
-                  const file = event.target.files && event.target.files[0];
-                  if (file) onUpload(dataset.id, file);
-                  event.target.value = "";
-                }}
-              />
-            </label>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function OutputRows({ runId, exchangeArtifacts }) {
-  const artifacts = DEFAULT_OUTPUT_ARTIFACTS.map((row) => {
-    if (exchangeArtifacts && exchangeArtifacts[row.key]) {
-      const artifactPath = String(exchangeArtifacts[row.key] || "");
-      const href = artifactPath.startsWith("/api/")
-        ? `${API_BASE}${artifactPath}`
-        : runId
-          ? `${API_BASE}/api/run/${encodeURIComponent(runId)}/download/artifact/${encodeURIComponent(artifactPath).replace(/%2F/g, "/")}`
-          : "";
-      return { ...row, href };
-    }
-    if (!runId || !row.url) return { ...row, href: "" };
-    return { ...row, href: `${API_BASE}/api/run/${encodeURIComponent(runId)}/download/${row.url}` };
-  });
-  return (
-    <div className="diagram-dataset-list">
-      {artifacts.map((artifact) => (
-        <div key={artifact.key} className="diagram-output-row">
-          <div>
-            <div style={{ fontWeight: 700 }}>{artifact.label}</div>
-            <div className="muted" style={{ fontSize: 11 }}>{artifact.key}</div>
-          </div>
-          {artifact.href ? (
-            <a href={artifact.href} download>Download</a>
-          ) : (
-            <span className="muted" style={{ fontSize: 12 }}>Available after run</span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function RunTabs({ jobs, selectedJobId, activeJob, onSelectJob }) {
-  const rows = (jobs || []).slice(0, 8);
+function RunTabs({
+  jobs,
+  selectedJobId,
+  activeJob,
+  mode,
+  onSelectProjectView,
+  onSelectJob,
+  onNewModel,
+  newModelDisabled = false,
+}) {
+  const rows = jobs || [];
   return (
     <div className="run-tab-strip" aria-label="Model run tabs">
+      <button
+        type="button"
+        className={`run-tab project-level-tab ${mode === "project" ? "active" : ""}`}
+        onClick={onSelectProjectView}
+        title="Project-level view"
+      >
+        <span className="run-tab-title">Project</span>
+      </button>
       {rows.length ? rows.map((job) => {
-        const effective = activeJob && activeJob.job_id === job.job_id ? activeJob : job;
+        const effective = activeJob && runExecutionId(activeJob) === runExecutionId(job)
+          ? { ...job, ...activeJob, project_run_number: job.project_run_number || activeJob.project_run_number }
+          : job;
         const status = displayStatus(effective.status);
-        const selected = selectedJobId === job.job_id;
+        const statusKey = normalizeStatus(effective.status) || "unknown";
+        const modelNumber = runProjectNumber(effective);
+        const modelTitle = modelNumber ? `Model ${modelNumber}` : "Model";
+        const customName = runCustomName(effective);
+        const id = runExecutionId(effective);
+        const selected = mode !== "project" && selectedJobId === id;
         return (
           <button
-            key={job.job_id}
+            key={id || job.run_id}
             type="button"
-            className={`run-tab ${selected ? "active" : ""}`}
+            className={`run-tab status-${statusKey} ${selected ? "active" : ""}`}
             onClick={() => onSelectJob(effective)}
+            title={`${runLabel(effective)} - ${status.label}`}
+            aria-label={`${runLabel(effective)} - ${status.label}`}
           >
-            <span>{effective.artifacts && effective.artifacts.run_id ? effective.artifacts.run_id : effective.job_id}</span>
-            <span className={status.className}>{status.label}</span>
+            <span className="run-tab-text">
+              <span className="run-tab-title">{modelTitle}</span>
+              {customName ? <span className="run-tab-subtitle">{customName}</span> : null}
+            </span>
+            <span className="run-tab-status-label">{status.label}</span>
           </button>
         );
-      }) : <div className="muted" style={{ fontSize: 12 }}>No model runs yet.</div>}
+      }) : null}
+      <button
+        type="button"
+        className="run-tab run-tab-new-model"
+        onClick={onNewModel}
+        disabled={newModelDisabled}
+        title="New model"
+        aria-label="New model"
+      >
+        <span aria-hidden="true">+</span>
+      </button>
     </div>
   );
 }
 
-function normalizeAiQueryText(raw) {
-  return String(raw || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9.%/+-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function aiTextHas(text, phrase) {
-  const normalizedPhrase = normalizeAiQueryText(phrase);
-  if (!normalizedPhrase) return false;
-  return (` ${text} `).includes(` ${normalizedPhrase} `);
-}
-
-function clampAiValue(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function aiAddUpdate(result, parameter, value, reason) {
-  result.updates.push({ parameter, value, reason });
-}
-
-function aiPercentValue(text, subjectPattern, directionPattern) {
-  const a = new RegExp(`${directionPattern}\\s+(?:the\\s+)?${subjectPattern}[^0-9]{0,36}([0-9]+(?:\\.[0-9]+)?)\\s*%`, "i");
-  const b = new RegExp(`${subjectPattern}[^0-9]{0,36}${directionPattern}[^0-9]{0,36}([0-9]+(?:\\.[0-9]+)?)\\s*%`, "i");
-  const match = text.match(a) || text.match(b);
-  return match ? toNumber(match[1], NaN) : NaN;
-}
-
-function aiMultiplierValue(text, subjectPattern) {
-  const match =
-    text.match(new RegExp(`${subjectPattern}[^0-9]{0,36}(?:multiplier|to|at|=)\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(?:x)?`, "i")) ||
-    text.match(new RegExp(`(?:multiplier|set)\\s+${subjectPattern}[^0-9]{0,36}([0-9]+(?:\\.[0-9]+)?)\\s*(?:x)?`, "i"));
-  return match ? toNumber(match[1], NaN) : NaN;
-}
-
-function aiCarbonPriceValue(text) {
-  const match =
-    text.match(/(?:carbon price|carbon tax|co2 price|co2 cost)[^0-9]{0,36}([0-9]+(?:\.[0-9]+)?)/i) ||
-    text.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:usd\/tco2|usd per tco2|dollars per tonne|dollars per ton)/i);
-  return match ? toNumber(match[1], NaN) : NaN;
-}
-
-function aiLocationCandidates(locationMapData) {
-  const candidates = [];
-  Object.entries(SUBREGION_CENTROIDS).forEach(([code, row]) => {
-    candidates.push({
-      type: "subregion",
-      aliases: [code.toLowerCase(), normalizeAiQueryText(row.label)],
-      locationId: code,
-      countryIso3: row.country,
-      label: row.label || code,
-    });
-  });
-  if (locationMapData && locationMapData.byLocation instanceof Map) {
-    locationMapData.byLocation.forEach((row, locationId) => {
-      const id = normalizeLocationId(locationId);
-      const label = firstNonEmpty(row, ["display_name", "name", "label", "location", "location_id"]) || id;
-      candidates.push({
-        type: isSubregionLocation(id) ? "subregion" : "country",
-        aliases: [id.toLowerCase(), normalizeAiQueryText(label)],
-        locationId: id,
-        countryIso3: normalizeLocationId(row && row.country_iso3) || locationToParentCountry(id),
-        region: row && row.region ? String(row.region) : "",
-        label,
-      });
-    });
-  }
-  AI_COUNTRY_ALIASES.forEach((row) => {
-    candidates.push({
-      type: "country",
-      aliases: row.aliases,
-      locationId: row.iso3,
-      countryIso3: row.iso3,
-      label: row.label,
-    });
-  });
-  AI_REGION_ALIASES.forEach((row) => {
-    candidates.push({
-      type: "region",
-      aliases: row.aliases,
-      region: row.region,
-      pool: row.pool,
-      label: row.label,
-    });
-  });
-  return candidates
-    .map((row) => ({
-      ...row,
-      aliases: (row.aliases || []).map(normalizeAiQueryText).filter(Boolean),
-    }))
-    .sort((a, b) => {
-      const aLen = Math.max(...a.aliases.map((alias) => alias.length), 0);
-      const bLen = Math.max(...b.aliases.map((alias) => alias.length), 0);
-      return bLen - aLen;
-    });
-}
-
-function inferAiFocus(text, locationMapData) {
-  for (const candidate of aiLocationCandidates(locationMapData)) {
-    if ((candidate.aliases || []).some((alias) => aiTextHas(text, alias))) return candidate;
-  }
-  return null;
-}
-
-function applyPromptConfiguration(prompt, options) {
-  const text = normalizeAiQueryText(prompt);
-  const result = { ok: false, message: "", updates: [], warnings: [], focus: null };
-  if (!text) {
-    result.message = "No query was provided. Enter a new query with scenario, year, lever, or geography intent.";
-    return result;
-  }
-
-  const selectorModel = options.selectorModel || {};
-  const scenarioPatch = {};
-  const nextLevers = { ...(options.currentLevers || DEFAULT_LEVERS) };
-  const targetYears = (options.targetYears || []).map((year) => Number(year)).filter((year) => Number.isFinite(year));
-
-  if (aiTextHas(text, "osemosys")) {
-    options.onEnergyModelEngineChange("osemosys");
-    aiAddUpdate(result, "Energy model engine", "OSeMOSYS", "The query explicitly mentioned OSeMOSYS.");
-  } else if (aiTextHas(text, "calliope")) {
-    options.onEnergyModelEngineChange("calliope");
-    aiAddUpdate(result, "Energy model engine", "Calliope", "The query explicitly mentioned Calliope.");
-  }
-
-  if (aiTextHas(text, "full")) {
-    options.onSetRunProfile("full");
-    aiAddUpdate(result, "Run profile", "full", "The query asked for a full run.");
-  } else if (aiTextHas(text, "analysis") || aiTextHas(text, "review")) {
-    options.onSetRunProfile("analysis");
-    aiAddUpdate(result, "Run profile", "analysis", "The query asked for analysis/review mode.");
-  } else if (aiTextHas(text, "fast") || aiTextHas(text, "dev") || aiTextHas(text, "quick")) {
-    options.onSetRunProfile("dev");
-    aiAddUpdate(result, "Run profile", "dev", "The query asked for a fast or development run.");
-  }
-
-  const yearMatch = text.match(/\b(2030|2040|2050)\b/);
-  if (yearMatch) {
-    const year = Number(yearMatch[1]);
-    if (!targetYears.length || targetYears.includes(year)) {
-      options.onTargetYearChange(year);
-      aiAddUpdate(result, "Target year", String(year), `The query explicitly mentioned ${year}.`);
-    } else {
-      result.warnings.push(`Target year ${year} is not available in the current catalog; available years are ${targetYears.join(", ")}.`);
-    }
-  }
-
-  if (aiTextHas(text, "s1") || aiTextHas(text, "decarbonization") || aiTextHas(text, "decarbonisation") || aiTextHas(text, "net zero") || aiTextHas(text, "renewable push")) {
-    const target = (options.targetScenarios || []).find((s) => String(s.scenario_id || "").toLowerCase() === "s1");
-    if (target) {
-      options.onMrioScenarioChange(target.scenario_id);
-      aiAddUpdate(result, "Target pathway", target.scenario_id, "The query points to S1/decarbonization-style targets.");
-    }
-  } else if (aiTextHas(text, "s2") || aiTextHas(text, "national policy") || aiTextHas(text, "ndc") || aiTextHas(text, "policy target")) {
-    const target = (options.targetScenarios || []).find((s) => String(s.scenario_id || "").toLowerCase() === "s2");
-    if (target) {
-      options.onMrioScenarioChange(target.scenario_id);
-      aiAddUpdate(result, "Target pathway", target.scenario_id, "The query points to S2/national-policy-target assumptions.");
-    }
-  }
-
-  if (selectorModel.hasTransmissionOnly && (aiTextHas(text, "transmission only") || aiTextHas(text, "new links only"))) {
-    scenarioPatch.family = "transmission_only";
-    aiAddUpdate(result, "Main scenario type", "Transmission-only", "The query asked for a transmission-only/new-links scenario.");
-  }
-
-  if (selectorModel.hasPathway2040) {
-    if (aiTextHas(text, "announced commitments") || aiTextHas(text, "ac pathway") || aiTextHas(text, "ac scenario")) {
-      scenarioPatch.pathway = "AC";
-      aiAddUpdate(result, "Demand pathway", "Announced Commitments (AC)", "The query referenced the AC/Announced Commitments pathway.");
-    } else if (aiTextHas(text, "steps") || aiTextHas(text, "stated policies")) {
-      scenarioPatch.pathway = "STEPS";
-      aiAddUpdate(result, "Demand pathway", "STEPS", "The query referenced the STEPS/Stated Policies pathway.");
-    } else if (aiTextHas(text, "high demand")) {
-      scenarioPatch.pathway = selectorModel.pathways && selectorModel.pathways.includes("AC") ? "AC" : scenarioPatch.pathway;
-      aiAddUpdate(result, "Demand pathway", scenarioPatch.pathway || "higher demand pathway", "The query asked for high demand; AC is used when present.");
-    } else if (aiTextHas(text, "low demand")) {
-      scenarioPatch.pathway = selectorModel.pathways && selectorModel.pathways.includes("STEPS") ? "STEPS" : scenarioPatch.pathway;
-      aiAddUpdate(result, "Demand pathway", scenarioPatch.pathway || "lower demand pathway", "The query asked for low demand; STEPS is used when present.");
-    }
-
-    if (aiTextHas(text, "new generation") || aiTextHas(text, "new gen") || aiTextHas(text, "generation expansion")) {
-      scenarioPatch.generation = "new";
-      aiAddUpdate(result, "Energy build package", "new generation", "The query asked for new generation buildout.");
-    } else if (aiTextHas(text, "legacy generation") || aiTextHas(text, "old generation") || aiTextHas(text, "old gen")) {
-      scenarioPatch.generation = "legacy";
-      aiAddUpdate(result, "Energy build package", "legacy generation", "The query asked to keep legacy generation assumptions.");
-    }
-
-    if (aiTextHas(text, "no new links") || aiTextHas(text, "legacy links") || aiTextHas(text, "old links") || aiTextHas(text, "legacy transmission")) {
-      scenarioPatch.transmission = "legacy";
-      aiAddUpdate(result, "Energy build package", "legacy links", "The query asked to avoid new transmission links.");
-    } else if (aiTextHas(text, "new links") || aiTextHas(text, "new transmission") || aiTextHas(text, "transmission expansion")) {
-      scenarioPatch.transmission = "new";
-      aiAddUpdate(result, "Energy build package", "new links", "The query asked for transmission expansion/new links.");
-    }
-
-    if (aiTextHas(text, "standard policy") || aiTextHas(text, "no policy push")) {
-      scenarioPatch.policy = false;
-      aiAddUpdate(result, "Policy package", "standard", "The query asked for standard/no policy push.");
-    } else if (aiTextHas(text, "policy push") || aiTextHas(text, "policy package") || aiTextHas(text, "strong policy")) {
-      scenarioPatch.policy = true;
-      aiAddUpdate(result, "Policy package", "on if available", "The query asked for stronger policy support.");
-    }
-  }
-
-  if (Object.keys(scenarioPatch).length) {
-    if (selectorModel.hasPathway2040 && !scenarioPatch.family) scenarioPatch.family = "pathway_2040";
-    options.onScenarioSelectionChange(scenarioPatch);
-  }
-
-  const demandMultiplier = aiMultiplierValue(text, "(?:demand|load)");
-  const demandUp = aiPercentValue(text, "(?:demand|load)", "(?:increase|raise|grow|higher)");
-  const demandDown = aiPercentValue(text, "(?:demand|load)", "(?:decrease|reduce|lower|cut)");
-  if (Number.isFinite(demandMultiplier)) {
-    nextLevers.demand_multiplier = clampAiValue(demandMultiplier, 0.8, 1.4);
-    aiAddUpdate(result, "Demand multiplier", nextLevers.demand_multiplier.toFixed(2), "The query specified a demand/load multiplier.");
-  } else if (Number.isFinite(demandUp)) {
-    nextLevers.demand_multiplier = clampAiValue(1 + demandUp / 100, 0.8, 1.4);
-    aiAddUpdate(result, "Demand multiplier", nextLevers.demand_multiplier.toFixed(2), `The query asked to increase demand by ${demandUp}%.`);
-  } else if (Number.isFinite(demandDown)) {
-    nextLevers.demand_multiplier = clampAiValue(1 - demandDown / 100, 0.8, 1.4);
-    aiAddUpdate(result, "Demand multiplier", nextLevers.demand_multiplier.toFixed(2), `The query asked to reduce demand by ${demandDown}%.`);
-  }
-
-  const renewablePattern = "(?:renewable|renewables|solar|wind|renewable capex|renewables capex)(?:\\s+(?:capex|cost|costs|price|prices))?";
-  const renewableMultiplier = aiMultiplierValue(text, renewablePattern);
-  const renewableDown = aiPercentValue(text, renewablePattern, "(?:decrease|reduce|lower|cut|cheaper)");
-  const renewableUp = aiPercentValue(text, renewablePattern, "(?:increase|raise|higher|more expensive)");
-  if (Number.isFinite(renewableMultiplier)) {
-    nextLevers.renewables_capex_multiplier = clampAiValue(renewableMultiplier, 0.7, 1.5);
-    aiAddUpdate(result, "Renewables CAPEX multiplier", nextLevers.renewables_capex_multiplier.toFixed(2), "The query specified a renewables cost/CAPEX multiplier.");
-  } else if (Number.isFinite(renewableDown)) {
-    nextLevers.renewables_capex_multiplier = clampAiValue(1 - renewableDown / 100, 0.7, 1.5);
-    aiAddUpdate(result, "Renewables CAPEX multiplier", nextLevers.renewables_capex_multiplier.toFixed(2), `The query asked to reduce renewable costs by ${renewableDown}%.`);
-  } else if (Number.isFinite(renewableUp)) {
-    nextLevers.renewables_capex_multiplier = clampAiValue(1 + renewableUp / 100, 0.7, 1.5);
-    aiAddUpdate(result, "Renewables CAPEX multiplier", nextLevers.renewables_capex_multiplier.toFixed(2), `The query asked to increase renewable costs by ${renewableUp}%.`);
-  } else if (aiTextHas(text, "cheap renewables") || aiTextHas(text, "low cost renewables")) {
-    nextLevers.renewables_capex_multiplier = 0.85;
-    aiAddUpdate(result, "Renewables CAPEX multiplier", "0.85", "The query implied cheaper renewables without a numeric value, so a moderate placeholder reduction was applied.");
-  }
-
-  const fossilPattern = "(?:fossil|gas|coal|oil|fuel)(?:\\s+(?:cost|costs|price|prices|variable cost))?";
-  const fossilMultiplier = aiMultiplierValue(text, fossilPattern);
-  const fossilUp = aiPercentValue(text, fossilPattern, "(?:increase|raise|higher|more expensive)");
-  const fossilDown = aiPercentValue(text, fossilPattern, "(?:decrease|reduce|lower|cut|cheaper)");
-  if (Number.isFinite(fossilMultiplier)) {
-    nextLevers.fossil_fuel_price_multiplier = clampAiValue(fossilMultiplier, 0.7, 1.8);
-    aiAddUpdate(result, "Fossil variable cost multiplier", nextLevers.fossil_fuel_price_multiplier.toFixed(2), "The query specified a fossil/fuel cost multiplier.");
-  } else if (Number.isFinite(fossilUp)) {
-    nextLevers.fossil_fuel_price_multiplier = clampAiValue(1 + fossilUp / 100, 0.7, 1.8);
-    aiAddUpdate(result, "Fossil variable cost multiplier", nextLevers.fossil_fuel_price_multiplier.toFixed(2), `The query asked to increase fossil/fuel costs by ${fossilUp}%.`);
-  } else if (Number.isFinite(fossilDown)) {
-    nextLevers.fossil_fuel_price_multiplier = clampAiValue(1 - fossilDown / 100, 0.7, 1.8);
-    aiAddUpdate(result, "Fossil variable cost multiplier", nextLevers.fossil_fuel_price_multiplier.toFixed(2), `The query asked to reduce fossil/fuel costs by ${fossilDown}%.`);
-  } else if (aiTextHas(text, "high fossil prices") || aiTextHas(text, "expensive fossil") || aiTextHas(text, "fuel price shock")) {
-    nextLevers.fossil_fuel_price_multiplier = 1.25;
-    aiAddUpdate(result, "Fossil variable cost multiplier", "1.25", "The query implied higher fossil/fuel prices without a numeric value, so a moderate placeholder increase was applied.");
-  }
-
-  const carbonPrice = aiCarbonPriceValue(text);
-  if (Number.isFinite(carbonPrice)) {
-    nextLevers.carbon_price_usd_per_tco2 = clampAiValue(carbonPrice, 0, 300);
-    aiAddUpdate(result, "Carbon price", `${nextLevers.carbon_price_usd_per_tco2.toFixed(0)} USD/tCO2`, "The query specified a carbon price or CO2 price.");
-  }
-
-  if (JSON.stringify(nextLevers) !== JSON.stringify(options.currentLevers || DEFAULT_LEVERS)) {
-    options.onSetLevers(nextLevers);
-  }
-
-  const focus = inferAiFocus(text, options.locationMapData);
-  if (focus) {
-    result.focus = focus;
-    if (focus.type === "region") {
-      options.onSetSpatialFilter({ region: focus.region, pool: focus.pool || inferPoolFromRegion(focus.region), label: focus.label, source: "ai_query" });
-      aiAddUpdate(result, "Geography focus", focus.label, "The query mentioned a model region/power pool.");
-    } else {
-      options.onSetSpatialFilter({
-        locationId: focus.locationId || focus.countryIso3 || "",
-        countryIso3: focus.countryIso3 || locationToParentCountry(focus.locationId),
-        region: focus.region || "",
-        label: focus.label || focus.locationId || focus.countryIso3,
-        source: "ai_query",
-      });
-      aiAddUpdate(result, "Geography focus", focus.label || focus.locationId || focus.countryIso3, "The query mentioned a country or subcountry model location.");
-    }
-  } else if (
-    aiTextHas(text, "global") ||
-    aiTextHas(text, "all countries") ||
-    aiTextHas(text, "no country filter") ||
-    aiTextHas(text, "africa") ||
-    aiTextHas(text, "africa wide")
-  ) {
-    options.onSetSpatialFilter(null);
-    aiAddUpdate(result, "Geography focus", "global / Africa-wide", "The query asked for the full model geography rather than a specific country or region.");
-  }
-
-  result.ok = result.updates.length > 0;
-  result.message = result.ok
-    ? `Applied ${result.updates.length} inferred setting${result.updates.length === 1 ? "" : "s"}.`
-    : "I could not infer any scenario controls, levers, or geography from that query. Enter a new query with explicit scenario, year, lever, or country/region terms.";
-  return result;
-}
-
-function applyRemoteAiPlan(remoteResult, options) {
-  const plan = (remoteResult && remoteResult.plan) || {};
-  const result = {
-    ok: Boolean(remoteResult && remoteResult.ok),
-    source: (remoteResult && remoteResult.source) || "azure_openai",
-    message: (remoteResult && remoteResult.message) || "AI planner returned a scenario configuration.",
-    updates: Array.isArray(remoteResult && remoteResult.updates) ? remoteResult.updates : [],
-    warnings: Array.isArray(remoteResult && remoteResult.warnings) ? remoteResult.warnings : [],
-    focus: null,
-  };
-
-  if (!result.ok) return result;
-
-  const applied = [];
-  const addApplied = (parameter, value, reason) => {
-    applied.push({ parameter, value, reason });
-  };
-
-  const runProfile = String(plan.run_profile || "").trim().toLowerCase();
-  if (["dev", "analysis", "full"].includes(runProfile)) {
-    options.onSetRunProfile(runProfile);
-    addApplied("Run profile", runProfile, "Set by Azure OpenAI query plan.");
-  }
-
-  const energyModelEngine = String(plan.energy_model_engine || "").trim().toLowerCase();
-  if (["calliope", "osemosys"].includes(energyModelEngine)) {
-    options.onEnergyModelEngineChange(energyModelEngine);
-    addApplied("Energy model engine", energyModelEngine === "osemosys" ? "OSeMOSYS" : "Calliope", "Set by Azure OpenAI query plan.");
-  }
-
-  const targetYear = Number(plan.target_year);
-  const targetYears = (options.targetYears || []).map((year) => Number(year)).filter((year) => Number.isFinite(year));
-  if (Number.isFinite(targetYear)) {
-    if (!targetYears.length || targetYears.includes(targetYear)) {
-      options.onTargetYearChange(targetYear);
-      addApplied("Target year", String(targetYear), "Set by Azure OpenAI query plan.");
-    } else {
-      result.warnings.push(`AI selected unavailable target year ${targetYear}; available years are ${targetYears.join(", ")}.`);
-    }
-  }
-
-  const targetScenarioId = String(plan.target_scenario_id || "").trim().toUpperCase();
-  if (targetScenarioId) {
-    const target = (options.targetScenarios || []).find((s) => String(s.scenario_id || "").toUpperCase() === targetScenarioId);
-    if (target) {
-      options.onMrioScenarioChange(target.scenario_id);
-      addApplied("Target pathway", target.scenario_id, "Set by Azure OpenAI query plan.");
-    } else {
-      result.warnings.push(`AI selected unavailable target pathway ${targetScenarioId}.`);
-    }
-  }
-
-  const scenarioPatch = plan.scenario_patch && typeof plan.scenario_patch === "object" ? plan.scenario_patch : {};
-  const cleanScenarioPatch = {};
-  if (["pathway_2040", "transmission_only"].includes(String(scenarioPatch.family || ""))) {
-    cleanScenarioPatch.family = scenarioPatch.family;
-  }
-  if (["STEPS", "AC"].includes(String(scenarioPatch.pathway || "").toUpperCase())) {
-    cleanScenarioPatch.pathway = String(scenarioPatch.pathway).toUpperCase();
-  }
-  if (["legacy", "new"].includes(String(scenarioPatch.generation || ""))) {
-    cleanScenarioPatch.generation = scenarioPatch.generation;
-  }
-  if (["legacy", "new"].includes(String(scenarioPatch.transmission || ""))) {
-    cleanScenarioPatch.transmission = scenarioPatch.transmission;
-  }
-  if (typeof scenarioPatch.policy === "boolean") {
-    cleanScenarioPatch.policy = scenarioPatch.policy;
-  }
-  if (Object.keys(cleanScenarioPatch).length) {
-    options.onScenarioSelectionChange(cleanScenarioPatch);
-    addApplied("Energy scenario controls", JSON.stringify(cleanScenarioPatch), "Set by Azure OpenAI query plan.");
-  }
-
-  const levers = plan.levers && typeof plan.levers === "object" ? plan.levers : {};
-  const nextLevers = { ...(options.currentLevers || DEFAULT_LEVERS) };
-  const leverRanges = {
-    demand_multiplier: [0.8, 1.4],
-    renewables_capex_multiplier: [0.7, 1.5],
-    fossil_fuel_price_multiplier: [0.7, 1.8],
-    carbon_price_usd_per_tco2: [0, 300],
-  };
-  Object.entries(leverRanges).forEach(([key, range]) => {
-    const value = Number(levers[key]);
-    if (!Number.isFinite(value)) return;
-    nextLevers[key] = clampAiValue(value, range[0], range[1]);
-    addApplied(key, String(nextLevers[key]), "Set by Azure OpenAI query plan.");
-  });
-  if (JSON.stringify(nextLevers) !== JSON.stringify(options.currentLevers || DEFAULT_LEVERS)) {
-    options.onSetLevers(nextLevers);
-  }
-
-  const focus = plan.geography_focus && typeof plan.geography_focus === "object" ? plan.geography_focus : {};
-  const focusType = String(focus.type || "").toLowerCase();
-  if (focusType === "global") {
-    options.onSetSpatialFilter(null);
-    addApplied("Geography focus", "global / Africa-wide", "Set by Azure OpenAI query plan.");
-  } else if (focusType === "region") {
-    const region = normalizeRegionKey(focus.region || focus.label);
-    const pool = normalizePoolKey(focus.pool) || inferPoolFromRegion(region);
-    options.onSetSpatialFilter({
-      region,
-      pool,
-      label: focus.label || region || pool || "Region focus",
-      source: "ai_query",
-    });
-    result.focus = focus;
-    addApplied("Geography focus", focus.label || region || pool, "Set by Azure OpenAI query plan.");
-  } else if (focusType === "country" || focusType === "subregion") {
-    const locationId = normalizeLocationId(focus.location_id || focus.country_iso3);
-    const countryIso3 = normalizeLocationId(focus.country_iso3) || locationToParentCountry(locationId);
-    if (locationId || countryIso3) {
-      options.onSetSpatialFilter({
-        locationId: locationId || countryIso3,
-        countryIso3,
-        region: focus.region || "",
-        label: focus.label || locationId || countryIso3,
-        source: "ai_query",
-      });
-      result.focus = focus;
-      addApplied("Geography focus", focus.label || locationId || countryIso3, "Set by Azure OpenAI query plan.");
-    }
-  }
-
-  if (!result.updates.length) result.updates = applied;
-  result.ok = applied.length > 0;
-  if (!result.ok) {
-    result.message = "The AI planner returned a response, but no valid UI setting could be applied. Enter a new query.";
-  }
-  return result;
-}
-
-function AiQueryResultPanel({ result }) {
-  if (!result) return null;
+function ReadOnlyScenarioValue({ label, value, note = "" }) {
   return (
-    <div className={`ai-query-result ${result.ok ? "ok" : "failed"}`}>
-      <div style={{ fontWeight: 800 }}>
-        {result.ok ? result.message : `${result.message} New query needed.`}
-      </div>
-      {result.source ? (
-        <div className="muted" style={{ marginTop: 4, fontSize: 11 }}>
-          Planner source: <code>{result.source}</code>
+    <div className="scenario-readonly-value">
+      <div className="scenario-readonly-label">{label}</div>
+      <div className="scenario-readonly-main">{value || "-"}</div>
+      {note ? <div className="scenario-readonly-note">{note}</div> : null}
+    </div>
+  );
+}
+
+function LockedScenarioSummary({
+  lockReason,
+  selectedArchitecture,
+  selectedEnergyModel,
+  selectedScenario,
+  scenarioKey,
+  selectedTargetScenario,
+  mrioScenarioId,
+  targetYear,
+  runProfile,
+  scenarioSelections,
+  activePackage,
+  policyAvailable,
+  requiresMrio,
+  shockMapping,
+  levers,
+}) {
+  const runProfileLabels = {
+    dev: "Dev profile",
+    analysis: "Analysis profile",
+    full: "Full profile",
+  };
+  const familyLabel = scenarioSelections && scenarioSelections.family === "pathway_2040"
+    ? "2040 pathway scenarios"
+    : scenarioSelections && scenarioSelections.family === "transmission_only"
+      ? "Transmission-only scenario"
+      : scenarioSelections && scenarioSelections.family
+        ? scenarioSelections.family
+        : "-";
+  const policyLabel = scenarioSelections && scenarioSelections.policy
+    ? "Policy push"
+    : policyAvailable
+      ? "Standard"
+      : "Standard";
+  const leverRows = [
+    ["Renewables CAPEX multiplier", levers && levers.renewables_capex_multiplier],
+    ["Fossil variable cost multiplier", levers && levers.fossil_fuel_price_multiplier],
+    ["Carbon price", levers && levers.carbon_price_usd_per_tco2, "USD/tCO2"],
+    ["Demand multiplier", levers && levers.demand_multiplier],
+  ];
+
+  return (
+    <div className="diagram-scenario-controls scenario-readonly-panel">
+      <div className="diagram-note scenario-readonly-lock">
+        <div>
+          <b>Inputs locked:</b> {lockReason || "This selected run uses an immutable input snapshot."}
         </div>
-      ) : null}
-      <details open={!result.ok}>
-        <summary>{result.ok ? "View query explanation" : "View parser details"}</summary>
-        {result.updates && result.updates.length ? (
-          <div className="ai-query-update-list">
-            {result.updates.map((row, idx) => (
-              <div key={`${row.parameter}-${idx}`} className="ai-query-update-row">
-                <div>
-                  <b>{row.parameter}</b>: <code>{row.value}</code>
-                </div>
-                <div className="muted" style={{ fontSize: 12 }}>{row.reason}</div>
-              </div>
-            ))}
+      </div>
+
+      <div className="scenario-readonly-section">
+        <div className="diagram-section-label">Selected configuration</div>
+        <div className="scenario-readonly-grid">
+          <ReadOnlyScenarioValue
+            label="Model architecture"
+            value={selectedArchitecture ? selectedArchitecture.shortLabel || selectedArchitecture.label : "-"}
+            note={selectedArchitecture && selectedArchitecture.description ? selectedArchitecture.description : ""}
+          />
+          <ReadOnlyScenarioValue
+            label="Energy model"
+            value={selectedEnergyModel ? selectedEnergyModel.label : "-"}
+            note={selectedEnergyModel ? selectedEnergyModel.runtimeStatus : ""}
+          />
+          <ReadOnlyScenarioValue
+            label="Energy scenario"
+            value={selectedScenario ? selectedScenario.title : scenarioKey}
+            note={scenarioKey ? `Resolved key: ${scenarioKey}` : ""}
+          />
+          <ReadOnlyScenarioValue
+            label="Target year"
+            value={String(Number(targetYear || 2030))}
+          />
+          {requiresMrio ? (
+            <ReadOnlyScenarioValue
+              label="Target pathway"
+              value={selectedTargetScenario ? selectedTargetScenario.short_label || selectedTargetScenario.label || selectedTargetScenario.scenario_id : mrioScenarioId}
+              note={mrioScenarioId ? `Resolved target: ${mrioScenarioId}` : ""}
+            />
+          ) : null}
+          <ReadOnlyScenarioValue
+            label="Run profile"
+            value={runProfileLabels[runProfile] || runProfile || "-"}
+          />
+          <ReadOnlyScenarioValue
+            label="Main scenario type"
+            value={familyLabel}
+          />
+          {scenarioSelections && scenarioSelections.family === "pathway_2040" ? (
+            <>
+              <ReadOnlyScenarioValue
+                label="Demand pathway"
+                value={pathwayLabel(scenarioSelections.pathway)}
+              />
+              <ReadOnlyScenarioValue
+                label="Energy build package"
+                value={SCENARIO_PACKAGE_LABELS[activePackage] || activePackage}
+              />
+              <ReadOnlyScenarioValue
+                label="Policy package"
+                value={policyLabel}
+              />
+            </>
+          ) : null}
+          {requiresMrio ? (
+            <ReadOnlyScenarioValue
+              label="MRIO shock mapping"
+              value={shockMapping && shockMapping.label ? shockMapping.label : "A/Z, E, and Y heuristic shock mapping"}
+              note={shockMapping && shockMapping.mapping_id ? `Method: ${shockMapping.mapping_id}` : ""}
+            />
+          ) : null}
+        </div>
+      </div>
+
+      <div className="scenario-readonly-section">
+        <div className="diagram-section-label">Selected policy levers</div>
+        <div className="scenario-readonly-grid lever-grid">
+          {leverRows.map(([label, rawValue, unit]) => (
+            <ReadOnlyScenarioValue
+              key={label}
+              label={label}
+              value={`${Number.isFinite(Number(rawValue)) ? compact(Number(rawValue)) : "-"}${unit ? ` ${unit}` : ""}`}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProjectWorkspacePanel({
+  activeProject,
+  projectRuns,
+  projectReports,
+  projectExports,
+  compareRunIds,
+  onToggleCompareRun,
+  onCreateReport,
+  onCreateRunExport,
+  onNewModel,
+  actionLoading,
+}) {
+  // Project-level controls intentionally sit outside the model diagram. They
+  // operate on persisted platform records: runs, reports, exports, and compare
+  // selections. Model internals remain hidden behind run artifacts.
+  const successfulRuns = succeededProjectRuns(projectRuns);
+  const selectedSuccessful = successfulRuns.filter((run) => compareRunIds.includes(run.run_id));
+  const reportLabel = selectedSuccessful.length > 1 ? "Generate comparison report" : "Generate project report";
+  return (
+    <aside className="project-selection-rail" aria-label="Project model selection and reports">
+      <div className="project-workspace-header">
+        <div className="project-workspace-title">
+          <div className="run-management-eyebrow">Model selection</div>
+          <h2>Project runs</h2>
+          <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>
+            {(projectRuns || []).length} runs · {successfulRuns.length} completed · {selectedSuccessful.length} selected
           </div>
+        </div>
+        <button
+          type="button"
+          className="project-new-model-button"
+          onClick={onNewModel}
+          disabled={actionLoading || !activeProject}
+        >
+          New Model
+        </button>
+      </div>
+
+      <div className="project-selection-section">
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>Run library and comparison set</div>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+            Comparison checkboxes are available once a model run has succeeded.
+          </div>
+          {(projectRuns || []).length ? (
+            <div className="project-run-list">
+              {(projectRuns || []).slice(0, 14).map((run) => {
+                const complete = normalizeStatus(run.status) === "succeeded";
+                const checked = compareRunIds.includes(run.run_id);
+                return (
+                  <div key={run.run_id} className={`project-run-row ${checked ? "selected" : ""}`}>
+                    <div>
+                      <div><b>{runLabel(run)}</b> <StatusBadge status={run.status} /></div>
+                      <div className="muted" style={{ fontSize: 11 }}>
+                        {runMetadataLine(run)}
+                      </div>
+                    </div>
+                    <div className="diagram-dataset-actions project-run-actions">
+                      {complete ? (
+                        <label className="project-compare-toggle">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => onToggleCompareRun(run.run_id)}
+                          />
+                          Compare
+                        </label>
+                      ) : null}
+                      {complete ? (
+                        <button type="button" onClick={() => onCreateRunExport(run.run_id)} disabled={actionLoading}>Export</button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="muted" style={{ fontSize: 12 }}>No runs have been saved in this project yet.</div>
+          )}
+          {selectedSuccessful.length ? (
+            <div className="project-selected-compare-note">
+              Selected for comparison: {selectedSuccessful.map((run) => runLabel(run)).join(", ")}
+            </div>
+          ) : null}
+      </div>
+
+      <div className="project-selection-section">
+        <div className="project-selection-section-header">
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Reports</div>
+          <button type="button" onClick={onCreateReport} disabled={actionLoading || !successfulRuns.length}>{reportLabel}</button>
+        </div>
+            {(projectReports || []).length ? (
+              <div className="project-artifact-list">
+                {(projectReports || []).slice(0, 6).map((report) => (
+                  <div key={report.report_id} className="diagram-dataset-version-row">
+                    <div>
+                      <div><b>{report.report_type || "Project report"}</b> <StatusBadge status={report.status} /></div>
+                      <div className="muted" style={{ fontSize: 11 }}><code>{report.report_id}</code> · {(report.run_ids || []).length} runs</div>
+                    </div>
+                    <div className="diagram-dataset-actions">
+                      <a href={api.projectReportDownloadUrl(report.project_id, report.report_id)} download>Report</a>
+                      {report.source_data_url ? (
+                        <a href={api.projectReportDataUrl(report.project_id, report.report_id)} download>Data</a>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="muted" style={{ fontSize: 12 }}>No reports generated yet.</div>
+            )}
+      </div>
+
+      <div className="project-selection-section">
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Exports</div>
+            {(projectExports || []).length ? (
+              <div className="project-artifact-list">
+                {(projectExports || []).slice(0, 6).map((row) => (
+                  <div key={row.export_id} className="diagram-dataset-version-row">
+                    <div>
+                      <div><b>{(row.run_ids || []).length === 1 ? "Run export" : "Project files export"}</b> <StatusBadge status={row.status} /></div>
+                      <div className="muted" style={{ fontSize: 11 }}><code>{row.export_id}</code> · {compact(row.size_bytes || 0)} bytes</div>
+                    </div>
+                    <a href={api.projectExportDownloadUrl(row.project_id, row.export_id)} download>Download</a>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="muted" style={{ fontSize: 12 }}>No export bundles generated yet.</div>
+            )}
+      </div>
+    </aside>
+  );
+}
+
+function UploadedDatasetsPanel({ inputDatasets, onRefresh, actionLoading }) {
+  const [versionsByDataset, setVersionsByDataset] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const datasets = (Array.isArray(inputDatasets) ? inputDatasets : []).filter(
+    (dataset) => dataset && dataset.user_upload_listable !== false
+  );
+  const datasetKey = datasets.map((row) => `${row.id}:${row.active_version_id || ""}`).join("|");
+
+  async function refreshVersions() {
+    if (!datasets.length || typeof api.fetchInputDatasetVersions !== "function") {
+      setVersionsByDataset({});
+      return;
+    }
+    setLoading(true);
+    setMessage("");
+    try {
+      const pairs = await Promise.all(
+        datasets.map(async (dataset) => [dataset.id, await api.fetchInputDatasetVersions(dataset.id)])
+      );
+      setVersionsByDataset(Object.fromEntries(pairs));
+    } catch (err) {
+      setMessage(toErrorMessage(err, "Failed to load uploaded dataset versions"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refreshVersions();
+  }, [datasetKey]);
+
+  const uploadedRows = datasets.flatMap((dataset) => (
+    (versionsByDataset[dataset.id] || []).map((version) => ({
+      dataset,
+      version,
+      active: dataset.active_version_id && dataset.active_version_id === version.version_id,
+    }))
+  ));
+
+  return (
+    <div className="dashboard-note" style={{ marginTop: 14 }}>
+      <div className="row" style={{ justifyContent: "space-between", gap: 10 }}>
+        <div>
+          <div style={{ fontWeight: 900 }}>Uploaded datasets</div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>
+            User-scoped dataset overrides available to this user across project workspaces.
+          </div>
+        </div>
+        <button
+          type="button"
+          className={`icon-button refresh-icon-button ${loading ? "is-loading" : ""}`}
+          onClick={async () => {
+            await refreshVersions();
+            if (typeof onRefresh === "function") await onRefresh();
+          }}
+          disabled={actionLoading || loading}
+          aria-label={loading ? "Refreshing datasets" : "Refresh datasets"}
+          title={loading ? "Refreshing datasets" : "Refresh datasets"}
+        >
+          <span aria-hidden="true">↻</span>
+        </button>
+      </div>
+      {message ? <div className="warn" style={{ marginTop: 10 }}>{message}</div> : null}
+      {uploadedRows.length ? (
+        <div className="diagram-dataset-version-list" style={{ marginTop: 10 }}>
+          {uploadedRows.map(({ dataset, version, active }) => (
+            <div key={`${dataset.id}-${version.version_id}`} className="diagram-dataset-version-row">
+              <div>
+                <div>
+                  <b>{dataset.label || dataset.id}</b> {active ? <span className="badge badge-succeeded">Active</span> : null}
+                </div>
+                <div className="muted" style={{ fontSize: 11 }}>
+                  {version.filename || version.version_id} · <code>{version.version_id}</code> · {compact(version.size_bytes || 0)} bytes · {formatTimestamp(version.created_at)}
+                </div>
+              </div>
+              <div className="diagram-dataset-actions">
+                <a href={api.inputDatasetVersionDownloadUrl(dataset.id, version.version_id)} download>Download</a>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+          No uploaded dataset versions are available for this user yet. Upload model inputs from the dataset boxes inside a project workspace.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModelRunManagementPane({
+  activeJob,
+  selectedJob,
+  operationsPanel,
+  errorMessage,
+  statusMessage,
+  runViewMode,
+}) {
+  const statusSource = activeJob || selectedJob;
+  const normalizedStatus = normalizeStatus(statusSource && statusSource.status);
+  const overallStatusLabel = statusSource
+    ? displayStatus(statusSource.status).label
+    : runViewMode === "project"
+      ? "Project"
+      : "Ready";
+  return (
+    <aside className="model-run-management-pane" aria-label="Model run management">
+      <div className="run-management-header">
+        <div>
+          <div className="run-management-eyebrow">Run management</div>
+          <h2>Model runs</h2>
+        </div>
+        <div className={`overall-run-status ${normalizedStatus || ""}`}>
+          {overallStatusLabel}
+        </div>
+      </div>
+
+      {errorMessage ? <div className="warn" style={{ marginTop: 0 }}>{errorMessage}</div> : null}
+      {statusMessage ? <div className="ok" style={{ marginTop: errorMessage ? 8 : 0 }}>{statusMessage}</div> : null}
+
+      <section className="run-management-section">
+        <div className="run-management-section-title">Validation and execution</div>
+        {operationsPanel}
+      </section>
+    </aside>
+  );
+}
+
+function NewModelModal({
+  projectRuns,
+  defaultName,
+  onClose,
+  onCreateBase,
+  onCreateFromExisting,
+  actionLoading = false,
+}) {
+  const candidates = (projectRuns || []).filter((run) => {
+    const status = normalizeStatus(run && run.status);
+    return run && run.run_id && status !== "cancelled" && run.request;
+  });
+  const [mode, setMode] = useState("base");
+  const [name, setName] = useState("");
+  const [sourceRunId, setSourceRunId] = useState((candidates[0] && candidates[0].run_id) || "");
+
+  async function submit(event) {
+    event.preventDefault();
+    const cleanName = String(name || "").trim();
+    const created = mode === "existing"
+      ? await onCreateFromExisting(sourceRunId, cleanName)
+      : await onCreateBase(cleanName);
+    if (created) onClose();
+  }
+
+  return (
+    <Modal title="New model" subtitle="Create an editable model draft" onClose={onClose}>
+      <form className="project-create-form" onSubmit={submit}>
+        <label>
+          Model name
+          <input
+            type="text"
+            value={name}
+            maxLength={200}
+            placeholder={defaultName || "Example: National policy target 2050"}
+            onChange={(event) => setName(event.target.value)}
+            autoFocus
+          />
+        </label>
+
+        <fieldset className="new-model-choice-group">
+          <legend>Starting point</legend>
+          <label className="new-model-choice">
+            <input
+              type="radio"
+              name="new-model-source"
+              value="base"
+              checked={mode === "base"}
+              onChange={() => setMode("base")}
+            />
+            <span>
+              <b>Start from base model</b>
+              <small>Use the project architecture, default scenario inputs, default target year, and neutral policy levers.</small>
+            </span>
+          </label>
+          <label className="new-model-choice">
+            <input
+              type="radio"
+              name="new-model-source"
+              value="existing"
+              checked={mode === "existing"}
+              onChange={() => setMode("existing")}
+              disabled={!candidates.length}
+            />
+            <span>
+              <b>Customize an existing model input</b>
+              <small>Copy the selected run configuration into a new editable draft without changing the original.</small>
+            </span>
+          </label>
+        </fieldset>
+
+        {mode === "existing" ? (
+          <label>
+            Existing model input
+            <select value={sourceRunId} onChange={(event) => setSourceRunId(event.target.value)} disabled={!candidates.length}>
+              {candidates.map((run) => (
+                <option key={run.run_id} value={run.run_id}>
+                  {runLabel(run)} - {displayStatus(run.status).label}
+                </option>
+              ))}
+            </select>
+            {!candidates.length ? (
+              <div className="muted" style={{ fontSize: 12, marginTop: 5 }}>
+                No existing model inputs are available in this project yet.
+              </div>
+            ) : null}
+          </label>
+        ) : null}
+
+        <div className="modal-action-row">
+          <button type="button" onClick={onClose} disabled={actionLoading}>Cancel</button>
+          <button
+            type="submit"
+            className="run-play-button"
+            disabled={actionLoading || (mode === "existing" && !sourceRunId)}
+          >
+            Create draft
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function ProjectsOverviewPanel({
+  projects,
+  activeProjectId,
+  activeProject,
+  projectRuns,
+  projectReports,
+  projectExports,
+  inputDatasets,
+  onOpenProject,
+  onCreateProject,
+  onRenameProject,
+  onArchiveProject,
+  onRestoreProject,
+  onDeleteProject,
+  onDownloadProjectFiles,
+  onRefreshDatasets,
+  actionLoading,
+  isAdminView = false,
+}) {
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState("");
+  const [titleDrafts, setTitleDrafts] = useState({});
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState({
+    title: "",
+    geography: PROJECT_GEOGRAPHY_OPTIONS[0],
+    model_architecture_id: "energy-development",
+  });
+  const activeRunRows = activeProject ? projectRuns || [] : [];
+  const completedCount = succeededProjectRuns(activeRunRows).length;
+  const activeProjects = (projects || []).filter((project) => String(project.status || "active").toLowerCase() !== "archived");
+  const archivedProjects = (projects || []).filter((project) => String(project.status || "active").toLowerCase() === "archived");
+  const visibleProjects = archiveOpen ? archivedProjects : activeProjects;
+
+  function draftTitle(project) {
+    const id = project.project_id;
+    return Object.prototype.hasOwnProperty.call(titleDrafts, id)
+      ? titleDrafts[id]
+      : (project.title || "");
+  }
+
+  async function saveTitle(project) {
+    const nextTitle = String(draftTitle(project) || "").trim();
+    if (!nextTitle || nextTitle === (project.title || "")) {
+      setEditingProjectId("");
+      return;
+    }
+    await onRenameProject(project.project_id, nextTitle);
+    setEditingProjectId("");
+  }
+
+  async function submitCreateProject(event) {
+    event.preventDefault();
+    const title = String(createDraft.title || "").trim();
+    const architectureId = String(createDraft.model_architecture_id || "energy-development");
+    const created = await onCreateProject({
+      title: title || "Untitled project",
+      geography: String(createDraft.geography || "").trim(),
+      model_architecture_id: architectureId,
+      project_type: projectTypeForArchitecture(architectureId),
+      scenario_label: architectureId === "energy-only" ? "Energy model workspace" : "Energy-development model workspace",
+      notes: "Created from the projects overview.",
+    });
+    if (!created) return;
+    setCreateModalOpen(false);
+    setCreateDraft({
+      title: "",
+      geography: PROJECT_GEOGRAPHY_OPTIONS[0],
+      model_architecture_id: "energy-development",
+    });
+  }
+
+  function maybeOpenProject(event, projectId) {
+    const interactive = event.target && event.target.closest
+      ? event.target.closest("button, a, input, select, textarea, summary, details, label")
+      : null;
+    if (interactive || actionLoading) return;
+    onOpenProject(projectId);
+  }
+
+  return (
+    <div className="card projects-overview-panel">
+      <div className="row" style={{ justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+        <div>
+          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "#8ea4c5" }}>
+            Projects overview
+          </div>
+          <h2 style={{ margin: "6px 0 6px" }}>Select a project workspace</h2>
+          <div className="muted" style={{ fontSize: 13 }}>
+            Each project owns its model runs, uploaded dataset versions, reports, exports, and comparison workflow for the active user.
+          </div>
+        </div>
+        <button type="button" onClick={() => setCreateModalOpen(true)} disabled={actionLoading}>
+          New project
+        </button>
+      </div>
+
+      {createModalOpen ? (
+        <Modal title="Create project" subtitle="Project setup" onClose={() => setCreateModalOpen(false)}>
+          <form className="project-create-form" onSubmit={submitCreateProject}>
+            <label>
+              Project name
+              <input
+                type="text"
+                value={createDraft.title}
+                maxLength={200}
+                placeholder="Example: South Africa energy transition"
+                onChange={(event) => setCreateDraft((prev) => ({ ...prev, title: event.target.value }))}
+                autoFocus
+              />
+            </label>
+            <label>
+              Geography
+              <select
+                value={createDraft.geography}
+                onChange={(event) => setCreateDraft((prev) => ({ ...prev, geography: event.target.value }))}
+              >
+                {PROJECT_GEOGRAPHY_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Type
+              <select
+                value={createDraft.model_architecture_id}
+                onChange={(event) => setCreateDraft((prev) => ({ ...prev, model_architecture_id: event.target.value }))}
+              >
+                {PROJECT_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <div className="modal-action-row">
+              <button type="button" onClick={() => setCreateModalOpen(false)} disabled={actionLoading}>
+                Cancel
+              </button>
+              <button type="submit" className="run-play-button" disabled={actionLoading}>
+                Create project
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      <div className="row" style={{ gap: 8, marginTop: 14 }}>
+        <button
+          type="button"
+          className={!archiveOpen ? "seg-button active" : "seg-button"}
+          onClick={() => setArchiveOpen(false)}
+        >
+          Active projects ({activeProjects.length})
+        </button>
+        <button
+          type="button"
+          className={archiveOpen ? "seg-button active" : "seg-button"}
+          onClick={() => setArchiveOpen(true)}
+        >
+          Project archive ({archivedProjects.length})
+        </button>
+      </div>
+
+      <div className="workspace-grid-3" style={{ marginTop: 14 }}>
+        {visibleProjects.length ? (
+          visibleProjects.map((project) => {
+            const selected = project.project_id === activeProjectId;
+            const modifiedAt = project.updated_at || project.last_modified_at || project.created_at;
+            const editing = editingProjectId === project.project_id;
+            return (
+              <div
+                key={project.project_id}
+                className={`dashboard-note project-card ${selected ? "row-selected" : ""}`}
+                role="button"
+                tabIndex={0}
+                onClick={(event) => maybeOpenProject(event, project.project_id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    maybeOpenProject(event, project.project_id);
+                  }
+                }}
+              >
+                <div className="project-card-header">
+                  <div className="project-card-title-wrap">
+                    {editing ? (
+                      <div className="project-title-edit-row">
+                        <input
+                          type="text"
+                          value={draftTitle(project)}
+                          maxLength={200}
+                          onChange={(event) => setTitleDrafts((prev) => ({ ...prev, [project.project_id]: event.target.value }))}
+                          style={{ width: "100%", minWidth: 0, fontWeight: 800 }}
+                        />
+                        <button type="button" onClick={() => saveTitle(project)} disabled={actionLoading}>Save</button>
+                        <button type="button" onClick={() => setEditingProjectId("")} disabled={actionLoading}>Cancel</button>
+                      </div>
+                    ) : (
+                      <div className="project-title-row">
+                        <div className="project-card-title">{project.title || "Untitled project"}</div>
+                        <button
+                          type="button"
+                          className="project-edit-icon"
+                          aria-label={`Edit project name: ${project.title || "Untitled project"}`}
+                          title="Edit project name"
+                          onClick={() => {
+                            setTitleDrafts((prev) => ({ ...prev, [project.project_id]: project.title || "" }));
+                            setEditingProjectId(project.project_id);
+                          }}
+                          disabled={actionLoading}
+                        >
+                          ✎
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <details className="project-overflow-menu">
+                    <summary aria-label={`Project actions for ${project.title || "Untitled project"}`}>...</summary>
+                    <div className="project-overflow-menu-body">
+                      <button
+                        type="button"
+                        onClick={() => onDownloadProjectFiles(project.project_id)}
+                        disabled={actionLoading}
+                      >
+                        Download files
+                      </button>
+                      {String(project.status || "active").toLowerCase() === "archived" ? (
+                        <button type="button" onClick={() => onRestoreProject(project.project_id)} disabled={actionLoading}>Restore</button>
+                      ) : (
+                        <button type="button" onClick={() => onArchiveProject(project.project_id)} disabled={actionLoading}>Archive</button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onDeleteProject(project.project_id)}
+                        disabled={actionLoading}
+                        className="danger-menu-button"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </details>
+                </div>
+                <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+                  {projectGeographyLabel(project.geography) ? <>Geography: <b>{projectGeographyLabel(project.geography)}</b></> : "No geography label set."}
+                </div>
+                <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
+                  Type: <b>{projectTypeLabel(project)}</b>
+                </div>
+                {isAdminView ? (
+                  <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
+                    Owner: <code>{project.owner_user_id || "-"}</code>
+                  </div>
+                ) : null}
+                <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
+                  Last modified: <code>{formatTimestamp(modifiedAt)}</code>
+                </div>
+                <div className="project-card-footer">
+                  <div>
+                    {selected ? (
+                      <>
+                        <div><b>Loaded:</b> {activeRunRows.length} runs, {completedCount} completed</div>
+                        <div className="muted" style={{ fontSize: 11 }}>
+                          {projectReports.length} reports · {projectExports.length} exports
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="project-open-link"
+                    onClick={() => onOpenProject(project.project_id)}
+                    disabled={actionLoading}
+                  >
+                    Open →
+                  </button>
+                </div>
+              </div>
+            );
+          })
         ) : (
-          <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-            No settings were changed. Try mentioning a target like <code>S1</code>, a year like <code>2050</code>,
-            a lever like <code>carbon price 50</code>, or a focus such as <code>Kenya</code> or <code>West Africa</code>.
+          <div className="dashboard-note" style={{ gridColumn: "1 / -1" }}>
+            <div style={{ fontWeight: 800 }}>{archiveOpen ? "No archived projects." : "No active projects for this user yet."}</div>
+            <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
+              {archiveOpen ? "Archived projects will appear here after they are removed from the active workspace list." : "Create a project to start configuring and running models."}
+            </div>
           </div>
         )}
-        {result.warnings && result.warnings.length ? (
-          <div className="ai-query-warnings">
-            {result.warnings.map((warning, idx) => (
-              <div key={`warning-${idx}`}>{warning}</div>
-            ))}
+      </div>
+
+      <UploadedDatasetsPanel
+        inputDatasets={inputDatasets}
+        onRefresh={onRefreshDatasets}
+        actionLoading={actionLoading}
+      />
+    </div>
+  );
+}
+
+function ProjectComparePanel({
+  activeProject,
+  projectRuns,
+  projectReports,
+  projectExports,
+  compareRunIds,
+  onToggleCompareRun,
+  isAdminView = false,
+}) {
+  // The project-level view reads completed run summaries from persisted artifacts. It
+  // does not depend on the live execution queue, so comparisons survive backend
+  // restarts once cloud storage/database providers are in place.
+  const runs = projectRuns || [];
+  const successfulRuns = succeededProjectRuns(runs);
+  const selectedIds = compareRunIds;
+  const selectedRuns = successfulRuns.filter((run) => selectedIds.includes(run.run_id));
+  const sortedRuns = [...runs].sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")));
+  const latestRun = sortedRuns[0] || null;
+  const latestReport = (projectReports || [])[0] || null;
+  const modifiedAt = activeProject && (activeProject.updated_at || activeProject.last_modified_at || activeProject.created_at);
+  const [summaries, setSummaries] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const missing = selectedRuns.map((run) => run.run_id).filter((runId) => runId && !summaries[runId]);
+    if (!missing.length) return;
+    let cancelled = false;
+    async function loadSummaries() {
+      setLoading(true);
+      setError("");
+      try {
+        const rows = await Promise.all(missing.map(async (runId) => [runId, await api.fetchSummary(runId)]));
+        if (cancelled) return;
+        setSummaries((prev) => {
+          const next = { ...prev };
+          rows.forEach(([runId, summary]) => {
+            next[runId] = summary;
+          });
+          return next;
+        });
+      } catch (err) {
+        if (!cancelled) setError(toErrorMessage(err, "Failed to load comparison summaries"));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    loadSummaries();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRuns.map((run) => run.run_id).join("|")]);
+
+  const metricRows = useMemo(() => {
+    const byMetric = new Map();
+    selectedRuns.forEach((run) => {
+      const metrics = extractComparableMetrics(summaries[run.run_id]);
+      Object.values(metrics).forEach((metric) => {
+        if (!byMetric.has(metric.key)) byMetric.set(metric.key, { key: metric.key, label: metric.label, unit: metric.unit, values: {} });
+        byMetric.get(metric.key).values[run.run_id] = metric.value;
+      });
+    });
+    return Array.from(byMetric.values());
+  }, [selectedRuns.map((run) => run.run_id).join("|"), JSON.stringify(Object.keys(summaries).sort())]);
+
+  return (
+    <div className="project-home-unified card">
+      <section className="project-home-hero-card" aria-label="Project homepage and comparison overview">
+        <div className="project-home-copy">
+          <div className="run-management-eyebrow">Project workspace</div>
+          <h2>{activeProject ? activeProject.title || "Untitled project" : "No project selected"}</h2>
+          <div className="muted project-home-meta">
+            {activeProject && projectGeographyLabel(activeProject.geography) ? `Geography: ${projectGeographyLabel(activeProject.geography)}` : "No geography"}
+            {activeProject ? ` · ${projectTypeLabel(activeProject)}` : ""}
+            {modifiedAt ? ` · Modified ${formatTimestamp(modifiedAt)}` : ""}
+            {isAdminView && activeProject && activeProject.owner_user_id ? ` · Owner ${activeProject.owner_user_id}` : ""}
+          </div>
+          <p>
+            Use this project page to understand the run inventory, choose completed models for comparison,
+            and read the headline metric differences before opening a specific model run.
+          </p>
+        </div>
+        <div className="project-home-stats" aria-label="Project status summary">
+          <MetricCard label="Runs" value={String(runs.length)} />
+          <MetricCard label="Completed" value={String(successfulRuns.length)} />
+          <MetricCard label="Reports" value={String((projectReports || []).length)} />
+          <MetricCard label="Exports" value={String((projectExports || []).length)} />
+        </div>
+      </section>
+
+      <section className="project-home-activity-strip" aria-label="Latest project activity">
+        <span><b>Latest run</b> {latestRun ? `${runLabel(latestRun)} · ${displayStatus(latestRun.status).label}` : "No runs yet"}</span>
+        <span><b>Latest report</b> {latestReport ? `${latestReport.report_type || "Project report"} · ${formatTimestamp(latestReport.created_at)}` : "No reports yet"}</span>
+      </section>
+
+      <section className="project-comparison-workbench" aria-label="Project run comparison">
+        <div className="project-comparison-header">
+          <div>
+            <div className="run-management-eyebrow">Comparison workbench</div>
+            <h3>Compare completed model runs</h3>
+            <div className="muted">
+              Select completed runs here or in the run library. Metrics are read from persisted summary artifacts.
+            </div>
+          </div>
+          <div className="project-comparison-count">
+            <b>{selectedRuns.length}</b>
+            <span>selected</span>
+          </div>
+        </div>
+
+        <div className="project-compare-run-pills" aria-label="Completed runs available for comparison">
+          {successfulRuns.length ? successfulRuns.map((run) => {
+            const selected = selectedIds.includes(run.run_id);
+            return (
+              <button
+                key={run.run_id}
+                type="button"
+                className={`project-compare-run-pill ${selected ? "selected" : ""}`}
+                onClick={() => onToggleCompareRun(run.run_id)}
+                aria-pressed={selected}
+              >
+                <span>{runLabel(run)}</span>
+                <small>{runMetadataLine(run)}</small>
+              </button>
+            );
+          }) : (
+            <div className="muted" style={{ fontSize: 12 }}>No completed runs are available for comparison yet.</div>
+          )}
+        </div>
+
+        {selectedRuns.length ? (
+          <div className="project-selected-compare-note">
+            Selected comparison set: {selectedRuns.map((run) => runLabel(run)).join(", ")}
           </div>
         ) : null}
-      </details>
+
+        {error ? <div className="warn">{error}</div> : null}
+        {loading ? <div className="diagram-note">Loading comparison summaries...</div> : null}
+
+        <div className="project-comparison-table-panel">
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>Headline metric comparison</div>
+          {selectedRuns.length < 2 ? (
+            <div className="muted" style={{ fontSize: 12 }}>
+              {successfulRuns.length
+                ? "Select at least two completed runs to compare headline metrics."
+                : "Run and complete at least two models to activate comparison."}
+            </div>
+          ) : metricRows.length ? (
+            <div style={{ overflowX: "auto" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Metric</th>
+                    {selectedRuns.map((run) => <th key={run.run_id}>{runLabel(run)}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {metricRows.map((metric) => (
+                    <tr key={metric.key}>
+                      <td>{metric.label} {metric.unit ? <span className="muted">({metric.unit})</span> : null}</td>
+                      {selectedRuns.map((run) => (
+                        <td key={`${metric.key}-${run.run_id}`}>
+                          {Number.isFinite(metric.values[run.run_id]) ? compact(metric.values[run.run_id]) : "-"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="muted" style={{ fontSize: 12 }}>Selected run summaries do not expose comparable headline metrics yet.</div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
 
 function ArchitectureRunWorkspace({
+  architecture,
   runViewMode,
-  jobs,
-  selectedJobId,
-  activeJob,
-  onSelectJob,
+  flowActiveJob = null,
+  inputsLocked = false,
+  lockReason = "",
   selectedRunId,
   result,
-  exchangeArtifacts,
   inputDatasets,
   onUploadDataset,
+  onDatasetVersionChange,
   errorMessage,
   statusMessage,
+  runManagementPanel,
+  projectInfoPanel,
+  projectsOverviewPanel,
+  comparePanel,
   scenarioControls,
-  operationsPanel,
   resultsPanel,
 }) {
-  const workspaceState = activeJob ? "running" : result ? "complete" : "ready";
+  const workspaceState = flowActiveJob ? "running" : result ? "complete" : "ready";
   const datasetGroups = useMemo(() => {
     const byLayer = new Map();
     (inputDatasets || []).forEach((dataset) => {
@@ -6467,36 +8226,61 @@ function ArchitectureRunWorkspace({
     ...(datasetGroups.get("mrio") || []),
     ...(datasetGroups.get("bridge") || []),
   ];
+  const datasetsByNode = useMemo(() => {
+    const out = {};
+    ((architecture && architecture.boxes) || ARCHITECTURE_BOXES).forEach((box) => {
+      const layers = Array.isArray(box.datasetLayers) ? box.datasetLayers : [];
+      if (!layers.length) return;
+      out[box.id] = layers.flatMap((layer) => datasetGroups.get(layer) || []);
+    });
+    return out;
+  }, [architecture, datasetGroups]);
 
   return (
     <div className={`architecture-run-workspace ${workspaceState}`}>
-      <RunTabs jobs={jobs} selectedJobId={selectedJobId} activeJob={activeJob} onSelectJob={onSelectJob} />
-
-      {errorMessage ? <div className="warn" style={{ marginTop: 0 }}>{errorMessage}</div> : null}
-      {statusMessage && runViewMode === "results" ? <div className="ok" style={{ marginTop: 0 }}>{statusMessage}</div> : null}
-
-      {runViewMode === "results" && result ? (
-        <div className="results-mode-grid">
-          <aside className="results-settings-panel">
-            <ArchitectureBox box={ARCHITECTURE_BOXES[0]} activeJob={activeJob} result={result}>
-              {scenarioControls}
-            </ArchitectureBox>
-          </aside>
-          <main className="results-mode-main">{resultsPanel}</main>
-        </div>
+      {runViewMode === "projects" ? (
+        <>
+          {projectsOverviewPanel}
+          {errorMessage || statusMessage ? (
+            <div className="project-overview-message-stack">
+              {errorMessage ? <div className="warn" style={{ marginTop: 0 }}>{errorMessage}</div> : null}
+              {statusMessage ? <div className="ok" style={{ marginTop: errorMessage ? 8 : 0 }}>{statusMessage}</div> : null}
+            </div>
+          ) : null}
+        </>
       ) : (
-        <FlowModelCanvas
-          activeJob={activeJob}
-          result={result}
-          scenarioControls={scenarioControls}
-          operationsPanel={operationsPanel}
-          calliopeDatasets={calliopeDatasets}
-          mrioDatasets={mrioDatasets}
-          selectedRunId={selectedRunId}
-          exchangeArtifacts={exchangeArtifacts}
-          onUploadDataset={onUploadDataset}
-          statusMessage={statusMessage}
-        />
+        <div className="model-workspace-with-management">
+          <main className="model-workspace-primary">
+            {runViewMode === "project" ? (
+              comparePanel
+            ) : runViewMode === "results" && result ? (
+              <div className="results-mode-grid">
+                <aside className="results-settings-panel">
+                  <ArchitectureBox box={((architecture && architecture.boxes) || ARCHITECTURE_BOXES)[0] || ARCHITECTURE_BOXES[0]} activeJob={flowActiveJob} result={result}>
+                    {scenarioControls}
+                  </ArchitectureBox>
+                </aside>
+                <main className="results-mode-main">{resultsPanel}</main>
+              </div>
+            ) : (
+              <FlowModelCanvas
+                activeJob={flowActiveJob}
+                result={result}
+                architecture={architecture}
+                scenarioControls={scenarioControls}
+                calliopeDatasets={calliopeDatasets}
+                mrioDatasets={mrioDatasets}
+                datasetsByNode={datasetsByNode}
+                selectedRunId={selectedRunId}
+                inputsLocked={inputsLocked}
+                lockReason={lockReason}
+                onUploadDataset={onUploadDataset}
+                onDatasetVersionChange={onDatasetVersionChange}
+              />
+            )}
+          </main>
+          {runViewMode === "project" ? projectInfoPanel : runManagementPanel}
+        </div>
       )}
     </div>
   );
@@ -6528,7 +8312,24 @@ function aggregateByLabel(records, labelKey, valueKey) {
 }
 
 function App() {
+  const [session, setSession] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(api.getActiveUserId ? api.getActiveUserId() : "undp_analyst");
+  const [apiTarget, setApiTarget] = useState(() => (
+    api.getApiTarget
+      ? api.getApiTarget()
+      : { mode: "local", localApiBase: window.location.origin, backendApiBase: "", apiBase: window.location.origin }
+  ));
+  const [systemCompatibility, setSystemCompatibility] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [activeProjectId, setActiveProjectId] = useState("");
+  const [projectRuns, setProjectRuns] = useState([]);
+  const [projectReports, setProjectReports] = useState([]);
+  const [projectExports, setProjectExports] = useState([]);
+  const [compareRunIds, setCompareRunIds] = useState([]);
+  const [platformActionLoading, setPlatformActionLoading] = useState(false);
   const [scenarioCatalog, setScenarioCatalog] = useState(null);
+  const [architectureCatalog, setArchitectureCatalog] = useState(() => normalizeArchitectureCatalog(null));
+  const [selectedArchitectureId, setSelectedArchitectureId] = useState(DEFAULT_MODEL_ARCHITECTURE_ID);
   const [scenarios, setScenarios] = useState([]);
   const [inputDatasets, setInputDatasets] = useState([]);
   const [scenarioKey, setScenarioKey] = useState("");
@@ -6540,6 +8341,7 @@ function App() {
   const [energyModelEngine, setEnergyModelEngine] = useState("calliope");
   const [levers, setLevers] = useState({ ...DEFAULT_LEVERS });
   const [runProfile, setRunProfile] = useState("dev");
+  const [customRunName, setCustomRunName] = useState("");
   const [environmentSetup, setEnvironmentSetup] = useState(null);
   const [environmentSetupLoading, setEnvironmentSetupLoading] = useState(false);
   const [jobs, setJobs] = useState([]);
@@ -6561,16 +8363,37 @@ function App() {
   const [runSpatialTechLoading, setRunSpatialTechLoading] = useState(false);
   const [runSpatialTechError, setRunSpatialTechError] = useState("");
   const [spatialFilter, setSpatialFilter] = useState(null);
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [aiQueryResult, setAiQueryResult] = useState(null);
-  const [runViewMode, setRunViewMode] = useState("setup");
+  const [runViewMode, setRunViewMode] = useState("projects");
+  const [methodologyOpen, setMethodologyOpen] = useState(() => window.location.hash === "#/methodology");
+  const [landingOpen, setLandingOpen] = useState(() => window.location.hash !== "#/methodology");
+  const [newModelModalOpen, setNewModelModalOpen] = useState(false);
   const locationMapCacheRef = useRef(new Map());
   const runSpatialTechCacheRef = useRef(new Map());
+  const availableUsers = (session && session.available_users) || [];
+  const currentUser = (session && session.user) || {};
+  const isAdminView = Boolean(currentUser && currentUser.is_admin);
 
   const selectedScenario = useMemo(
     () => (scenarios || []).find((s) => s.key === scenarioKey),
     [scenarios, scenarioKey]
   );
+
+  useEffect(() => {
+    function handleHashChange() {
+      const nextMethodologyOpen = window.location.hash === "#/methodology";
+      setMethodologyOpen(nextMethodologyOpen);
+      if (nextMethodologyOpen) setLandingOpen(false);
+    }
+    handleHashChange();
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+  const defaultRunName = useMemo(() => {
+    const baseName = selectedScenario && selectedScenario.title
+      ? selectedScenario.title
+      : scenarioKey || "EDIM run";
+    return `${baseName} ${targetYear || ""}`.trim();
+  }, [selectedScenario, scenarioKey, targetYear]);
   const scenarioSelectorModel = useMemo(
     () => buildScenarioSelectorModel(scenarios),
     [scenarios]
@@ -6581,42 +8404,139 @@ function App() {
     () => deriveScenarioSelections(scenarioKey, scenarioSelectorModel),
     [scenarioKey, scenarioSelectorModel]
   );
+  const selectedArchitecture = useMemo(
+    () => architectureById(architectureCatalog, selectedArchitectureId),
+    [architectureCatalog, selectedArchitectureId]
+  );
+  const selectedArchitectureRequiresMrio = architectureIncludesDevelopment(selectedArchitecture);
+  const effectiveMrioScenarioId = selectedArchitectureRequiresMrio ? mrioScenarioId : (mrioScenarioId || "S1");
+
+  function clearBackendBoundState() {
+    setProjects([]);
+    setActiveProjectId("");
+    setProjectRuns([]);
+    setProjectReports([]);
+    setProjectExports([]);
+    setCompareRunIds([]);
+    setInputDatasets([]);
+    setJobs([]);
+    setActiveJob(null);
+    setSelectedJobId("");
+    setResult(null);
+    setSelectedRunId("");
+    setIntegratedPayload(null);
+    setRunning(false);
+    setQueueSubmitting(false);
+    setEnvironmentSetup(null);
+    setLocationMapData(null);
+    setLocationMapError("");
+    setRunSpatialTechData(null);
+    setRunSpatialTechError("");
+    setSpatialFilter(null);
+    locationMapCacheRef.current.clear();
+    runSpatialTechCacheRef.current.clear();
+    setRunViewMode("projects");
+  }
+
+  function applyScenarioCatalog(catalog) {
+    const rows = rowsFromScenarioChannel(catalog, "scenario.energy_scenario_key", "key");
+    const targetRows = rowsFromScenarioChannel(catalog, "scenario.target_scenario_id", "scenario_id");
+    const shockRows = rowsFromScenarioChannel(catalog, "scenario.mrio_shock_mapping_id", "mapping_id");
+    const years = yearsFromScenarioChannel(catalog);
+    setScenarioCatalog(catalog);
+    setScenarios(rows);
+    setTargetScenarios(targetRows);
+    setMrioShockMappings(shockRows);
+    setTargetYears(years.length ? years : [2030, 2050]);
+    setEnergyModelEngine((prev) => {
+      const available = new Set(
+        energyModelCatalogOptions(catalog)
+          .filter((row) => !row.disabled)
+          .map((row) => String(row.value || "").toLowerCase())
+      );
+      if (prev && available.has(String(prev).toLowerCase())) return prev;
+      return String((catalog.defaults && catalog.defaults.energy_model_engine) || "calliope");
+    });
+    setScenarioKey((prev) => {
+      if (prev && rows.some((s) => s.key === prev)) return prev;
+      return (catalog.defaults && catalog.defaults.energy_scenario_key) || (rows[0] && rows[0].key) || "";
+    });
+    setMrioScenarioId((prev) => {
+      if (prev && targetRows.some((s) => s.scenario_id === prev)) return prev;
+      return (
+        (catalog.defaults && catalog.defaults.target_scenario_id) ||
+        (targetRows[0] && targetRows[0].scenario_id) ||
+        ""
+      );
+    });
+    setTargetYear((prev) => {
+      if (years.includes(Number(prev))) return Number(prev);
+      return Number((catalog.defaults && catalog.defaults.target_year) || years[0] || 2030);
+    });
+    return { rows, targetRows, shockRows, years };
+  }
+
+  async function refreshModelArchitectures() {
+    try {
+      const runtimeCatalog = await api.fetchModelRuntimes();
+      const catalog = normalizeArchitectureCatalog(
+        (runtimeCatalog && runtimeCatalog.architecture_catalog) ||
+        {
+          schemaVersion: "edim_model_architecture_catalog",
+          defaultArchitectureId: DEFAULT_MODEL_ARCHITECTURE_ID,
+          architectures: (runtimeCatalog && runtimeCatalog.model_architectures) || [],
+        }
+      );
+      setArchitectureCatalog(catalog);
+      setSelectedArchitectureId((prev) => {
+        if (prev && catalog.architectures.some((row) => row.id === prev)) return prev;
+        return catalog.defaultArchitectureId;
+      });
+      if (runtimeCatalog && runtimeCatalog.scenario_catalog) {
+        applyScenarioCatalog(runtimeCatalog.scenario_catalog);
+      }
+      return catalog;
+    } catch (err) {
+      try {
+        const bundledCatalog = normalizeArchitectureCatalog(await loadBundledArchitectureCatalog());
+        setArchitectureCatalog(bundledCatalog);
+        setSelectedArchitectureId((prev) => {
+          if (prev && bundledCatalog.architectures.some((row) => row.id === prev)) return prev;
+          return bundledCatalog.defaultArchitectureId;
+        });
+        setErrorMessage("");
+        return bundledCatalog;
+      } catch (bundleErr) {
+        setErrorMessage(
+          `${toErrorMessage(err, "Failed to load model architecture catalog from backend runtime catalog")} ` +
+          `${toErrorMessage(bundleErr, "Bundled model architecture catalog is also unavailable")}`
+        );
+      }
+      return architectureCatalog;
+    }
+  }
 
   async function refreshScenarios() {
     try {
       const catalog = await api.fetchScenarioCatalog();
-      const rows = catalog.energy_scenarios || [];
-      const targetRows = catalog.target_scenarios || [];
-      const shockRows = catalog.mrio_shock_mappings || [];
-      const years = (catalog.target_years || [2030, 2050]).map((y) => Number(y)).filter((y) => Number.isFinite(y));
-      setScenarioCatalog(catalog);
-      setScenarios(rows);
-      setTargetScenarios(targetRows);
-      setMrioShockMappings(shockRows);
-      setTargetYears(years.length ? years : [2030, 2050]);
-      setEnergyModelEngine((prev) => {
-        const available = new Set((catalog.energy_model_engines || ENERGY_MODEL_OPTIONS).map((row) => String(row.value || "").toLowerCase()));
-        if (prev && available.has(String(prev).toLowerCase())) return prev;
-        return String((catalog.defaults && catalog.defaults.energy_model_engine) || "calliope");
-      });
-      setScenarioKey((prev) => {
-        if (prev && rows.some((s) => s.key === prev)) return prev;
-        return (catalog.defaults && catalog.defaults.energy_scenario_key) || (rows[0] && rows[0].key) || "";
-      });
-      setMrioScenarioId((prev) => {
-        if (prev && targetRows.some((s) => s.scenario_id === prev)) return prev;
-        return (
-          (catalog.defaults && catalog.defaults.target_scenario_id) ||
-          (targetRows[0] && targetRows[0].scenario_id) ||
-          ""
-        );
-      });
-      setTargetYear((prev) => {
-        if (years.includes(Number(prev))) return Number(prev);
-        return Number((catalog.defaults && catalog.defaults.target_year) || years[0] || 2030);
-      });
+      applyScenarioCatalog(catalog);
     } catch (err) {
       setErrorMessage(toErrorMessage(err, "Failed to load scenarios"));
+    }
+  }
+
+  async function refreshSession() {
+    try {
+      const payload = await api.fetchSession();
+      setSession(payload);
+      if (payload && payload.user && payload.user.user_id) {
+        setCurrentUserId(payload.user.user_id);
+        if (api.setActiveUserId) api.setActiveUserId(payload.user.user_id);
+      }
+      return payload;
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to load user session"));
+      return null;
     }
   }
 
@@ -6631,17 +8551,124 @@ function App() {
     }
   }
 
-  async function refreshEnvironmentSetup(nextScenario, nextMrioScenarioId, nextTargetYear, nextRunProfile, nextStrictValidation, nextAllowPlaceholderData) {
+  async function refreshProjects() {
+    try {
+      const rows = typeof api.fetchProjects === "function" ? await api.fetchProjects() : [];
+      setProjects(rows);
+      setActiveProjectId((prev) => {
+        if (prev && rows.some((project) => project.project_id === prev)) return prev;
+        const activeRows = rows.filter((project) => String(project.status || "active").toLowerCase() !== "archived");
+        return ((activeRows[0] || rows[0]) && (activeRows[0] || rows[0]).project_id) || "";
+      });
+      return rows;
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to load projects"));
+      return [];
+    }
+  }
+
+  async function refreshProjectRuns(projectId) {
+    // Project run records are the durable history source. The active execution
+    // poller can enrich one row while running, but tabs/compare/reporting should
+    // come from this project-owned list rather than ephemeral queue memory.
+    const id = projectId || activeProjectId;
+    if (!id || typeof api.fetchProjectRuns !== "function") {
+      setProjectRuns([]);
+      setJobs([]);
+      return [];
+    }
+    try {
+      const rows = await api.fetchProjectRuns(id, { includeDrafts: true, limit: 100 });
+      const displayRows = rows.map(projectRunToDisplayRun);
+      const activeDisplayJob = displayRows.find((j) => isActiveStatus(j.status)) || null;
+      setProjectRuns(displayRows);
+      setJobs(displayRows);
+      setRunning(Boolean(displayRows.find((j) => normalizeStatus(j.status) === "running")));
+      setActiveJob((prev) => activeDisplayJob || (prev && isActiveStatus(prev.status) ? prev : null));
+      setCompareRunIds((prev) => {
+        const valid = new Set(succeededProjectRuns(displayRows).map((run) => run.run_id));
+        return prev.filter((runId) => valid.has(runId));
+      });
+      const selected = selectedJobId ? displayRows.find((run) => runExecutionId(run) === selectedJobId || run.run_id === selectedJobId) : null;
+      if (!selected && displayRows[0]) {
+        setSelectedJobId(runExecutionId(displayRows[0]));
+      }
+      return displayRows;
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to load project runs"));
+      setProjectRuns([]);
+      setJobs([]);
+      return [];
+    }
+  }
+
+  async function refreshProjectOutputs(projectId) {
+    const id = projectId || activeProjectId;
+    if (!id) {
+      setProjectReports([]);
+      setProjectExports([]);
+      return { reports: [], exports: [] };
+    }
+    try {
+      const [reports, exports] = await Promise.all([
+        typeof api.fetchProjectReports === "function" ? api.fetchProjectReports(id) : [],
+        typeof api.fetchProjectExports === "function" ? api.fetchProjectExports(id) : [],
+      ]);
+      setProjectReports(reports);
+      setProjectExports(exports);
+      return { reports, exports };
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to load project reports/exports"));
+      return { reports: [], exports: [] };
+    }
+  }
+
+  async function refreshProjectWorkspace(projectId) {
+    const id = projectId || activeProjectId;
+    const [runs] = await Promise.all([
+      refreshProjectRuns(id),
+      refreshProjectOutputs(id),
+    ]);
+    return runs;
+  }
+
+  async function ensureActiveProject() {
+    const current = activeProjectId && projects.find((project) => project.project_id === activeProjectId);
+    if (current) return current;
+    const rows = await refreshProjects();
+    if (rows[0]) return rows[0];
+    const created = await api.createProject({
+      title: "Default EDIM project",
+      geography: "",
+      project_type: "energy-development",
+      model_architecture_id: "energy-development",
+      scenario_label: "Integrated EDIM runs",
+      notes: "Auto-created local project for canonical project-owned run submission.",
+    });
+    setProjects([created]);
+    setActiveProjectId(created.project_id);
+    return created;
+  }
+
+  async function refreshEnvironmentSetup(nextScenario, nextMrioScenarioId, nextTargetYear, nextRunProfile, nextProjectId) {
     const scenario = nextScenario || scenarioKey;
     const mrioScenario = nextMrioScenarioId || mrioScenarioId;
     const year = nextTargetYear || targetYear;
     const profile = nextRunProfile || runProfile;
-    const strict = typeof nextStrictValidation === "boolean" ? nextStrictValidation : effectiveStrictValidation;
-    const allowPlaceholders =
-      typeof nextAllowPlaceholderData === "boolean" ? nextAllowPlaceholderData : allowPlaceholderData;
     setEnvironmentSetupLoading(true);
     try {
-      const payload = await api.fetchEnvironmentSetup(scenario, mrioScenario, year, profile, strict, allowPlaceholders);
+      const payload = await api.fetchEnvironmentSetup(
+        scenario,
+        mrioScenario,
+        year,
+        profile,
+        nextProjectId || activeProjectId || "default",
+        {
+          model_architecture_id: selectedArchitecture.id,
+          energy_model_engine: energyModelEngine,
+          levers,
+        }
+      );
       setEnvironmentSetup(payload);
       return payload;
     } catch (err) {
@@ -6654,6 +8681,19 @@ function App() {
   }
 
   async function refreshJobs() {
+    if (activeProjectId) {
+      const displayRows = await refreshProjectRuns(activeProjectId);
+      const activeDisplayJob = displayRows.find((j) => isActiveStatus(j.status)) || null;
+      const selectedJob =
+        (selectedJobId && displayRows.find((j) => runExecutionId(j) === selectedJobId || j.run_id === selectedJobId)) ||
+        activeDisplayJob ||
+        displayRows[0] ||
+        null;
+      setRunning(Boolean(displayRows.find((j) => normalizeStatus(j.status) === "running")));
+      setActiveJob((prev) => activeDisplayJob || (prev && isActiveStatus(prev.status) ? prev : null));
+      if (selectedJob) setSelectedJobId(runExecutionId(selectedJob));
+      return displayRows;
+    }
     try {
       const rows = await api.fetchJobs(50);
       setJobs(rows);
@@ -6667,12 +8707,12 @@ function App() {
         return null;
       });
       const selectedJob =
-        (selectedJobId && rows.find((j) => j.job_id === selectedJobId)) ||
+        (selectedJobId && rows.find((j) => runExecutionId(j) === selectedJobId || j.run_id === selectedJobId)) ||
         runningJob ||
         rows[0] ||
         null;
       if (selectedJob) {
-        setSelectedJobId(selectedJob.job_id);
+        setSelectedJobId(runExecutionId(selectedJob));
       }
       if (
         selectedJob &&
@@ -6693,9 +8733,100 @@ function App() {
     }
   }
 
-  async function hydrateIntegratedForRun(runId, fallbackSummary) {
-    if (fallbackSummary && Object.keys(fallbackSummary).length > 0) {
-      setIntegratedPayload(fallbackSummary);
+  async function reloadPlatformShell(successMessage = "") {
+    clearBackendBoundState();
+    setErrorMessage("");
+    setStatusMessage("");
+    await refreshSession();
+    const [initialProjects] = await Promise.all([
+      refreshProjects(),
+      refreshInputDatasets(),
+      refreshModelArchitectures(),
+    ]);
+    const initialProjectId = (initialProjects && initialProjects[0] && initialProjects[0].project_id) || "";
+    if (initialProjects && initialProjects[0] && initialProjects[0].model_architecture_id) {
+      setSelectedArchitectureId(initialProjects[0].model_architecture_id);
+    }
+    if (initialProjectId) {
+      await refreshProjectWorkspace(initialProjectId);
+    } else {
+      await refreshJobs();
+    }
+    setRunViewMode("projects");
+    if (successMessage) setStatusMessage(successMessage);
+  }
+
+  async function probeSystemCompatibility() {
+    const target = api.getApiTarget ? api.getApiTarget() : apiTarget;
+    setSystemCompatibility({
+      status: "checking",
+      mode: target.mode,
+      apiBase: target.apiBase,
+      message: "Checking API contract...",
+    });
+    try {
+      const manifest = await api.fetchSystemManifest();
+      const compatibility = evaluateSystemManifest(manifest, target);
+      setSystemCompatibility(compatibility);
+      return compatibility;
+    } catch (err) {
+      const compatibility = {
+        status: "error",
+        mode: target.mode,
+        apiBase: target.apiBase,
+        message: toErrorMessage(err, "Contract error: system manifest is unavailable"),
+        missingEndpoints: [],
+        diagnostics: [],
+        checkedAt: new Date().toISOString(),
+      };
+      setSystemCompatibility(compatibility);
+      return compatibility;
+    }
+  }
+
+  async function applyApiTarget(nextMode) {
+    if (!api.setApiTarget) return;
+    const mode = String(nextMode || "local") === "backend" ? "backend" : "local";
+    const currentTarget = api.getApiTarget ? api.getApiTarget() : apiTarget;
+    if (mode === "backend" && !currentTarget.hasBackendApiBase) {
+      setApiTarget(currentTarget);
+      setErrorMessage("Backend mode is unavailable because EDIM_BACKEND_API_BASE is not configured.");
+      return;
+    }
+    const next = api.setApiTarget({ mode });
+    setApiTarget(next);
+    clearBackendBoundState();
+    setErrorMessage("");
+    setStatusMessage("");
+    setPlatformActionLoading(true);
+    try {
+      const compatibility = await probeSystemCompatibility();
+      if (mode === "backend" && compatibility.status === "error") {
+        const restored = api.setApiTarget({ mode: currentTarget.mode || "local" });
+        setApiTarget(restored);
+        setErrorMessage(compatibility.message || "Backend API contract check failed.");
+        return;
+      }
+      await reloadPlatformShell(
+        mode === "backend"
+          ? `Connected to backend API: ${next.apiBase}${compatibility.status === "warning" ? " (contract warning)" : ""}`
+          : `Connected to local API: ${next.apiBase}`
+      );
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, `Failed to connect to ${mode === "backend" ? "backend" : "local"} API`));
+    } finally {
+      setApiTarget(api.getApiTarget ? api.getApiTarget() : next);
+      setPlatformActionLoading(false);
+    }
+  }
+
+  async function handleApiTargetModeChange(nextMode) {
+    await applyApiTarget(nextMode);
+  }
+
+  async function hydrateIntegratedForRun(runId, summaryPayload) {
+    if (summaryPayload && Object.keys(summaryPayload).length > 0) {
+      setIntegratedPayload(summaryPayload);
       return;
     }
     try {
@@ -6711,32 +8842,47 @@ function App() {
     const status = normalizeStatus(job.status);
 
     if (status === "succeeded" && job.artifacts && job.summary) {
+      if (job.request && job.request.model_architecture_id) setSelectedArchitectureId(job.request.model_architecture_id);
       const nextResult = { artifacts: job.artifacts, summary: job.summary };
       setResult(nextResult);
       setSelectedRunId(job.artifacts.run_id);
-      setSelectedJobId(job.job_id);
-      setStatusMessage(`Run ${job.artifacts.run_id} completed successfully.`);
+      setSelectedJobId(runExecutionId(job));
+      setStatusMessage(`${runLabel(job)} completed successfully.`);
       setErrorMessage("");
       setRunViewMode("results");
       await hydrateIntegratedForRun(job.artifacts.run_id, job.summary.integrated_results || null);
     } else if (status === "failed") {
-      setSelectedJobId(job.job_id);
+      setSelectedJobId(runExecutionId(job));
       setErrorMessage(job.error || job.message || "Run failed.");
     } else if (status === "cancelled") {
-      setSelectedJobId(job.job_id);
+      setSelectedJobId(runExecutionId(job));
       setErrorMessage("Run was cancelled.");
+    } else if (status === "draft") {
+      setSelectedJobId(job.run_id || "");
+      setSelectedRunId("");
+      setResult(null);
+      setIntegratedPayload(null);
+      setStatusMessage("Run cancelled; draft restored.");
+      setErrorMessage("");
+      setRunViewMode("setup");
     }
 
     setActiveJob(null);
-    await refreshJobs();
+    await refreshProjectWorkspace(activeProjectId || (job.request && job.request.project_id) || "default");
   }
 
   useEffect(() => {
     let cancelled = false;
     async function boot() {
-      setErrorMessage("");
-      setStatusMessage("");
-      await Promise.all([refreshScenarios(), refreshJobs(), refreshInputDatasets()]);
+      const target = api.getApiTarget ? api.getApiTarget() : apiTarget;
+      setApiTarget(target);
+      if (target.mode === "backend" && !target.backendApiBase) {
+        clearBackendBoundState();
+        setErrorMessage("Backend mode is unavailable because EDIM_BACKEND_API_BASE is not configured.");
+        return;
+      }
+      await probeSystemCompatibility();
+      await reloadPlatformShell("");
       if (cancelled) return;
     }
     boot();
@@ -6745,6 +8891,203 @@ function App() {
     };
   }, []);
 
+  async function handleUserChange(userId) {
+    if (api.setActiveUserId) api.setActiveUserId(userId);
+    setCurrentUserId(userId);
+    setJobs([]);
+    setProjects([]);
+    setProjectRuns([]);
+    setProjectReports([]);
+    setProjectExports([]);
+    setCompareRunIds([]);
+    setActiveProjectId("");
+    setActiveJob(null);
+    setSelectedJobId("");
+    setResult(null);
+    setSelectedRunId("");
+    setIntegratedPayload(null);
+    setStatusMessage("");
+    setErrorMessage("");
+    setRunViewMode("projects");
+    await refreshSession();
+    let refreshedProjects = await refreshProjects();
+    if (!refreshedProjects.length && typeof api.createProject === "function") {
+      const created = await api.createProject({
+        title: "Default EDIM project",
+        geography: "",
+        project_type: "energy-development",
+        model_architecture_id: "energy-development",
+        scenario_label: "Integrated EDIM runs",
+        notes: "Auto-created local project for canonical project-owned run submission.",
+      });
+      refreshedProjects = [created];
+      setProjects(refreshedProjects);
+      setActiveProjectId(created.project_id);
+    }
+    const nextProjectId = (refreshedProjects[0] && refreshedProjects[0].project_id) || "";
+    if (refreshedProjects[0] && refreshedProjects[0].model_architecture_id) {
+      setSelectedArchitectureId(refreshedProjects[0].model_architecture_id);
+    }
+    await Promise.all([
+      refreshInputDatasets(),
+      nextProjectId ? refreshProjectWorkspace(nextProjectId) : refreshJobs(),
+      refreshEnvironmentSetup(scenarioKey, effectiveMrioScenarioId, targetYear, runProfile, nextProjectId || "default"),
+    ]);
+    setRunViewMode("projects");
+  }
+
+  async function handleProjectChange(projectId, nextMode = "project") {
+    if (!projectId) return;
+    const project = (projects || []).find((row) => row.project_id === projectId) || null;
+    const architectureId = String((project && project.model_architecture_id) || "").trim();
+    if (architectureId) setSelectedArchitectureId(architectureId);
+    if (projectId === activeProjectId) {
+      if (nextMode === "project") {
+        setSelectedJobId("");
+        setSelectedRunId("");
+        setResult(null);
+        setIntegratedPayload(null);
+      }
+      if (nextMode) setRunViewMode(nextMode);
+      return;
+    }
+    setActiveProjectId(projectId);
+    setActiveJob(null);
+    setSelectedJobId("");
+    setResult(null);
+    setSelectedRunId("");
+    setIntegratedPayload(null);
+    setCompareRunIds([]);
+    setStatusMessage(`Selected project ${project && project.title ? project.title : projectId}.`);
+    setErrorMessage("");
+    await Promise.all([
+      refreshProjectWorkspace(projectId),
+      refreshEnvironmentSetup(scenarioKey, effectiveMrioScenarioId, targetYear, runProfile, projectId),
+    ]);
+    if (nextMode === "project") {
+      setSelectedJobId("");
+      setSelectedRunId("");
+      setResult(null);
+      setIntegratedPayload(null);
+    }
+    if (nextMode) setRunViewMode(nextMode);
+  }
+
+  async function handleCreateProject(projectPayload = null) {
+    setPlatformActionLoading(true);
+    setErrorMessage("");
+    try {
+      const architectureId = String((projectPayload && projectPayload.model_architecture_id) || "energy-development");
+      const created = await api.createProject({
+        title: `EDIM project ${(projects || []).length + 1}`,
+        geography: "Africa",
+        project_type: projectTypeForArchitecture(architectureId),
+        model_architecture_id: architectureId,
+        scenario_label: architectureId === "energy-only" ? "Energy model workspace" : "Energy-development model workspace",
+        notes: "Created from the modeling dashboard.",
+        ...(projectPayload || {}),
+      });
+      setProjects((prev) => [created, ...(prev || [])]);
+      if (created.model_architecture_id) setSelectedArchitectureId(created.model_architecture_id);
+      await handleProjectChange(created.project_id);
+      setStatusMessage(`Created project ${created.title || created.project_id}.`);
+      return created;
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to create project"));
+      return null;
+    } finally {
+      setPlatformActionLoading(false);
+    }
+  }
+
+  async function handleRenameProject(projectId, title) {
+    if (!projectId || !title) return;
+    setPlatformActionLoading(true);
+    setErrorMessage("");
+    try {
+      const updated = await api.updateProject(projectId, { title });
+      setProjects((prev) => (prev || []).map((project) => project.project_id === projectId ? updated : project));
+      setStatusMessage(`Renamed project to ${updated.title || projectId}.`);
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to rename project"));
+    } finally {
+      setPlatformActionLoading(false);
+    }
+  }
+
+  async function handleArchiveProject(projectId) {
+    if (!projectId) return;
+    const confirmed = window.confirm("Archive this project? It will move out of the active project list but can be restored from the project archive.");
+    if (!confirmed) return;
+    setPlatformActionLoading(true);
+    setErrorMessage("");
+    try {
+      const updated = await api.updateProject(projectId, { status: "archived" });
+      const nextProjects = (projects || []).map((project) => project.project_id === projectId ? updated : project);
+      setProjects(nextProjects);
+      if (activeProjectId === projectId) {
+        const nextActive = nextProjects.find((row) => String(row.status || "active").toLowerCase() !== "archived");
+        setActiveProjectId(nextActive ? nextActive.project_id : "");
+        setRunViewMode("projects");
+      }
+      setStatusMessage(`Archived project ${updated.title || projectId}.`);
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to archive project"));
+    } finally {
+      setPlatformActionLoading(false);
+    }
+  }
+
+  async function handleRestoreProject(projectId) {
+    if (!projectId) return;
+    setPlatformActionLoading(true);
+    setErrorMessage("");
+    try {
+      const updated = await api.updateProject(projectId, { status: "active" });
+      setProjects((prev) => (prev || []).map((project) => project.project_id === projectId ? updated : project));
+      setStatusMessage(`Restored project ${updated.title || projectId}.`);
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to restore project"));
+    } finally {
+      setPlatformActionLoading(false);
+    }
+  }
+
+  async function handleDeleteProject(projectId) {
+    if (!projectId) return;
+    const project = (projects || []).find((row) => row.project_id === projectId);
+    const confirmed = window.confirm(`Delete project "${project && project.title ? project.title : projectId}"? This removes its local runs, reports, exports, and project metadata.`);
+    if (!confirmed) return;
+    setPlatformActionLoading(true);
+    setErrorMessage("");
+    try {
+      await api.deleteProject(projectId, { deleteFiles: true });
+      const rows = await refreshProjects();
+      if (activeProjectId === projectId) {
+        setActiveProjectId("");
+        setProjectRuns([]);
+        setProjectReports([]);
+        setProjectExports([]);
+        setCompareRunIds([]);
+        setActiveJob(null);
+        setSelectedJobId("");
+        setResult(null);
+        setSelectedRunId("");
+        setIntegratedPayload(null);
+        const nextProject = rows.find((row) => String(row.status || "active").toLowerCase() !== "archived") || rows[0] || null;
+        if (nextProject) {
+          setActiveProjectId(nextProject.project_id);
+        }
+      }
+      setRunViewMode("projects");
+      setStatusMessage("Deleted project.");
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to delete project"));
+    } finally {
+      setPlatformActionLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!scenarioKey) return;
     let cancelled = false;
@@ -6752,11 +9095,15 @@ function App() {
       try {
         const payload = await api.fetchEnvironmentSetup(
           scenarioKey,
-          mrioScenarioId,
+          effectiveMrioScenarioId,
           targetYear,
           runProfile,
-          effectiveStrictValidation,
-          allowPlaceholderData
+          activeProjectId || "default",
+          {
+            model_architecture_id: selectedArchitecture.id,
+            energy_model_engine: energyModelEngine,
+            levers,
+          }
         );
         if (!cancelled) setEnvironmentSetup(payload);
       } catch (_) {
@@ -6770,7 +9117,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [scenarioKey, mrioScenarioId, targetYear, runProfile, effectiveStrictValidation]);
+  }, [scenarioKey, effectiveMrioScenarioId, targetYear, runProfile, activeProjectId, selectedArchitecture.id, energyModelEngine, levers]);
 
   useEffect(() => {
     const runId = result && result.artifacts && result.artifacts.run_id;
@@ -6827,8 +9174,8 @@ function App() {
       try {
         const [geojsonResult, capexCsvText, opexCsvText] = await Promise.all([
           fetch(LOCATION_MAP_GEOJSON_PATH),
-          api.fetchExchangeCsv(runId, "investment_shocks.csv"),
-          api.fetchExchangeCsv(runId, "operating_shocks.csv"),
+          api.fetchArtifactText(runId, "investment_shocks_csv"),
+          api.fetchArtifactText(runId, "operating_shocks_csv"),
         ]);
         let sourceGeojson = { type: "FeatureCollection", features: [] };
         if (geojsonResult.ok) {
@@ -6906,15 +9253,17 @@ function App() {
 
   useEffect(() => {
     if (!activeJob || !isActiveStatus(activeJob.status)) return;
+    const executionId = runExecutionId(activeJob);
+    if (!executionId) return;
 
     let stopped = false;
     const poll = async () => {
       try {
-        const latest = await api.fetchJob(activeJob.job_id);
+        const latest = await api.fetchJob(executionId);
         if (stopped) return;
         setActiveJob(latest);
         setRunning(isActiveStatus(latest.status));
-        if (isTerminalStatus(latest.status)) await finalizeJob(latest);
+        if (isTerminalStatus(latest.status) || isResetStatus(latest.status)) await finalizeJob(latest);
       } catch (err) {
         if (!stopped) setErrorMessage(toErrorMessage(err, "Failed to poll active job"));
       }
@@ -6926,23 +9275,36 @@ function App() {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [activeJob && activeJob.job_id]);
+  }, [activeJob && runExecutionId(activeJob)]);
 
   async function onRun() {
-    if (!scenarioKey || !mrioScenarioId || queueSubmitting) return;
+    if (selectedRunInputsLocked) {
+      setErrorMessage("This selected run is locked. Create an editable draft from the locked configuration before running changes.");
+      return;
+    }
+    const editableDraftRunId =
+      selectedJob && normalizeStatus(selectedJob.status) === "draft" && selectedJob.run_id
+        ? selectedJob.run_id
+        : "";
+    if (!editableDraftRunId) {
+      setErrorMessage("Create a new model draft, or select an existing draft, before running the model.");
+      return;
+    }
+    if (!scenarioKey || (selectedArchitectureRequiresMrio && !mrioScenarioId) || queueSubmitting) return;
 
     setErrorMessage("");
     setStatusMessage("");
     setQueueSubmitting(true);
 
     try {
+      const project = await ensureActiveProject();
+      const projectId = project && project.project_id ? project.project_id : "default";
       const currentEnvironmentSetup = await refreshEnvironmentSetup(
         scenarioKey,
-        mrioScenarioId,
+        effectiveMrioScenarioId,
         targetYear,
         runProfile,
-        effectiveStrictValidation,
-        allowPlaceholderData
+        projectId
       );
       if (!(currentEnvironmentSetup && currentEnvironmentSetup.ok)) {
         const blockingErrors = Array.isArray(currentEnvironmentSetup && currentEnvironmentSetup.errors)
@@ -6960,21 +9322,18 @@ function App() {
         return;
       }
 
-      const job = await api.submitJob({
-        energy_model_engine: energyModelEngine,
-        energy_scenario_key: scenarioKey,
-        mrio_scenario_id: mrioScenarioId,
-        target_year: Number(targetYear),
-        run_profile: runProfile,
-        strict_validation: effectiveStrictValidation,
-        allow_placeholder_data: allowPlaceholderData,
-        levers,
+      const resolvedRunName = (customRunName || "").trim() || defaultRunName;
+      const requestPayload = currentRunRequestPayload(projectId, resolvedRunName);
+      await api.updateRunDraft(projectId, editableDraftRunId, {
+        request: requestPayload,
+        run_name: resolvedRunName,
       });
+      const job = await api.submitProjectRun(projectId, editableDraftRunId);
       setActiveJob(job);
-      setSelectedJobId(job.job_id);
+      setSelectedJobId(runExecutionId(job));
       setRunning(true);
-      setStatusMessage(`Queued run ${job.job_id}.`);
-      await refreshJobs();
+      setStatusMessage(`Queued run "${resolvedRunName}".`);
+      await refreshProjectWorkspace(projectId);
     } catch (err) {
       setErrorMessage(toErrorMessage(err, "Failed to submit run"));
     } finally {
@@ -6985,22 +9344,38 @@ function App() {
   async function onCancelActiveJob() {
     if (!activeJob) return;
     try {
-      const updated = await api.cancelJob(activeJob.job_id);
-      setActiveJob(updated);
-      setStatusMessage(updated.message || `Cancellation requested for job ${updated.job_id}.`);
-      if (isTerminalStatus(updated.status)) await finalizeJob(updated);
+      const updated = await api.cancelJob(runExecutionId(activeJob));
+      if (isResetStatus(updated.status)) {
+        setActiveJob(null);
+        setRunning(false);
+        setSelectedJobId(updated.run_id || "");
+        setSelectedRunId("");
+        setResult(null);
+        setIntegratedPayload(null);
+        setStatusMessage(updated.message || "Run cancelled; draft restored.");
+        setErrorMessage("");
+      } else {
+        setActiveJob(updated);
+        setStatusMessage(updated.message || `Cancellation requested for execution ${runExecutionId(updated)}.`);
+        if (isTerminalStatus(updated.status)) await finalizeJob(updated);
+      }
+      await refreshProjectWorkspace(activeProjectId || (updated.request && updated.request.project_id) || "default");
     } catch (err) {
-      setErrorMessage(toErrorMessage(err, "Failed to cancel job"));
+      setErrorMessage(toErrorMessage(err, "Failed to cancel run"));
     }
   }
 
   async function onUploadDataset(datasetId, file) {
     if (!datasetId || !file) return;
+    if (selectedRunInputsLocked) {
+      setErrorMessage("Inputs are locked for the selected run. Duplicate the configuration before changing datasets.");
+      return;
+    }
     setErrorMessage("");
     setStatusMessage(`Uploading ${file.name}...`);
     try {
       await api.uploadInputDataset(datasetId, file);
-      await refreshInputDatasets();
+      await onDatasetVersionChange();
       setStatusMessage(`Updated input dataset ${datasetId}. Re-run validation before queuing a model run.`);
     } catch (err) {
       setErrorMessage(toErrorMessage(err, "Failed to upload input dataset"));
@@ -7008,112 +9383,327 @@ function App() {
     }
   }
 
-  function aiPlannerOptions() {
-    return {
-      targetScenarios,
-      targetYears,
-      selectorModel: scenarioSelectorModel,
-      currentLevers: levers,
-      onSetRunProfile: setRunProfile,
-      onMrioScenarioChange: setMrioScenarioId,
-      onTargetYearChange: setTargetYear,
-      onScenarioSelectionChange,
-      onSetLevers: setLevers,
-      onEnergyModelEngineChange: setEnergyModelEngine,
-      locationMapData,
-      onSetSpatialFilter: setSpatialFilter,
-    };
+  async function onDatasetVersionChange() {
+    await Promise.all([
+      refreshInputDatasets(),
+      refreshEnvironmentSetup(scenarioKey, effectiveMrioScenarioId, targetYear, runProfile, activeProjectId || "default"),
+    ]);
   }
 
-  function aiPlannerPayload() {
-    return {
-      query: aiPrompt,
-      current: {
-        energy_scenario_key: scenarioKey,
-        energy_model_engine: energyModelEngine,
-        mrio_scenario_id: mrioScenarioId,
-        target_year: Number(targetYear),
-        run_profile: runProfile,
-        levers,
-        spatial_filter: spatialFilter,
-      },
-      available: {
-        target_years: targetYears,
-        target_scenarios: (targetScenarios || []).map((row) => ({
-          scenario_id: row.scenario_id,
-          label: row.short_label || row.label || row.scenario_type || "",
-        })),
-        energy_controls: {
-          families: [
-            scenarioSelectorModel.hasPathway2040 ? "pathway_2040" : "",
-            scenarioSelectorModel.hasTransmissionOnly ? "transmission_only" : "",
-          ].filter(Boolean),
-          pathways: scenarioSelectorModel.pathways || [],
-          generation_options: scenarioSelectorModel.generationOptions || [],
-          transmission_options: scenarioSelectorModel.transmissionOptions || [],
-          packages: SCENARIO_PACKAGE_ORDER,
-          energy_model_engines: ENERGY_MODEL_OPTIONS.map((option) => option.value),
-        },
-      },
-    };
+  function onToggleCompareRun(runId) {
+    if (!runId) return;
+    setCompareRunIds((prev) => {
+      if (prev.includes(runId)) return prev.filter((id) => id !== runId);
+      return [...prev, runId];
+    });
   }
 
-  async function onApplyAiPrompt() {
-    const options = aiPlannerOptions();
-    let queryResult = null;
+  async function onCreateProjectReport() {
+    if (!activeProjectId) return;
+    setPlatformActionLoading(true);
+    setErrorMessage("");
     try {
-      const remote = await api.planScenarioQuery(aiPlannerPayload());
-      if (remote && remote.ok) {
-        queryResult = applyRemoteAiPlan(remote, options);
-      } else {
-        const fallback = applyPromptConfiguration(aiPrompt, options);
-        queryResult = {
-          ...fallback,
-          source: "local_fallback",
-          warnings: [
-            ...((remote && remote.warnings) || []),
-            remote && remote.message ? `Azure planner unavailable: ${remote.message}` : "Azure planner returned no applicable settings.",
-            ...(fallback.warnings || []),
-          ],
-        };
-      }
+      const runIds = compareRunIds.length ? compareRunIds : succeededProjectRuns(projectRuns).map((run) => run.run_id);
+      const report = await api.createProjectReport(activeProjectId, {
+        run_ids: runIds,
+        report_type: compareRunIds.length > 1 ? "comparison_summary" : "project_summary",
+        options: { source: "dashboard", selected_compare_run_ids: compareRunIds },
+      });
+      await refreshProjectOutputs(activeProjectId);
+      setStatusMessage(`Generated project report ${report.report_id}.`);
     } catch (err) {
-      const fallback = applyPromptConfiguration(aiPrompt, options);
-      queryResult = {
-        ...fallback,
-        source: "local_fallback",
-        warnings: [
-          `Azure planner request failed: ${toErrorMessage(err, "AI planner request failed")}`,
-          ...(fallback.warnings || []),
-        ],
-      };
-    }
-
-    setAiQueryResult(queryResult);
-    if (queryResult.ok) {
-      setStatusMessage(queryResult.message);
-      setErrorMessage("");
-    } else {
-      setStatusMessage("");
-      setErrorMessage(`${queryResult.message} New query needed.`);
+      setErrorMessage(toErrorMessage(err, "Failed to generate project report"));
+    } finally {
+      setPlatformActionLoading(false);
     }
   }
 
-  function onSelectJob(job) {
+  function downloadProjectExport(projectId, exportId) {
+    if (!projectId || !exportId) return;
+    const anchor = document.createElement("a");
+    anchor.href = api.projectExportDownloadUrl(projectId, exportId);
+    anchor.download = "";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }
+
+  async function onDownloadProjectFiles(projectId) {
+    const targetProjectId = projectId || activeProjectId;
+    if (!targetProjectId) return;
+    setPlatformActionLoading(true);
+    setErrorMessage("");
+    try {
+      const bundle = await api.createProjectExport(targetProjectId, {
+        run_ids: [],
+        include_reports: true,
+      });
+      if (targetProjectId === activeProjectId) await refreshProjectOutputs(targetProjectId);
+      setStatusMessage(`Prepared project files export ${bundle.export_id}.`);
+      downloadProjectExport(targetProjectId, bundle.export_id);
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to download project files"));
+    } finally {
+      setPlatformActionLoading(false);
+    }
+  }
+
+  async function onCreateRunExport(runId) {
+    if (!runId) return;
+    setPlatformActionLoading(true);
+    setErrorMessage("");
+    try {
+      const bundle = await api.createRunExport(runId);
+      await refreshProjectOutputs(activeProjectId);
+      setStatusMessage(`Created run export ${bundle.export_id}.`);
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to create run export"));
+    } finally {
+      setPlatformActionLoading(false);
+    }
+  }
+
+  function baseRunRequestPayload(projectId, runName = "") {
+    const architectureId = String(
+      (activeProject && activeProject.model_architecture_id) ||
+        selectedArchitecture.id ||
+        DEFAULT_MODEL_ARCHITECTURE_ID
+    );
+    const defaultScenarioKey =
+      (scenarioCatalog && scenarioCatalog.defaults && scenarioCatalog.defaults.energy_scenario_key) ||
+      ((scenarios || [])[0] && (scenarios || [])[0].key) ||
+      scenarioKey;
+    const defaultMrioScenarioId =
+      (scenarioCatalog && scenarioCatalog.defaults && scenarioCatalog.defaults.target_scenario_id) ||
+      ((targetScenarios || [])[0] && (targetScenarios || [])[0].scenario_id) ||
+      effectiveMrioScenarioId;
+    const defaultYear = Number(
+      (scenarioCatalog && scenarioCatalog.defaults && scenarioCatalog.defaults.target_year) ||
+        ((targetYears || [])[0]) ||
+        targetYear ||
+        2030
+    );
+    const defaultEngine =
+      (scenarioCatalog && scenarioCatalog.defaults && scenarioCatalog.defaults.energy_model_engine) ||
+      "calliope";
+    const defaultTargetScenarioId = architectureIncludesDevelopment(architectureById(architectureCatalog, architectureId))
+      ? defaultMrioScenarioId
+      : (defaultMrioScenarioId || "S1");
+    return {
+      run_name: String(runName || "").trim() || `Base model ${defaultYear}`,
+      model_architecture_id: architectureId,
+      energy_model_engine: defaultEngine,
+      scenario: {
+        energy_scenario_key: defaultScenarioKey,
+        target_scenario_id: defaultTargetScenarioId,
+        target_year: defaultYear,
+      },
+      run_profile: "dev",
+      levers: { ...DEFAULT_LEVERS },
+    };
+  }
+
+  function currentRunRequestPayload(projectId, runName = "") {
+    const resolvedRunName = String(runName || "").trim() || defaultRunName;
+    return {
+      run_name: resolvedRunName,
+      model_architecture_id: selectedArchitecture.id,
+      energy_model_engine: energyModelEngine,
+      scenario: {
+        energy_scenario_key: scenarioKey,
+        target_scenario_id: effectiveMrioScenarioId,
+        target_year: Number(targetYear),
+      },
+      run_profile: runProfile,
+      levers,
+    };
+  }
+
+  function applyRunRequestToControls(request) {
+    const payload = runConfigurationPayload(request);
+    if (payload.model_architecture_id) setSelectedArchitectureId(String(payload.model_architecture_id));
+    if (payload.energy_model_engine) setEnergyModelEngine(String(payload.energy_model_engine));
+    if (payload.energy_scenario_key) setScenarioKey(String(payload.energy_scenario_key));
+    if (payload.mrio_scenario_id) setMrioScenarioId(String(payload.mrio_scenario_id));
+    if (payload.target_year) setTargetYear(Number(payload.target_year));
+    if (payload.run_profile) setRunProfile(String(payload.run_profile));
+    if (payload.levers && typeof payload.levers === "object") {
+      setLevers({ ...DEFAULT_LEVERS, ...payload.levers });
+    }
+    setCustomRunName(String(payload.run_name || ""));
+  }
+
+  async function onDuplicateSelectedConfiguration() {
+    const source = selectedJob || activeJob;
+    const sourceRunId = source && source.run_id;
+    const projectId = activeProjectId || (source && source.request && source.request.project_id) || "";
+    if (!sourceRunId || !projectId) {
+      setErrorMessage("Select a project run before duplicating its configuration.");
+      return;
+    }
+    setPlatformActionLoading(true);
+    setErrorMessage("");
+    try {
+      const draft = await api.duplicateProjectRun(projectId, sourceRunId);
+      applyRunRequestToControls(draft.request || {});
+      setResult(null);
+      setSelectedRunId("");
+      setIntegratedPayload(null);
+      setSelectedJobId(runExecutionId(draft));
+      setRunViewMode("setup");
+      await refreshProjectWorkspace(projectId);
+      setSelectedJobId(runExecutionId(draft));
+      setStatusMessage(`Duplicated configuration as draft "${runLabel(draft)}".`);
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to duplicate configuration"));
+    } finally {
+      setPlatformActionLoading(false);
+    }
+  }
+
+  async function onDeleteSelectedRun() {
+    const source = selectedJob || activeJob;
+    const sourceRunId = source && source.run_id;
+    const projectId = activeProjectId || (source && source.request && source.request.project_id) || "";
+    const status = normalizeStatus(source && source.status);
+    if (!sourceRunId || !projectId) {
+      setErrorMessage("Select a project run before deleting it.");
+      return;
+    }
+    if (status === "queued" || status === "running") {
+      setErrorMessage("Cancel the active execution before deleting this run.");
+      return;
+    }
+    const confirmed = window.confirm(`Delete ${runLabel(source)}? This removes the run record and generated run files.`);
+    if (!confirmed) return;
+    setPlatformActionLoading(true);
+    setErrorMessage("");
+    try {
+      await api.deleteProjectRun(projectId, sourceRunId, { deleteFiles: true });
+      setActiveJob((prev) => (prev && runExecutionId(prev) === runExecutionId(source) ? null : prev));
+      setRunning(false);
+      setSelectedJobId("");
+      setSelectedRunId("");
+      setResult(null);
+      setIntegratedPayload(null);
+      setRunViewMode("project");
+      await refreshProjectWorkspace(projectId);
+      await refreshProjectOutputs(projectId);
+      setStatusMessage(`Deleted ${runLabel(source)}.`);
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to delete run"));
+    } finally {
+      setPlatformActionLoading(false);
+    }
+  }
+
+  async function onCreateBaseModelDraft(name = "") {
+    setPlatformActionLoading(true);
+    setErrorMessage("");
+    try {
+      const project = await ensureActiveProject();
+      const projectId = project && project.project_id ? project.project_id : "default";
+      const requestPayload = baseRunRequestPayload(projectId, name);
+      const draft = await api.createRunDraft(projectId, requestPayload);
+      applyRunRequestToControls(draft.request || requestPayload);
+      setActiveJob(null);
+      setRunning(false);
+      setResult(null);
+      setSelectedRunId("");
+      setIntegratedPayload(null);
+      setSelectedJobId(runExecutionId(draft));
+      setRunViewMode("setup");
+      await refreshProjectWorkspace(projectId);
+      setSelectedJobId(runExecutionId(draft));
+      setStatusMessage(`Created editable model draft "${runLabel(draft)}".`);
+      return draft;
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to create model draft"));
+      return null;
+    } finally {
+      setPlatformActionLoading(false);
+    }
+  }
+
+  async function onCreateModelDraftFromExisting(sourceRunId, name = "") {
+    if (!sourceRunId) {
+      setErrorMessage("Select an existing model input to customize.");
+      return null;
+    }
+    const projectId = activeProjectId || "";
+    if (!projectId) {
+      setErrorMessage("Select a project before creating a model draft.");
+      return null;
+    }
+    setPlatformActionLoading(true);
+    setErrorMessage("");
+    try {
+      const duplicated = await api.duplicateProjectRun(projectId, sourceRunId);
+      const cleanName = String(name || "").trim();
+      const draft = cleanName
+        ? await api.updateRunDraft(projectId, duplicated.run_id, { run_name: cleanName })
+        : duplicated;
+      applyRunRequestToControls(draft.request || duplicated.request || {});
+      setActiveJob(null);
+      setRunning(false);
+      setResult(null);
+      setSelectedRunId("");
+      setIntegratedPayload(null);
+      setSelectedJobId(runExecutionId(draft));
+      setRunViewMode("setup");
+      await refreshProjectWorkspace(projectId);
+      setSelectedJobId(runExecutionId(draft));
+      setStatusMessage(`Created editable model draft "${runLabel(draft)}" from existing inputs.`);
+      return draft;
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to create model draft from existing input"));
+      return null;
+    } finally {
+      setPlatformActionLoading(false);
+    }
+  }
+
+  function onSelectProjectView() {
+    setSelectedJobId("");
+    setSelectedRunId("");
+    setResult(null);
+    setIntegratedPayload(null);
+    setErrorMessage("");
+    setRunViewMode("project");
+  }
+
+  async function onSelectJob(job) {
     if (!job) return;
-    setSelectedJobId(job.job_id);
-    if (normalizeStatus(job.status) === "succeeded" && job.artifacts && job.summary) {
-      setResult({ artifacts: job.artifacts, summary: job.summary });
-      setSelectedRunId(job.artifacts.run_id);
-      setStatusMessage(`Inspecting run ${job.artifacts.run_id}.`);
-      setRunViewMode("results");
+    const id = runExecutionId(job);
+    const jobArchitectureId = job.request && job.request.model_architecture_id;
+    if (jobArchitectureId) setSelectedArchitectureId(jobArchitectureId);
+    if (job.request) applyRunRequestToControls(job.request);
+    setSelectedJobId(id);
+    setErrorMessage("");
+    const runId = job.run_id || (job.artifacts && job.artifacts.run_id);
+    if (normalizeStatus(job.status) === "succeeded" && runId) {
+      try {
+        const summary = job.summary || await api.fetchSummary(runId);
+        setResult({
+          artifacts: job.artifacts || {
+            run_id: runId,
+            summary_url: `/api/runs/${encodeURIComponent(runId)}/summary`,
+            csv_url: `/api/runs/${encodeURIComponent(runId)}/artifacts/results_csv`,
+          },
+          summary,
+        });
+        setSelectedRunId(runId);
+        setStatusMessage(`Inspecting ${runLabel(job)}.`);
+        setRunViewMode("results");
+      } catch (err) {
+        setErrorMessage(toErrorMessage(err, "Failed to load selected run results"));
+      }
     } else {
       setSelectedRunId("");
       setResult(null);
       setRunViewMode("setup");
-      setStatusMessage(`Selected job ${job.job_id} (${job.status}).`);
+      setStatusMessage(`Selected execution ${id || runId} (${job.status}).`);
     }
-    setErrorMessage("");
   }
 
   function onApplyTemplateLevers() {
@@ -7129,14 +9719,18 @@ function App() {
     }
   }
 
+  function onArchitectureChange(architectureId) {
+    const next = architectureById(architectureCatalog, architectureId);
+    setSelectedArchitectureId(next.id);
+    setStatusMessage(`Selected model architecture: ${next.shortLabel || next.label}.`);
+  }
+
   function onResetLevers() {
     setLevers({ ...DEFAULT_LEVERS });
   }
 
   const summaryDiagnostics = (result && result.summary && result.summary.summary_diagnostics) || {};
   const runMetadata = summaryDiagnostics.run_metadata || {};
-  const exchangeArtifacts = (result && result.summary && result.summary.exchange_artifacts) || {};
-
   const integratedView = integratedPayload || ((result && result.summary && result.summary.integrated_results) || {});
   const integratedMetrics = Array.isArray(integratedView && integratedView.integrated_overview && integratedView.integrated_overview.metrics)
     ? integratedView.integrated_overview.metrics
@@ -7189,15 +9783,44 @@ function App() {
     ? result.summary.development_impacts.by_supplier_sector.records
     : [];
   const selectedJob = useMemo(() => {
-    if (activeJob && selectedJobId && activeJob.job_id === selectedJobId) return activeJob;
-    return (jobs || []).find((j) => j.job_id === selectedJobId) || null;
+    if (activeJob && selectedJobId && runExecutionId(activeJob) === selectedJobId) return activeJob;
+    return (jobs || []).find((j) => runExecutionId(j) === selectedJobId || j.run_id === selectedJobId) || null;
   }, [jobs, activeJob, selectedJobId]);
-  const energyModelExecutable = energyModelEngine === "calliope";
-  const runDisabled = !scenarioKey || !mrioScenarioId || queueSubmitting || !energyModelExecutable;
+  const selectedRunStatus = normalizeStatus(selectedJob && selectedJob.status);
+  const selectedRunInputsLocked = Boolean(selectedJob && RUN_CONFIG_LOCK_STATUSES.has(selectedRunStatus));
+  const selectedRunLockReason = selectedRunInputsLocked
+    ? selectedRunStatus === "succeeded"
+      ? "Completed run inputs are locked to preserve result provenance."
+      : "Queued and running run inputs are locked because execution uses an immutable input snapshot."
+    : "";
+  const selectedRunActiveJob = activeJob && selectedJob && runExecutionId(activeJob) === runExecutionId(selectedJob)
+    ? activeJob
+    : null;
+  const selectedEditableDraft = selectedJob && normalizeStatus(selectedJob.status) === "draft" && selectedJob.run_id
+    ? selectedJob
+    : null;
+  const activeProject = useMemo(
+    () => (projects || []).find((project) => project.project_id === activeProjectId) || null,
+    [projects, activeProjectId]
+  );
+  const runDisabled = selectedRunInputsLocked || !selectedEditableDraft || !scenarioKey || (selectedArchitectureRequiresMrio && !mrioScenarioId) || queueSubmitting;
+  const runDisabledReason = !selectedEditableDraft
+    ? "Click New model to create an editable draft, or select an existing draft, before running."
+    : selectedRunInputsLocked
+      ? selectedRunLockReason
+      : !scenarioKey
+        ? "Select an energy scenario before running."
+        : selectedArchitectureRequiresMrio && !mrioScenarioId
+          ? "Select a target pathway before running."
+          : "";
 
-  const selectedRunLabel = selectedRunId ? "Selected run" : "Latest run";
+  const selectedRunLabel = selectedJob ? runLabel(selectedJob) : selectedRunId ? "Selected model" : "Latest model";
   const scenarioControls = (
     <DiagramScenarioControls
+      architectureCatalog={architectureCatalog}
+      selectedArchitectureId={selectedArchitecture.id}
+      selectedArchitecture={selectedArchitecture}
+      energyModelOptions={energyModelCatalogOptions(scenarioCatalog)}
       scenarios={scenarios}
       scenarioKey={scenarioKey}
       targetScenarios={targetScenarios}
@@ -7215,10 +9838,7 @@ function App() {
       environmentSetupLoading={environmentSetupLoading}
       running={running}
       queueSubmitting={queueSubmitting}
-      aiPrompt={aiPrompt}
-      setAiPrompt={setAiPrompt}
-      onApplyAiPrompt={onApplyAiPrompt}
-      aiQueryResult={aiQueryResult}
+      onArchitectureChange={onArchitectureChange}
       onScenarioChange={setScenarioKey}
       onMrioScenarioChange={setMrioScenarioId}
       onTargetYearChange={setTargetYear}
@@ -7229,22 +9849,35 @@ function App() {
       onApplyTemplateLevers={onApplyTemplateLevers}
       onRun={onRun}
       onResetLevers={onResetLevers}
+      inputsLocked={selectedRunInputsLocked}
+      lockReason={selectedRunLockReason}
     />
   );
   const operationsPanel = (
     <div className="diagram-ops-stack">
-      <EnvironmentSetupPanel
-        environmentSetup={environmentSetup}
-        loading={environmentSetupLoading}
-        onRun={onRun}
-        runDisabled={runDisabled}
-        queueSubmitting={queueSubmitting}
-        running={running}
-        onRefresh={() =>
-          refreshEnvironmentSetup(scenarioKey, mrioScenarioId, targetYear, runProfile, effectiveStrictValidation, allowPlaceholderData)
-        }
-        style={{ marginTop: 0 }}
-      />
+      {selectedRunInputsLocked ? (
+        <DuplicateConfigurationPanel
+          selectedJob={selectedJob}
+          onDuplicateConfiguration={onDuplicateSelectedConfiguration}
+          onDeleteRun={onDeleteSelectedRun}
+          actionLoading={platformActionLoading}
+          style={{ marginTop: 0 }}
+        />
+      ) : (
+        <EnvironmentSetupPanel
+          environmentSetup={environmentSetup}
+          loading={environmentSetupLoading}
+          onRun={onRun}
+          runName={customRunName}
+          defaultRunName={defaultRunName}
+          onRunNameChange={setCustomRunName}
+          runDisabled={runDisabled}
+          runDisabledReason={runDisabledReason}
+          queueSubmitting={queueSubmitting}
+          running={running}
+          style={{ marginTop: 0 }}
+        />
+      )}
       <ActiveJobPanel activeJob={activeJob} onCancel={onCancelActiveJob} style={{ marginTop: 0 }} />
       <SelectedJobDetailsPanel job={selectedJob} style={{ marginTop: 0 }} />
     </div>
@@ -7252,9 +9885,9 @@ function App() {
   const resultsPanel = result ? (
     <RunResultsPanel
       result={result}
+      architecture={selectedArchitecture}
       selectedRunLabel={selectedRunLabel}
       runMetadata={runMetadata}
-      exchangeArtifacts={exchangeArtifacts}
       integratedMetrics={integratedMetrics}
       developmentDrivers={developmentDrivers}
       confidence={confidence}
@@ -7290,31 +9923,200 @@ function App() {
       setSpatialFilter={setSpatialFilter}
     />
   ) : null;
+  const projectPanel = (
+    <ProjectWorkspacePanel
+      activeProject={activeProject}
+      projectRuns={projectRuns}
+      projectReports={projectReports}
+      projectExports={projectExports}
+      compareRunIds={compareRunIds}
+      onToggleCompareRun={onToggleCompareRun}
+      onCreateReport={onCreateProjectReport}
+      onCreateRunExport={onCreateRunExport}
+      onNewModel={() => setNewModelModalOpen(true)}
+      actionLoading={platformActionLoading}
+    />
+  );
+  const runManagementPanel = (
+    <ModelRunManagementPane
+      activeJob={activeJob}
+      selectedJob={selectedJob}
+      operationsPanel={operationsPanel}
+      errorMessage={errorMessage}
+      statusMessage={statusMessage}
+      runViewMode={runViewMode}
+    />
+  );
+  const projectSelectionPanel = projectPanel;
+  const projectsOverviewPanel = (
+    <ProjectsOverviewPanel
+      projects={projects}
+      activeProjectId={activeProjectId}
+      activeProject={activeProject}
+      projectRuns={projectRuns}
+      projectReports={projectReports}
+      projectExports={projectExports}
+      inputDatasets={inputDatasets}
+      onOpenProject={(projectId) => handleProjectChange(projectId, "project")}
+      onCreateProject={handleCreateProject}
+      onRenameProject={handleRenameProject}
+      onArchiveProject={handleArchiveProject}
+      onRestoreProject={handleRestoreProject}
+      onDeleteProject={handleDeleteProject}
+      onDownloadProjectFiles={onDownloadProjectFiles}
+      onRefreshDatasets={refreshInputDatasets}
+      actionLoading={platformActionLoading}
+      isAdminView={isAdminView}
+    />
+  );
+  const comparePanel = (
+    <ProjectComparePanel
+      activeProject={activeProject}
+      projectRuns={projectRuns}
+      projectReports={projectReports}
+      projectExports={projectExports}
+      compareRunIds={compareRunIds}
+      onToggleCompareRun={onToggleCompareRun}
+      isAdminView={isAdminView}
+    />
+  );
+  const showRunTabs = runViewMode !== "projects" && Boolean(activeProject);
+  const clearMethodologyRoute = () => {
+    if (window.location.hash === "#/methodology" && window.history && window.history.pushState) {
+      window.history.pushState("", document.title, window.location.pathname + window.location.search);
+    }
+  };
+  const openMethodologyPage = () => {
+    setMethodologyOpen(true);
+    setLandingOpen(false);
+    if (window.location.hash !== "#/methodology") window.location.hash = "/methodology";
+  };
+  const openLandingPage = () => {
+    clearMethodologyRoute();
+    setMethodologyOpen(false);
+    setLandingOpen(true);
+  };
+  const openProjectsPage = () => {
+    clearMethodologyRoute();
+    setMethodologyOpen(false);
+    setLandingOpen(false);
+    setRunViewMode("projects");
+  };
+
+  if (methodologyOpen) {
+    const MethodologyPage = window.EDIMMethodology && window.EDIMMethodology.MethodologyPage;
+    return MethodologyPage ? (
+      <MethodologyPage
+        architectureCatalog={architectureCatalog}
+        header={(
+          <UnifiedHeader
+            currentUserId={currentUserId}
+            availableUsers={availableUsers}
+            onUserChange={handleUserChange}
+            apiTarget={apiTarget}
+            systemCompatibility={systemCompatibility}
+            onApiTargetModeChange={handleApiTargetModeChange}
+            apiTargetLoading={platformActionLoading}
+            onReturnToLanding={openLandingPage}
+          />
+        )}
+        onOpenProjects={openProjectsPage}
+        onStartProject={openProjectsPage}
+        onReturnDashboard={openLandingPage}
+      />
+    ) : (
+      <div className="container">
+        <div className="card">
+          <h2>Explore the methodology</h2>
+          <p className="muted">The methodology page script is not loaded.</p>
+          <button type="button" onClick={openProjectsPage}>Open projects</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (landingOpen) {
+    return (
+      <LandingPage
+        currentUserId={currentUserId}
+        availableUsers={availableUsers}
+        onUserChange={handleUserChange}
+        apiTarget={apiTarget}
+        systemCompatibility={systemCompatibility}
+        onApiTargetModeChange={handleApiTargetModeChange}
+        apiTargetLoading={platformActionLoading}
+        onEnter={() => {
+          openProjectsPage();
+        }}
+        onOpenMethodology={openMethodologyPage}
+        statusMessage={statusMessage}
+        errorMessage={errorMessage}
+      />
+    );
+  }
 
   return (
     <div className="app-shell">
-      <DashboardHeader
+      <UnifiedHeader
         runViewMode={runViewMode}
-        onRunViewModeChange={setRunViewMode}
-        hasResult={Boolean(result)}
+        currentUserId={currentUserId}
+        availableUsers={availableUsers}
+        onUserChange={handleUserChange}
+        projects={projects}
+        activeProjectId={activeProjectId}
+        onReturnToProjects={() => setRunViewMode("projects")}
+        apiTarget={apiTarget}
+        systemCompatibility={systemCompatibility}
+        onApiTargetModeChange={handleApiTargetModeChange}
+        apiTargetLoading={platformActionLoading}
+        onReturnToLanding={openLandingPage}
       />
+
+      {newModelModalOpen ? (
+        <NewModelModal
+          projectRuns={projectRuns}
+          defaultName={defaultRunName}
+          onClose={() => setNewModelModalOpen(false)}
+          onCreateBase={onCreateBaseModelDraft}
+          onCreateFromExisting={onCreateModelDraftFromExisting}
+          actionLoading={platformActionLoading}
+        />
+      ) : null}
+
+      <div className={`global-run-tab-bar ${showRunTabs ? "" : "empty"}`}>
+        {showRunTabs ? (
+          <RunTabs
+            jobs={jobs}
+            selectedJobId={selectedJobId}
+            activeJob={activeJob}
+            mode={runViewMode}
+            onSelectProjectView={onSelectProjectView}
+            onSelectJob={onSelectJob}
+            onNewModel={() => setNewModelModalOpen(true)}
+            newModelDisabled={!activeProjectId || platformActionLoading}
+          />
+        ) : null}
+      </div>
 
       <div className="app-body app-body-single">
         <ArchitectureRunWorkspace
+          architecture={selectedArchitecture}
           runViewMode={runViewMode}
-          jobs={jobs}
-          selectedJobId={selectedJobId}
-          activeJob={activeJob}
-          onSelectJob={onSelectJob}
+          flowActiveJob={selectedRunActiveJob}
+          inputsLocked={selectedRunInputsLocked}
+          lockReason={selectedRunLockReason}
           selectedRunId={selectedRunId}
           result={result}
-          exchangeArtifacts={exchangeArtifacts}
           inputDatasets={inputDatasets}
           onUploadDataset={onUploadDataset}
+          onDatasetVersionChange={onDatasetVersionChange}
           errorMessage={errorMessage}
           statusMessage={statusMessage}
+          runManagementPanel={runManagementPanel}
+          projectInfoPanel={projectSelectionPanel}
+          projectsOverviewPanel={projectsOverviewPanel}
+          comparePanel={comparePanel}
           scenarioControls={scenarioControls}
-          operationsPanel={operationsPanel}
           resultsPanel={resultsPanel}
         />
       </div>
