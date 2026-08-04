@@ -551,17 +551,30 @@ def _execute_payload(
     execution_id = payload["execution_id"]
     attempt_count = int(payload.get("attempt_count", 1))
     dataset_versions = payload.get("dataset_versions", [])
-    request_payload = payload.get("request_payload") or {}
 
-    bundle = {
-        "execution_id": execution_id,
-        "run_id": run_id,
-        "project_id": payload.get("project_id"),
-        "user_id": payload.get("user_id"),
-        "request_payload": request_payload,
-        "dataset_versions": dataset_versions,
-        "attempt_count": attempt_count,
-    }
+    # When the API has already constructed a complete model_run_bundle_v1
+    # (signalled by the presence of "schema_version"), pass it directly to
+    # the black-box CLI without reconstruction.
+    if "schema_version" in payload:
+        bundle = dict(payload)
+    else:
+        request_payload = payload.get("request_payload") or {}
+        bundle = {
+            "execution_id": execution_id,
+            "run_id": run_id,
+            "project_id": payload.get("project_id"),
+            "user_id": payload.get("user_id"),
+            "request_payload": request_payload,
+            "dataset_versions": dataset_versions,
+            "attempt_count": attempt_count,
+        }
+
+    # Clean up stale directories from prior attempts (retry safety).
+    # The model runtime's _create_run_dir uses mkdir(exist_ok=False).
+    for stale in (config.runs_dir / run_id, config.runs_dir / execution_id):
+        if stale.exists():
+            shutil.rmtree(stale)
+
     workspace = _stage_workspace(config, execution_id, bundle)
 
     # Upload the request bundle to blob for traceability (plan 7 / issue 7).
@@ -655,7 +668,7 @@ def _execute_payload(
                 storage_refs = _upload_artifacts(config, blob_client, artifact_root, run_id, artifact_catalog)
                 if summary is None:
                     summary = {}
-                summary["artifact_storage_refs"] = storage_refs
+                summary["artifact_catalog"] = storage_refs
             except Exception as exc:
                 logger.exception("Artifact upload failed for run %s", run_id)
                 outcome = "failed"
@@ -692,7 +705,7 @@ def _execute_payload(
         attempt_count,
         error,
         summary,
-        summary.get("artifact_storage_refs", []) if isinstance(summary, dict) else [],
+        summary.get("artifact_catalog", []) if isinstance(summary, dict) else [],
         started_at,
         finished_at,
         blob_client=blob_client,
@@ -744,7 +757,7 @@ def _send_completion(
         "error": error,
         "summary": None if summary_ref else summary,
         "summary_ref": summary_ref,
-        "artifact_storage_refs": artifact_storage_refs,
+        "artifact_catalog": artifact_storage_refs,
         "started_at": started_at,
         "finished_at": finished_at or _utcnow_iso(),
     }
@@ -814,21 +827,21 @@ def _process_one(config: WorkerConfig, execution_client, completion_client, canc
         execution_id = payload.get("execution_id")
         logger.info("Received SB message execution_id=%s", execution_id)
 
-        lease = _ActiveLease(sb_message, receiver)
-        lease.start_renewer(config.lock_renewal_seconds)
+        # Complete the Service Bus message immediately so the emulator does not
+        # redeliver it when lock renewal fails (a known issue with the local
+        # Service Bus emulator).  Status is tracked exclusively through the
+        # completion queue, so the API knows the run outcome even if the
+        # worker crashes after this point.
+        try:
+            receiver.complete_message(sb_message)
+            logger.info("Completed SB message execution_id=%s (immediate settlement)", execution_id)
+        except Exception:
+            logger.warning("Could not complete SB message for execution_id=%s; continuing anyway", execution_id, exc_info=True)
 
         try:
             _execute_payload(config, execution_client, completion_client, cancellation_client, blob_client, payload)
-            lease.complete()
-            logger.info("Completed SB message execution_id=%s", execution_id)
         except Exception:
             logger.exception("Run failed for execution_id=%s", execution_id)
-            try:
-                lease.dead_letter(reason="run exception")
-            except Exception:
-                logger.exception("Failed to dead-letter message")
-        finally:
-            lease.stop_renewer()
     return True
 
 

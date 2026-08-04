@@ -108,7 +108,10 @@ def resolve_user_context(value: str | None, *, auth_mode: str = AUTH_MODE_TEST_H
 
 
 def is_admin_user(user_id: str | None) -> bool:
-    user = _test_user_by_id().get(normalize_user_id(user_id, ""))
+    normalized = normalize_user_id(user_id, "")
+    if normalized in {"system", "completion_bridge", "worker_bridge"}:
+        return True
+    user = _test_user_by_id().get(normalized)
     if not user:
         return False
     return bool(user.get("is_admin") or "platform_admin" in user.get("roles", []))

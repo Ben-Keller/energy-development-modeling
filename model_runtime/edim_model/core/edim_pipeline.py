@@ -251,7 +251,6 @@ def _prepare_scenario(ctx: EdimPipelineContext) -> None:
     write_scenario_artifacts(
         ctx.run_dir,
         ctx.scenario_package,
-        artifact_registry=ctx.artifact_registry,
     )
 
 

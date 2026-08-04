@@ -108,6 +108,8 @@ class JobManager:
         event_store: EventStore | None = None,
         dataset_repository: DatasetRepository | None = None,
         artifact_storage: ArtifactStorageService | None = None,
+        *,
+        start_worker: bool = True,
     ):
         self._settings = settings
         self._runtime_manifest = self._load_runtime_manifest()
@@ -120,8 +122,12 @@ class JobManager:
         self._pending: List[str] = []
         self._queue = execution_queue or LocalExecutionQueue()
         self._lock = threading.Lock()
-        self._worker = threading.Thread(target=self._worker_loop, daemon=True, name="edim-run-worker")
-        self._worker.start()
+        self._start_worker = start_worker
+        if start_worker:
+            self._worker = threading.Thread(target=self._worker_loop, daemon=True, name="edim-run-worker")
+            self._worker.start()
+        else:
+            self._worker = None
 
     def _load_runtime_manifest(self) -> ModelRuntimeManifest:
         path = getattr(self._settings, "model_manifest_path", None)

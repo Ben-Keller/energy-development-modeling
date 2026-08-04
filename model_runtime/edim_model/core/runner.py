@@ -2691,7 +2691,6 @@ def _attach_mrio_direct_layer(
         run_dir,
         scenario_package,
         mrio_direct_inputs=mrio_direct_inputs,
-        artifact_registry=artifact_registry,
     )
     warnings.append(
         "MRIO-direct heuristic outputs are retained separately; bridge-derived values remain authoritative for headline totals."

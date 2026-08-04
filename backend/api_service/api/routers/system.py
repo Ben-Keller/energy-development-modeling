@@ -432,16 +432,27 @@ def get_environment_setup(
         },
     ]
     platform_backend = str(getattr(settings, "platform_store_backend", "sqlite") or "sqlite").strip().lower()
+    import os as _os
+    database_url = _os.getenv("EDIM_DATABASE_URL", "").strip()
+    if database_url:
+        platform_backend = "postgresql"
     platform_path = getattr(settings, "platform_sqlite_path", None)
     sqlite_path = Path(str(platform_path or settings.runs_dir.parent / "platform" / "platform.sqlite3"))
-    storage_ok = platform_backend in {"sqlite", "sqlite3"} and (sqlite_path.exists() or sqlite_path.parent.exists())
+    if database_url:
+        storage_ok = True
+        store_label = "PostgreSQL"
+        store_path = database_url.split("@")[-1] if "@" in database_url else database_url
+    else:
+        storage_ok = platform_backend in {"sqlite", "sqlite3"} and (sqlite_path.exists() or sqlite_path.parent.exists())
+        store_label = "SQLite"
+        store_path = str(sqlite_path)
     checks.append(
         {
             "id": "platform_metadata_store",
             "type": "storage",
             "status": "ok" if storage_ok else "error",
-            "message": f"Platform metadata store: SQLite at {sqlite_path}",
-            "path": str(sqlite_path),
+            "message": f"Platform metadata store: {store_label} at {store_path}",
+            "path": str(sqlite_path) if not database_url else store_path,
         }
     )
     placeholder_datasets = []

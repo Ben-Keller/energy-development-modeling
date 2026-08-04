@@ -26,7 +26,6 @@ from ..runtime import ArtifactRegistry
 try:
     from azure.core.exceptions import ResourceNotFoundError
     from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions
-    from azure.storage.blob._shared_access_signature import _UserDelegationKey
     _BLOB_SDK_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _BLOB_SDK_AVAILABLE = False
@@ -82,8 +81,24 @@ def _artifact_container_name() -> str:
 
 
 def _blob_name(run_id: str, artifact_id: str) -> str:
-    """Consistent blob path: ``runs/<run_id>/<artifact_id>``."""
-    return f"runs/{run_id}/{artifact_id}"
+    """Blob path matching the worker upload convention.
+
+    Worker uploads to ``<run_id>/<rel_path>`` (e.g. ``<run_id>/summary.json``).
+    The API uses artifact IDs like ``summary_json`` which are mapped here.
+    """
+    # Map common artifact IDs to the relative paths used by the worker.
+    _id_to_file: dict[str, str] = {
+        "summary_json": "summary.json",
+        "results_csv": "results.csv",
+        "operating_shocks_csv": "exchange/operating_shocks.csv",
+        "investment_shocks_csv": "exchange/investment_shocks.csv",
+        "integrated_results_json": "integrated_results.json",
+        "coupling_manifest_json": "coupling_manifest.json",
+        "development_impacts_json": "development_impacts.json",
+        "report_md": "report.md",
+    }
+    file_name = _id_to_file.get(artifact_id, artifact_id)
+    return f"{run_id}/{file_name}"
 
 
 # ---------------------------------------------------------------------------

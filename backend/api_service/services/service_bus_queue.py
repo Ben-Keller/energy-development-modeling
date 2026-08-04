@@ -191,6 +191,124 @@ class ServiceBusQueueClient:
         thread.join(timeout=2)
 
 
+class ServiceBusExecutionQueue:
+    """Service Bus adapter matching the LocalExecutionQueue interface.
+
+    Exposes ``put / qsize / task_done`` so it can be injected as the
+    ``execution_queue`` parameter of the local ``JobManager``.  When this
+    adapter is active the ``JobManager`` worker thread is disabled — the
+    isolated ``edim-worker`` container consumes the same Service Bus queue
+    and runs models externally.
+
+    On ``put()``, the adapter constructs a complete ``model_run_bundle_v1``
+    bundle from the incoming message dict and the injected manifest/settings.
+    The worker daemon receives this bundle and writes it directly to
+    ``request_bundle.json`` — no reconstruction needed.
+    """
+
+    def __init__(
+        self,
+        client: ServiceBusQueueClient,
+        settings: "Settings | None" = None,
+        manifest: dict | None = None,
+        runtime_config: dict | None = None,
+    ) -> None:
+        self._client = client
+        self._settings = settings
+        self._manifest = manifest or {}
+        self._runtime_config = runtime_config or {}
+
+    def put(self, message: dict) -> None:
+        execution_id = str(message.get("execution_id") or "")
+        run_id = str(message.get("run_id") or "")
+
+        # Construct a complete model_run_bundle_v1 bundle so the worker
+        # daemon can pass it directly to the black-box CLI.
+        bundle = self._build_bundle(message)
+        self._client.send_json(
+            bundle,
+            message_id=execution_id,
+            correlation_id=run_id,
+        )
+        logger.info("Dispatched execution %s to Service Bus queue %s", execution_id, self._client._queue_name)
+
+    def _build_bundle(self, message: dict) -> dict:
+        """Build a model_run_bundle_v1 from a queue message and injected config."""
+        execution_id = str(message.get("execution_id") or "")
+        run_id = str(message.get("run_id") or execution_id)
+        request_payload = message.get("request_payload") if isinstance(message.get("request_payload"), dict) else {}
+
+        artifact_policy = {}
+        if self._runtime_config:
+            artifact_policy = self._runtime_config.get("artifacts") if isinstance(self._runtime_config.get("artifacts"), dict) else {}
+
+        runtime_settings: dict = {}
+        if self._settings is not None:
+            runtime_settings = self._settings_snapshot(self._settings)
+
+        return {
+            "schema_version": "model_run_bundle_v1",
+            "execution_id": execution_id,
+            "run_id": run_id,
+            "project_id": message.get("project_id", ""),
+            "user_id": message.get("user_id", ""),
+            "request": request_payload,
+            "dataset_versions": message.get("dataset_versions") or [],
+            "attempt_count": int(message.get("attempt_count", message.get("attempt", 1))),
+            "model_runtime": self._manifest,
+            "artifact_policy": artifact_policy,
+            "runtime_settings": runtime_settings,
+        }
+
+    @staticmethod
+    def _settings_snapshot(settings) -> dict:
+        """Minimal runtime_settings snapshot for the model black box."""
+        from pathlib import Path
+
+        def _ps(p):
+            return str(p.resolve()) if p is not None else ""
+
+        rc = getattr(settings, "runtime_config", {}) or {}
+        return {
+            "calliope_root": _ps(getattr(settings, "calliope_root", None)),
+            "runs_dir": _ps(getattr(settings, "runs_dir", None)),
+            "config_dir": _ps(getattr(settings, "config_dir", None)),
+            "dev_subset_start": getattr(settings, "dev_subset_start", ""),
+            "dev_subset_end": getattr(settings, "dev_subset_end", ""),
+            "analysis_subset_start": getattr(settings, "analysis_subset_start", ""),
+            "analysis_subset_end": getattr(settings, "analysis_subset_end", ""),
+            "dev_solver_time_limit_seconds": getattr(settings, "dev_solver_time_limit_seconds", 0),
+            "analysis_solver_time_limit_seconds": getattr(settings, "analysis_solver_time_limit_seconds", 0),
+            "allow_full_year": getattr(settings, "allow_full_year", False),
+            "solver": getattr(settings, "solver", "highs"),
+            "summary_max_generation_techs": getattr(settings, "summary_max_generation_techs", 0),
+            "summary_max_generation_timesteps": getattr(settings, "summary_max_generation_timesteps", 0),
+            "summary_max_category_rows": getattr(settings, "summary_max_category_rows", 0),
+            "summary_diagnostics_max_rows": getattr(settings, "summary_diagnostics_max_rows", 0),
+            "development_engine": getattr(settings, "development_engine", "mario"),
+            "mario_db_path": getattr(settings, "mario_db_path", ""),
+            "mario_timeout_seconds": getattr(settings, "mario_timeout_seconds", 120.0),
+            "mario_fail_on_error": getattr(settings, "mario_fail_on_error", False),
+            "model_runtime_mode": getattr(settings, "model_runtime_mode", "subprocess"),
+            "runtime_artifact_handoff_mode": getattr(settings, "runtime_artifact_handoff_mode", "shared_filesystem"),
+            "dataset_staging_mode": getattr(settings, "dataset_staging_mode", "copy_to_run"),
+            "model_manifest_path": _ps(getattr(settings, "model_manifest_path", None)),
+            "dataset_manifest_path": _ps(getattr(settings, "dataset_manifest_path", None)),
+            "runtime_config": rc,
+            "job_dedupe_enabled": getattr(settings, "job_dedupe_enabled", True),
+            "job_queue_capacity": getattr(settings, "job_queue_capacity", 12),
+        }
+
+    def qsize(self) -> int:
+        return 0
+
+    def task_done(self) -> None:
+        pass
+
+    def get(self):
+        raise RuntimeError("ServiceBusExecutionQueue.get() is not used when start_worker=False")
+
+
 class AzureServiceBusQueue(ExecutionQueue):
     """Azure Service Bus implementation of the ExecutionQueue protocol.
 

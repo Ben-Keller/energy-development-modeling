@@ -130,7 +130,7 @@ services:
       - ./backend:/app/backend:rw
       - ./frontend:/app/frontend:ro
       - ./inputs:/app/inputs:rw
-      - ./Calliope-Africa-main:/app/calliope-africa:ro
+      - ./model_runtime/model_modules/calliope/Calliope-Africa-main:/app/calliope-africa:ro
       - ./model_runtime:/app/model_runtime:ro
       # Scenario report (referenced by repo_root in settings)
       - ./Energy Modelling Scenario Report.docx:/app/Energy Modelling Scenario Report.docx:ro
@@ -179,6 +179,7 @@ services:
       EDIM_BLOB_PUBLIC_URL: ${EDIM_BLOB_PUBLIC_URL:-http://localhost:10000}
       EDIM_SERVICEBUS_CONNECTION_STRING: Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
       EDIM_SERVICEBUS_QUEUE_NAME: ${EDIM_SERVICEBUS_QUEUE_NAME:-execution-queue-local}
+      EDIM_BLOB_ARTIFACT_CONTAINER: stg-run-artifacts
 
       # OpenAI / Azure OpenAI (optional)
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
@@ -215,7 +216,7 @@ services:
       # black box currently lives there and is loaded by edim_model.cli.
       # The worker daemon itself does not import backend service code.
       - ./inputs:/app/inputs:rw
-      - ./Calliope-Africa-main:/app/calliope-africa:ro
+      - ./model_runtime/model_modules/calliope/Calliope-Africa-main:/app/calliope-africa:ro
       # Scenario report (referenced by repo_root in settings)
       - ./Energy Modelling Scenario Report.docx:/app/Energy Modelling Scenario Report.docx:ro
       # Shared runtime outputs

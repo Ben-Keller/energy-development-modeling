@@ -52,10 +52,16 @@ def _normalize_request_for_project(req: RunRequest | PublicRunCreateRequest | Di
     payload = req.model_dump(mode="json") if hasattr(req, "model_dump") else dict(req)
     scenario = payload.get("scenario")
     if isinstance(scenario, dict):
-        payload["energy_scenario_key"] = scenario.get("energy_scenario_key") or payload.get("energy_scenario_key")
-        payload["mrio_scenario_id"] = scenario.get("target_scenario_id") or scenario.get("mrio_scenario_id") or payload.get("mrio_scenario_id")
-        payload["target_year"] = scenario.get("target_year") or payload.get("target_year")
+        energy_key = str(scenario.get("energy_scenario_key") or payload.get("energy_scenario_key") or "").strip()
+        mrio_id = str(scenario.get("target_scenario_id") or scenario.get("mrio_scenario_id") or payload.get("mrio_scenario_id") or "").strip()
+        payload["energy_scenario_key"] = energy_key or "new_links"
+        payload["mrio_scenario_id"] = mrio_id or "S2"
+        payload["target_year"] = scenario.get("target_year") or payload.get("target_year") or 2030
         payload.pop("scenario", None)
+    # Ensure non-empty defaults satisfy Pydantic min_length=1 constraints.
+    payload["energy_scenario_key"] = str(payload.get("energy_scenario_key") or "").strip() or "new_links"
+    payload["mrio_scenario_id"] = str(payload.get("mrio_scenario_id") or "").strip() or "S2"
+    payload["target_year"] = payload.get("target_year") or 2030
     profile = str(payload.get("run_profile") or "dev").strip().lower() or "dev"
     payload["run_profile"] = profile
     payload.setdefault("model_architecture_id", "energy-development")
@@ -177,14 +183,26 @@ def get_run_status(
     storage: ArtifactStorageService = Depends(get_artifact_storage_service),
     user: UserContext = Depends(get_current_user_context),
 ):
+    # When Service Bus is active, the CompletionBridge updates Postgres directly
+    # while JobManager keeps stale in-memory state. Prefer repository for non-terminal
+    # runs so the frontend sees running/succeeded/failed transitions promptly.
+    mem_info: RunExecutionInfo | None = None
     try:
-        return _status_view_from_execution_info(job_manager.get(execution_id, user_id=user.user_id))
-    except KeyError as exc:
-        try:
-            record = repository.get_run_record_by_execution(execution_id, user_id=user.user_id)
-        except Exception:
-            raise HTTPException(status_code=404, detail="Run not found") from exc
-        return _status_view_from_execution_info(_execution_info_from_record(record, storage=storage))
+        mem_info = job_manager.get(execution_id, user_id=user.user_id)
+    except KeyError:
+        pass
+
+    try:
+        record = repository.get_run_record_by_execution(execution_id, user_id=user.user_id)
+    except Exception:
+        if mem_info is not None:
+            return _status_view_from_execution_info(mem_info)
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    repo_info = _execution_info_from_record(record, storage=storage)
+    if mem_info is not None and repo_info.queue_position is None:
+        repo_info = repo_info.model_copy(update={"queue_position": mem_info.queue_position})
+    return _status_view_from_execution_info(repo_info)
 
 
 @router.post("/api/executions/{execution_id}/cancel", response_model=RunStatusView)

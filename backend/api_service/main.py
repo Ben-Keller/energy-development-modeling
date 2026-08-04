@@ -89,6 +89,85 @@ def _create_artifact_storage(settings: Settings) -> ArtifactStorageService:
     return LocalArtifactStorageService(settings)
 
 
+def _create_execution_queue(settings: Settings):
+    """Return a Service Bus queue adapter when EDIM_SERVICEBUS_CONNECTION_STRING is set.
+
+    When Service Bus is active the JobManager dispatches execution messages to the
+    bus instead of an in-process queue and its worker thread is disabled — the
+    isolated edim-worker container independently consumes the same queue and runs
+    models.  Returns None (→ LocalExecutionQueue default) when Service Bus is not
+    configured.
+    """
+    conn_str = os.getenv("EDIM_SERVICEBUS_CONNECTION_STRING", "").strip()
+    namespace = os.getenv("EDIM_SERVICEBUS_NAMESPACE", "").strip()
+    if not conn_str and not namespace:
+        return None, True  # queue=None, start_worker=True (local in-process)
+
+    try:
+        from .services.service_bus_queue import ServiceBusExecutionQueue, ServiceBusQueueClient
+
+        queue_name = os.getenv("EDIM_SERVICEBUS_QUEUE_NAME", "execution-queue-local").strip()
+        client = ServiceBusQueueClient(
+            queue_name=queue_name,
+            connection_string=conn_str or None,
+            namespace=namespace or None,
+        )
+
+        # Load the model runtime manifest so the ServiceBusExecutionQueue can
+        # build complete model_run_bundle_v1 bundles for the black-box CLI.
+        manifest: dict = {}
+        manifest_path = getattr(settings, "model_manifest_path", None)
+        if manifest_path and manifest_path.exists():
+            try:
+                import json as _json
+                manifest = _json.loads(manifest_path.read_text(encoding="utf-8"))
+                if not isinstance(manifest, dict):
+                    manifest = {}
+            except Exception:
+                logger.warning("Could not load model manifest for Service Bus dispatch.", exc_info=True)
+
+        runtime_config = getattr(settings, "runtime_config", {}) or {}
+
+        logger.info("Dispatching execution messages to Azure Service Bus queue '%s'.", queue_name)
+        return ServiceBusExecutionQueue(
+            client,
+            settings=settings,
+            manifest=manifest,
+            runtime_config=runtime_config,
+        ), False  # queue, start_worker=False
+    except Exception as exc:
+        logger.warning("Service Bus unavailable (%s); using local in-process queue.", exc)
+        return None, True
+
+
+def _create_completion_bridge(platform_repository):
+    """Start a CompletionBridge when Service Bus is configured.
+
+    Returns None when Service Bus is not available (the in-process
+    JobManager writes run status directly in that case).
+    """
+    conn_str = os.getenv("EDIM_SERVICEBUS_CONNECTION_STRING", "").strip()
+    namespace = os.getenv("EDIM_SERVICEBUS_NAMESPACE", "").strip()
+    if not conn_str and not namespace:
+        return None
+
+    try:
+        from .services.completion_bridge import CompletionBridge
+
+        queue_name = os.getenv("EDIM_SERVICEBUS_COMPLETION_QUEUE_NAME", "completion-queue-local").strip()
+        bridge = CompletionBridge(
+            platform_repository=platform_repository,
+            queue_name=queue_name,
+            connection_string=conn_str or None,
+            namespace=namespace or None,
+        )
+        logger.info("CompletionBridge ready for queue '%s'.", queue_name)
+        return bridge
+    except Exception as exc:
+        logger.warning("CompletionBridge unavailable (%s); worker status updates will not be persisted.", exc)
+        return None
+
+
 def _discover_frontend_dir(settings) -> Path | None:
     env_dir = (os.getenv("EDIM_FRONTEND_DIR") or "").strip()
     if env_dir:
@@ -138,13 +217,25 @@ def create_app(
     dataset_repository = dataset_repository or LocalDatasetRepository(settings)
     event_store = event_store or _create_event_store(settings)
     model_catalog_provider = model_catalog_provider or RuntimeCliModelCatalogProvider()
+
+    execution_queue, start_worker = _create_execution_queue(settings)
     job_manager = job_manager or JobManager(
         settings,
         run_repository=platform_repository,
         dataset_repository=dataset_repository,
         event_store=event_store,
         artifact_storage=artifact_storage,
+        execution_queue=execution_queue,
+        start_worker=start_worker,
     )
+
+    # When Service Bus is configured, start a background bridge that
+    # listens on the completion queue and updates run status in Postgres.
+    # The isolated worker daemon posts status updates there; the bridge
+    # is the only component that writes terminal state to the DB.
+    completion_bridge = _create_completion_bridge(platform_repository)
+    if completion_bridge is not None:
+        completion_bridge.start()
 
     app = FastAPI(title="EDIM Calliope-Africa API", version="0.1.0")
     app.state.settings = settings
@@ -154,6 +245,7 @@ def create_app(
     app.state.event_store = event_store
     app.state.model_catalog_provider = model_catalog_provider
     app.state.job_manager = job_manager
+    app.state.completion_bridge = completion_bridge
     app.state.frontend_dir = _discover_frontend_dir(settings)
 
     app.add_middleware(
@@ -172,6 +264,14 @@ def create_app(
 
     for router in (system_router, platform_router, scenarios_router, datasets_router, runs_router):
         app.include_router(router)
+
+    # Graceful shutdown: stop the completion bridge background thread.
+    @app.on_event("shutdown")
+    def _stop_bridge() -> None:
+        bridge = getattr(app.state, "completion_bridge", None)
+        if bridge is not None:
+            bridge.stop()
+
     return app
 
 
