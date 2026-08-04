@@ -102,6 +102,42 @@ class PlatformUserRecord(BaseModel):
     auth_mode: str = ""
 
 
+class ProjectVisualModelSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    project_run_number: int = 0
+    status: str = "draft"
+    architecture_id: str = "energy-development"
+    scenario_key: str = ""
+    target_scenario_id: str = ""
+    target_year: int | None = None
+    run_profile: str = "dev"
+    lever_count: int = 0
+    artifact_count: int = 0
+    kpi_scope_count: int = 0
+    summary_available: bool = False
+    evidence_status: str = "not_evaluated"
+    evidence_score: int = 0
+
+
+class ProjectVisualSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model_count: int = 0
+    completed_count: int = 0
+    active_count: int = 0
+    failed_count: int = 0
+    architecture_count: int = 0
+    scenario_count: int = 0
+    kpi_scope_count: int = 0
+    variation_score: float = 0.0
+    evidence_status: str = "not_evaluated"
+    exploratory_model_count: int = 0
+    analyst_review_model_count: int = 0
+    models: List[ProjectVisualModelSummary] = Field(default_factory=list)
+
+
 class ProjectRecord(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -118,6 +154,7 @@ class ProjectRecord(BaseModel):
     last_updated_by_user_id: str = ""
     created_at: str = ""
     updated_at: str = ""
+    visual_summary: ProjectVisualSummary = Field(default_factory=ProjectVisualSummary)
 
 
 class ProjectRunRecord(BaseModel):
@@ -148,6 +185,13 @@ class ProjectRunRecord(BaseModel):
     artifact_catalog: List[Dict[str, Any]] = Field(default_factory=list)
     summary_available: bool = False
     source_run_id: str = ""
+    model_id: str = ""
+    model_number: int = 0
+    model_name: str = ""
+    latest_execution_id: str = ""
+    evidence_status: str = "not_evaluated"
+    evidence_score: int = 0
+    evidence_summary: str = ""
 
 
 class PublicRunScenarioSelection(BaseModel):
@@ -195,6 +239,13 @@ class ProjectRunListItem(BaseModel):
     project_id: str = ""
     project_run_number: int = 0
     run_name: str = ""
+    model_id: str = ""
+    model_number: int = 0
+    model_name: str = ""
+    latest_execution_id: str = ""
+    evidence_status: str = "not_evaluated"
+    evidence_score: int = 0
+    evidence_summary: str = ""
     status: RunStatus | str = "draft"
     stage: str = ""
     progress: float = 0.0
@@ -243,6 +294,8 @@ class ReportRecord(BaseModel):
     report_type: str = ""
     format: str = "markdown"
     source_schema_version: str = ""
+    evidence_status: str = "not_evaluated"
+    requires_evidence_acknowledgement: bool = False
     status: str = ""
     owner_user_id: str = ""
     created_by_user_id: str = ""
@@ -268,6 +321,8 @@ class ExportRecord(BaseModel):
     updated_at: str = ""
     storage_ref: StorageReference | None = None
     size_bytes: int = 0
+    evidence_status: str = "not_evaluated"
+    contains_exploratory_outputs: bool = False
     download_url: str = ""
 
 
@@ -377,6 +432,7 @@ class InputDatasetDescriptor(BaseModel):
     size_bytes: int | None = None
     active_version_id: str = ""
     versioned_override: bool = False
+    project_ids: List[str] = Field(default_factory=list)
     download_url: str
 
 
@@ -384,6 +440,47 @@ class InputDatasetListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     datasets: List[InputDatasetDescriptor] = Field(default_factory=list)
+
+
+class InputDatasetCreatePayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1, max_length=200)
+    layer: str = Field(min_length=1, max_length=80)
+    role: str = Field(min_length=1, max_length=500)
+    scope: str = Field(default="user", max_length=50)
+    upload_policy: str = Field(default="project_override", max_length=80)
+
+
+class InputDatasetPatchPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str | None = Field(default=None, min_length=1, max_length=200)
+    layer: str | None = Field(default=None, min_length=1, max_length=80)
+    role: str | None = Field(default=None, min_length=1, max_length=500)
+
+
+class InputDatasetResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dataset: InputDatasetDescriptor
+
+
+class ProjectDatasetAssignmentPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dataset_id: str = Field(min_length=1, max_length=120, pattern=r"^[a-z0-9_]+$")
+    version_id: str = Field(min_length=1, max_length=200)
+
+
+class ProjectDatasetAssignmentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool = True
+    project_id: str
+    dataset_id: str
+    version_id: str
+    project_ids: List[str] = Field(default_factory=list)
 
 
 class DatasetVersionMetadata(BaseModel):
@@ -397,6 +494,7 @@ class DatasetVersionMetadata(BaseModel):
     created_at: str = ""
     scope: str = ""
     user_id: str = ""
+    project_ids: List[str] = Field(default_factory=list)
     validation: Dict[str, Any] = Field(default_factory=dict)
 
 

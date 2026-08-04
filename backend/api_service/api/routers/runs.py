@@ -95,10 +95,14 @@ def _public_project_run_list_item(record: Dict[str, Any]) -> Dict[str, Any]:
     run_id = str(record.get("run_id") or "")
     return {
         "run_id": run_id,
+        "model_id": str(record.get("model_id") or run_id),
         "execution_id": str(record.get("execution_id") or ""),
+        "latest_execution_id": str(record.get("latest_execution_id") or record.get("execution_id") or ""),
         "project_id": str(record.get("project_id") or ""),
         "project_run_number": int(record.get("project_run_number") or 0),
+        "model_number": int(record.get("model_number") or record.get("project_run_number") or 0),
         "run_name": str(record.get("run_name") or ""),
+        "model_name": str(record.get("model_name") or record.get("run_name") or ""),
         "status": status,
         "stage": str(record.get("stage") or status),
         "progress": float(record.get("progress") or 0.0),
@@ -120,6 +124,9 @@ def _public_project_run_list_item(record: Dict[str, Any]) -> Dict[str, Any]:
             else None
         ),
         "summary_available": bool(record.get("summary_available")),
+        "evidence_status": str(record.get("evidence_status") or "not_evaluated"),
+        "evidence_score": int(record.get("evidence_score") or 0),
+        "evidence_summary": str(record.get("evidence_summary") or ""),
         "source_run_id": str(record.get("source_run_id") or ""),
         "configuration": _public_run_configuration(record).model_dump(mode="json"),
     }
@@ -449,7 +456,7 @@ def patch_project_run(
     if current.get("project_id") != actual_project_id:
         raise HTTPException(status_code=404, detail="Run record not found in project.")
     updates: Dict[str, Any] = {}
-    if payload.request is not None or payload.run_name is not None:
+    if payload.request is not None:
         _require_draft_run(current, action="edit")
     if payload.request is not None:
         normalized = _normalize_request_for_project(payload.request, actual_project_id, settings=settings)
@@ -457,9 +464,14 @@ def patch_project_run(
         updates["run_name"] = normalized.run_name
     if payload.run_name is not None:
         updates["run_name"] = payload.run_name
-        request_payload = dict(updates.get("request") or current.get("request") or {})
-        request_payload["run_name"] = payload.run_name
-        updates["request"] = _normalize_request_for_project(request_payload, actual_project_id, settings=settings).model_dump(mode="json")
+        if str(current.get("status") or "").strip().lower() == "draft":
+            request_payload = dict(updates.get("request") or current.get("request") or {})
+            request_payload["run_name"] = payload.run_name
+            updates["request"] = _normalize_request_for_project(
+                request_payload,
+                actual_project_id,
+                settings=settings,
+            ).model_dump(mode="json")
     if not updates:
         return {"run": _public_project_run_list_item(current)}
     return {"run": _public_project_run_list_item(repository.update_run_record(run_id, updates, user_id=user.user_id))}

@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EDIM – Integrated Energy-Development Workbench</title>
     <link rel="icon" href="./assets/undp-logo.svg?v=edim" type="image/svg+xml" />
+    <link rel="stylesheet" href="./vendor/fonts/proxima-nova/proxima-nova.css?v=native-2" />
     <link
       rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      crossorigin=""
+      href="./vendor/leaflet/leaflet.css"
     />
     <link rel="stylesheet" href="./methodology/methodology.css" />
     <style>
@@ -25,7 +25,7 @@
 
       body {
         margin: 0;
-        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        font-family: "Proxima Nova", sans-serif;
         background:
           radial-gradient(1200px 600px at 10% -20%, #1a2f56 0%, rgba(26, 47, 86, 0) 60%),
           radial-gradient(900px 520px at 100% -25%, #1d3b66 0%, rgba(29, 59, 102, 0) 62%),
@@ -49,6 +49,80 @@
 
       a:hover {
         text-decoration: underline;
+      }
+
+      .startup-shell {
+        min-height: 100%;
+        display: grid;
+        place-items: center;
+        padding: 32px;
+        background:
+          radial-gradient(860px 520px at 20% 20%, rgba(37, 99, 235, 0.2), transparent 64%),
+          radial-gradient(760px 480px at 82% 18%, rgba(20, 184, 166, 0.14), transparent 70%),
+          #070d17;
+        color: #e6edf7;
+      }
+
+      .startup-card,
+      .startup-error {
+        width: min(680px, 100%);
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: 24px;
+        background: rgba(8, 14, 24, 0.86);
+        box-shadow: 0 24px 90px rgba(0, 0, 0, 0.34);
+        padding: 28px;
+      }
+
+      .startup-card small,
+      .startup-error small {
+        display: block;
+        margin-bottom: 10px;
+        color: #8ea4c5;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .startup-card h1,
+      .startup-error h1 {
+        margin: 0 0 10px;
+        color: #f8fbff;
+        font-size: clamp(28px, 5vw, 46px);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      .startup-card p,
+      .startup-error p {
+        margin: 0;
+        color: #b9c6dc;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .startup-error {
+        position: fixed;
+        inset: 24px;
+        z-index: 9999;
+        align-self: center;
+        justify-self: center;
+        margin: auto;
+        height: fit-content;
+        max-height: calc(100vh - 48px);
+        overflow: auto;
+        border-color: rgba(248, 113, 113, 0.45);
+      }
+
+      .startup-error pre {
+        margin: 16px 0 0;
+        padding: 14px;
+        overflow: auto;
+        border-radius: 14px;
+        background: rgba(0, 0, 0, 0.32);
+        color: #fecaca;
+        font-size: 12px;
+        white-space: pre-wrap;
       }
 
       .container {
@@ -138,7 +212,7 @@
         color: #f8fbff;
         font-size: 18px;
         line-height: 1.05;
-        font-weight: 850;
+        font-weight: 800;
         letter-spacing: -0.03em;
       }
 
@@ -384,7 +458,7 @@
 
       .landing-video-title {
         color: #f8fbff;
-        font-size: 18px;
+        font-size: 24px;
         font-weight: 900;
       }
 
@@ -519,7 +593,7 @@
       .header-project-title {
         max-width: 100%;
         color: #e6f0ff;
-        font-size: 24px;
+        font-size: 18px;
         font-weight: 900;
         line-height: 1.1;
         overflow: hidden;
@@ -714,9 +788,9 @@
         border-radius: 999px;
         background: rgba(18, 30, 50, 0.9);
         color: #d9e9ff;
-        font-family: "IBM Plex Sans", sans-serif;
+        font-family: "Proxima Nova", sans-serif;
         font-size: 11px;
-        font-weight: 950;
+        font-weight: 900;
         line-height: 18px;
         text-align: center;
         cursor: help;
@@ -782,7 +856,7 @@
       }
 
       .header-title {
-        font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif;
+        font-family: "Proxima Nova", sans-serif;
         font-size: 28px;
         font-weight: 700;
         letter-spacing: 0.01em;
@@ -999,21 +1073,6 @@
         min-width: 0;
       }
 
-      .dashboard-empty {
-        flex: 1;
-        height: 100%;
-        min-height: 0;
-        display: grid;
-        grid-template-rows: auto 1fr;
-        gap: 12px;
-      }
-
-      .dashboard-empty-hero {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(300px, 0.9fr);
-        gap: 12px;
-      }
-
       .dashboard-note {
         border: 1px solid #2b3d5f;
         border-radius: 12px;
@@ -1214,13 +1273,14 @@
       }
 
       button {
-        background: #2d6bcd;
-        color: #f2f7ff;
-        border: 0;
+        background: rgba(31, 48, 76, 0.9);
+        color: #d7e6fb;
+        border: 1px solid rgba(130, 159, 204, 0.28);
         border-radius: 9px;
         padding: 9px 12px;
         cursor: pointer;
         font-weight: 600;
+        box-shadow: none;
       }
 
       button * {
@@ -1240,12 +1300,60 @@
         display: inline-flex;
         align-items: center;
         gap: 7px;
-        background: linear-gradient(135deg, #dc2626 0%, #f97316 58%, #f59e0b 100%);
-        color: #fff7ed;
-        border: 1px solid rgba(254, 215, 170, 0.46);
-        box-shadow: 0 10px 24px rgba(249, 115, 22, 0.2);
+        background: linear-gradient(135deg, #2563eb 0%, #2d6bcd 58%, #38bdf8 100%);
+        color: #f8fbff;
+        border: 1px solid rgba(147, 197, 253, 0.52);
+        box-shadow: 0 10px 24px rgba(37, 99, 235, 0.2);
         font-size: 12px;
         padding: 7px 11px;
+      }
+
+      .primary-action-button {
+        background: linear-gradient(135deg, #2563eb 0%, #2d6bcd 70%, #38bdf8 100%);
+        color: #f8fbff;
+        border: 1px solid rgba(147, 197, 253, 0.5);
+        box-shadow: 0 12px 26px rgba(37, 99, 235, 0.22);
+        font-weight: 800;
+      }
+
+      .secondary-action-button {
+        background: rgba(15, 23, 42, 0.72);
+        color: #bfdbfe;
+        border: 1px solid rgba(96, 165, 250, 0.5);
+        box-shadow: none;
+        font-weight: 800;
+      }
+
+      .text-link-button {
+        background: transparent;
+        border: 0;
+        color: #93c5fd;
+        box-shadow: none;
+        padding: 0;
+        font-size: inherit;
+        font-weight: 800;
+      }
+
+      .secondary-action-button.ready {
+        color: #e8f2ff;
+        border-color: rgba(96, 165, 250, 0.82);
+        background: rgba(37, 99, 235, 0.26);
+      }
+
+      .ghost-utility-button {
+        background: transparent;
+        color: #93a8c7;
+        border: 1px solid transparent;
+        box-shadow: none;
+        padding: 6px 8px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .ghost-utility-button:hover:enabled {
+        color: #d7e6fb;
+        border-color: rgba(130, 159, 204, 0.28);
+        background: rgba(15, 23, 42, 0.42);
       }
 
       .validation-expander {
@@ -1254,12 +1362,60 @@
         margin-top: 10px;
       }
 
-      .validation-toggle {
-        justify-self: start;
-        background: #22304c;
-        color: #bfdbfe;
+      .validation-disclosure-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border: 1px solid rgba(130, 159, 204, 0.24);
+        background: rgba(11, 19, 34, 0.54);
+        color: #d7e6fb;
         font-size: 12px;
-        padding: 6px 10px;
+        padding: 9px 10px;
+        text-align: left;
+      }
+
+      .validation-disclosure-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-weight: 900;
+      }
+
+      .validation-chevron {
+        display: inline-block;
+        transform: rotate(0deg);
+        transition: transform 140ms ease;
+        color: #60a5fa;
+        font-size: 17px;
+        line-height: 1;
+      }
+
+      .validation-chevron.open {
+        transform: rotate(90deg);
+      }
+
+      .validation-status-pill {
+        border-radius: 999px;
+        border: 1px solid rgba(130, 159, 204, 0.26);
+        color: #9fb3d1;
+        background: rgba(15, 23, 42, 0.66);
+        padding: 3px 7px;
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .validation-status-pill.ok {
+        color: #bbf7d0;
+        border-color: rgba(34, 197, 94, 0.42);
+        background: rgba(13, 84, 43, 0.25);
+      }
+
+      .validation-status-pill.warn {
+        color: #fed7aa;
+        border-color: rgba(245, 158, 11, 0.44);
+        background: rgba(91, 55, 6, 0.28);
       }
 
       .environment-inline-summary {
@@ -1675,19 +1831,6 @@
         gap: 12px;
       }
 
-      .project-home-unified {
-        min-width: 0;
-        display: grid;
-        gap: 14px;
-        padding: 0;
-        overflow: hidden;
-        border-color: rgba(103, 232, 249, 0.2);
-        background:
-          radial-gradient(680px 360px at 8% 0%, rgba(34, 197, 94, 0.14), transparent 62%),
-          radial-gradient(640px 360px at 100% 12%, rgba(59, 130, 246, 0.16), transparent 64%),
-          rgba(7, 13, 24, 0.88);
-      }
-
       .project-home-hero-card {
         display: grid;
         grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
@@ -1994,37 +2137,8 @@
         gap: 8px;
       }
 
-      .model-run-management-pane .card,
-      .model-run-management-pane .project-workspace-panel {
+      .model-run-management-pane .card {
         margin-top: 0 !important;
-      }
-
-      .model-run-management-pane .run-tab-strip {
-        display: flex;
-        align-items: flex-end;
-        gap: 0;
-        flex-wrap: wrap;
-        overflow: visible;
-        padding: 4px 2px 0;
-        border-bottom: 1px solid rgba(103, 232, 249, 0.28);
-      }
-
-      .model-run-management-pane .run-tab {
-        width: auto;
-        min-width: 0;
-        max-width: none;
-        justify-content: center;
-        border-radius: 11px 11px 0 0;
-        padding-left: 10px;
-        padding-right: 10px;
-      }
-
-      .model-run-management-pane .project-workspace-header {
-        grid-template-columns: 1fr;
-      }
-
-      .model-run-management-pane .project-workspace-actions {
-        justify-content: flex-start;
       }
 
       .model-run-management-pane .workspace-grid-3,
@@ -2186,31 +2300,6 @@
         --run-tab-accent: #94a3b8;
       }
 
-      .run-tab.project-level-tab {
-        --run-tab-accent: #38bdf8;
-        width: 170px;
-        min-width: 170px;
-        background:
-          linear-gradient(180deg, rgba(12, 74, 110, 0.86), rgba(9, 23, 39, 0.94));
-      }
-
-      .run-tab-new-model {
-        --run-tab-accent: #14b8a6;
-        width: 44px;
-        min-width: 44px;
-        max-width: 44px;
-        color: #99f6e4;
-        font-size: 19px;
-        font-weight: 900;
-        background:
-          linear-gradient(180deg, rgba(15, 118, 110, 0.55), rgba(9, 23, 39, 0.94));
-      }
-
-      .run-tab-new-model:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
       .run-tab.status-queued {
         --run-tab-accent: #60a5fa;
       }
@@ -2350,8 +2439,24 @@
         fill: none;
         stroke: rgba(103, 232, 249, 0.72);
         stroke-width: 2.4;
-        stroke-dasharray: 8 7;
         filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.18));
+      }
+
+      .flow-edge-io {
+        filter: drop-shadow(0 0 5px rgba(148, 163, 184, 0.1));
+      }
+
+      .flow-edge-hover-target {
+        fill: none;
+        stroke: transparent;
+        stroke-width: 7px;
+        pointer-events: stroke;
+      }
+
+      .flow-wire:hover .flow-edge {
+        opacity: 1 !important;
+        stroke-width: 3.4 !important;
+        filter: drop-shadow(0 0 11px rgba(226, 232, 240, 0.32));
       }
 
       .flow-edge-label {
@@ -2363,6 +2468,138 @@
         stroke: rgba(2, 6, 23, 0.96);
         stroke-width: 5px;
         stroke-linejoin: round;
+      }
+
+      .flow-edge-bundle-label {
+        fill: #dbeafe;
+        font-size: 10px;
+        opacity: 0.72;
+      }
+
+      .flow-io-mode-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border: 1px solid rgba(130, 159, 204, 0.24);
+        border-radius: 999px;
+        background: rgba(7, 13, 24, 0.72);
+        padding: 3px;
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .flow-io-mode-switch span {
+        padding: 0 7px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .flow-io-mode-switch button {
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: #a8bddb;
+        padding: 5px 8px;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .flow-io-mode-switch button.active {
+        background: rgba(103, 232, 249, 0.16);
+        color: #e0faff;
+        box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.34);
+      }
+
+      .flow-io-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        align-items: center;
+        padding: 10px 14px 14px;
+        border-top: 1px solid rgba(130, 159, 204, 0.14);
+        background: rgba(2, 6, 23, 0.42);
+      }
+
+      .flow-io-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid rgba(130, 159, 204, 0.2);
+        border-radius: 999px;
+        background: rgba(7, 13, 24, 0.58);
+        color: #b8c6dc;
+        padding: 4px 8px;
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      .flow-io-legend-swatch {
+        width: 14px;
+        height: 8px;
+        border-radius: 999px;
+        box-shadow: 0 0 10px currentColor;
+      }
+
+      .flow-io-legend-count {
+        color: #e2e8f0;
+        opacity: 0.8;
+      }
+
+      .flow-wire-tooltip {
+        position: absolute;
+        z-index: 7;
+        width: min(340px, calc(100vw - 48px));
+        pointer-events: none;
+        border: 1px solid rgba(103, 232, 249, 0.42);
+        border-radius: 14px;
+        background:
+          radial-gradient(220px 120px at 10% 0%, rgba(34, 211, 238, 0.16), transparent 70%),
+          rgba(4, 10, 20, 0.94);
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(15, 23, 42, 0.8);
+        color: #eaf6ff;
+        padding: 10px 12px;
+        backdrop-filter: blur(12px);
+      }
+
+      .flow-wire-tooltip-kicker {
+        color: #67e8f9;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .flow-wire-tooltip-title {
+        margin-top: 5px;
+        color: #f8fafc;
+        font-size: 13px;
+        font-weight: 900;
+        line-height: 1.25;
+      }
+
+      .flow-wire-tooltip-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .flow-wire-tooltip-meta span {
+        border: 1px solid rgba(130, 159, 204, 0.22);
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.72);
+        color: #b8c6dc;
+        padding: 3px 7px;
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      .flow-wire-tooltip-flow {
+        margin-top: 8px;
+        color: #a8bddb;
+        font-size: 11px;
+        line-height: 1.35;
       }
 
       .flow-node {
@@ -3029,52 +3266,6 @@
         flex-wrap: wrap;
       }
 
-      .project-selection-rail {
-        min-width: 0;
-        min-height: 0;
-        overflow: auto;
-        display: grid;
-        align-content: start;
-        gap: 12px;
-        padding: 14px;
-        border: 1px solid rgba(103, 232, 249, 0.28);
-        border-radius: 18px;
-        background:
-          radial-gradient(440px 260px at 100% 0%, rgba(103, 232, 249, 0.12), transparent 64%),
-          radial-gradient(360px 240px at 0% 12%, rgba(96, 165, 250, 0.1), transparent 66%),
-          rgba(7, 13, 24, 0.84);
-        box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08);
-      }
-
-      .project-selection-rail .project-workspace-header {
-        grid-template-columns: minmax(0, 1fr);
-      }
-
-      .project-selection-rail .project-workspace-title,
-      .project-selection-rail .run-management-eyebrow,
-      .project-selection-rail h2 {
-        min-width: 0;
-        overflow-wrap: normal;
-        word-break: normal;
-      }
-
-      .project-selection-rail h2 {
-        margin: 4px 0 0;
-        color: #f8fafc;
-        font-size: 20px;
-      }
-
-      .project-new-model-button {
-        justify-self: start;
-        margin-top: 2px;
-        border: 1px solid rgba(191, 219, 254, 0.42);
-        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
-        color: #f8fbff;
-        font-size: 12px;
-        font-weight: 900;
-        white-space: nowrap;
-      }
-
       .project-selection-section {
         display: grid;
         gap: 8px;
@@ -3203,48 +3394,6 @@
         font-size: 12px;
       }
 
-      .run-name-control {
-        display: grid;
-        gap: 7px;
-        margin-top: 10px;
-        border: 1px solid rgba(130, 159, 204, 0.2);
-        border-radius: 12px;
-        background: rgba(6, 12, 22, 0.55);
-        padding: 9px 10px;
-      }
-
-      .run-name-display-row {
-        min-width: 0;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 8px;
-        align-items: center;
-      }
-
-      .run-name-display {
-        min-width: 0;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        color: #f4f8ff;
-        font-size: 13px;
-        font-weight: 800;
-        overflow-wrap: anywhere;
-      }
-
-      .run-name-display .muted {
-        flex: 0 0 auto;
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      .run-name-edit-row input {
-        width: 100%;
-        min-width: 0;
-      }
-
       .run-record-action-row {
         flex: 0 0 auto;
         display: inline-flex;
@@ -3335,32 +3484,430 @@
         display: none;
       }
 
-      .results-mode-grid {
-        min-height: 0;
-        height: 100%;
-        overflow: hidden;
-        display: grid;
-        grid-template-columns: minmax(310px, 0.48fr) minmax(0, 1fr);
-        gap: 12px;
-        position: relative;
-        z-index: 1;
-      }
-
-      .results-settings-panel,
       .results-mode-main {
         min-height: 0;
         overflow: auto;
       }
 
-      .results-settings-panel {
+      .model-workspace-with-management.no-side-panel {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .projects-overview-nav {
+        display: flex;
+        justify-content: flex-start;
+        margin-bottom: 18px;
+      }
+
+      .projects-utility-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .dataset-management-view {
         display: grid;
-        align-content: start;
+        gap: 16px;
+      }
+
+      .dataset-management-header,
+      .project-selection-toolbar,
+      .project-comparison-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+      }
+
+      .dataset-management-actions,
+      .project-comparison-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .dataset-table-wrap {
+        overflow-x: auto;
+        border: 1px solid rgba(130, 159, 204, 0.24);
+        border-radius: 16px;
+      }
+
+      .dataset-table {
+        min-width: 920px;
+      }
+
+      .dataset-table-actions {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        flex-wrap: wrap;
+      }
+
+      .dataset-table-actions button,
+      .dataset-table-actions a {
+        font-size: 11px;
+        padding: 5px 7px;
+      }
+
+      .dataset-details-menu {
+        position: relative;
+      }
+
+      .dataset-details-menu summary {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid rgba(96, 165, 250, 0.36);
+        border-radius: 999px;
+        padding: 5px 7px;
+        color: #bfdbfe;
+        font-size: 11px;
+        font-weight: 800;
+        list-style: none;
+      }
+
+      .dataset-details-menu summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .dataset-details-body {
+        position: absolute;
+        z-index: 30;
+        top: calc(100% + 8px);
+        right: 0;
+        width: min(340px, 78vw);
+        display: grid;
+        gap: 5px;
+        padding: 12px;
+        border: 1px solid rgba(130, 159, 204, 0.32);
+        border-radius: 14px;
+        background: #07101e;
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42);
+        color: #d7e6fb;
+        font-size: 12px;
+      }
+
+      .dataset-empty-state,
+      .compact-placeholder-card {
+        border: 1px dashed rgba(130, 159, 204, 0.36);
+        border-radius: 16px;
+        padding: 18px;
+        background: rgba(11, 19, 34, 0.48);
+        color: #d7e6fb;
+      }
+
+      .project-workspace-page {
+        min-width: 0;
+        display: grid;
+        gap: 14px;
+        padding: 0;
+        overflow: hidden;
+        border-color: rgba(103, 232, 249, 0.2);
+        background:
+          radial-gradient(680px 360px at 8% 0%, rgba(34, 197, 94, 0.12), transparent 62%),
+          radial-gradient(640px 360px at 100% 12%, rgba(59, 130, 246, 0.14), transparent 64%),
+          rgba(7, 13, 24, 0.88);
+      }
+
+      .project-home-hero-card.compact {
+        padding: 22px 28px 18px;
+      }
+
+      .project-home-stats.compact {
+        gap: 10px;
+      }
+
+      .project-workspace-tabs {
+        display: flex;
+        gap: 0;
+        padding: 0 28px;
+        border-bottom: 1px solid rgba(130, 159, 204, 0.24);
+      }
+
+      .project-workspace-tab {
+        border-radius: 12px 12px 0 0;
+        border: 1px solid rgba(130, 159, 204, 0.22);
+        border-bottom-color: transparent;
+        background: rgba(8, 14, 24, 0.54);
+        color: #93a8c7;
+        padding: 10px 16px;
+        margin-bottom: -1px;
+      }
+
+      .project-workspace-tab.active {
+        color: #f8fbff;
+        background: linear-gradient(180deg, rgba(31, 63, 101, 0.98), rgba(8, 23, 44, 0.99));
+        border-color: rgba(96, 165, 250, 0.72);
+        border-bottom-color: rgba(8, 23, 44, 0.99);
+        box-shadow: inset 0 3px 0 #60a5fa;
+      }
+
+      .project-selection-workbench,
+      .project-comparison-workbench {
+        display: grid;
+        gap: 16px;
+        padding: 22px 28px 28px;
+      }
+
+      .project-selection-toolbar h3,
+      .project-secondary-panel h3,
+      .project-comparison-header h3 {
+        margin: 3px 0 4px;
+        font-size: 18px;
+      }
+
+      .project-run-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
         gap: 12px;
       }
 
-      .results-settings-panel .diagram-control-grid,
-      .results-settings-panel .diagram-lever-grid {
-        grid-template-columns: 1fr;
+      .project-model-card {
+        display: grid;
+        gap: 12px;
+        padding: 15px;
+        border: 1px solid rgba(130, 159, 204, 0.24);
+        border-radius: 16px;
+        background:
+          radial-gradient(280px 170px at 0% 0%, rgba(37, 99, 235, 0.13), transparent 70%),
+          rgba(11, 19, 34, 0.72);
+        cursor: pointer;
+      }
+
+      .project-model-card:hover {
+        border-color: rgba(96, 165, 250, 0.46);
+        background:
+          radial-gradient(300px 190px at 0% 0%, rgba(37, 99, 235, 0.18), transparent 72%),
+          rgba(11, 19, 34, 0.82);
+      }
+
+      .project-model-card.selected {
+        border-color: rgba(34, 197, 94, 0.54);
+        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.16);
+      }
+
+      .project-model-card-head,
+      .project-model-card-actions,
+      .scenario-definition-strip,
+      .results-mode-action-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .project-model-card h4 {
+        margin: 0 0 5px;
+        font-size: 15px;
+      }
+
+      .project-model-card-meta {
+        display: flex;
+        gap: 7px;
+        flex-wrap: wrap;
+        color: #8ea4c5;
+        font-size: 11px;
+      }
+
+      .project-secondary-panels {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 12px;
+      }
+
+      .project-secondary-panel {
+        border: 1px solid rgba(130, 159, 204, 0.2);
+        border-radius: 16px;
+        padding: 15px;
+        background: rgba(8, 14, 24, 0.46);
+      }
+
+      .project-comparison-count {
+        display: grid;
+        place-items: center;
+        min-width: 68px;
+        border: 1px solid rgba(130, 159, 204, 0.24);
+        border-radius: 14px;
+        padding: 8px 10px;
+        background: rgba(11, 19, 34, 0.72);
+      }
+
+      .project-comparison-count b {
+        font-size: 18px;
+      }
+
+      .project-comparison-count span {
+        color: #8ea4c5;
+        font-size: 11px;
+      }
+
+      .analysis-title-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+      }
+
+      .view-eyebrow {
+        color: #8ea4c5;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .view-title {
+        margin-top: 4px;
+        color: #f8fbff;
+        font-size: clamp(19px, 2vw, 26px);
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        line-height: 1.05;
+      }
+
+      .view-subtitle {
+        margin-top: 6px;
+        color: #9fb3d1;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .analysis-export-links {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .analysis-export-links a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(96, 165, 250, 0.34);
+        border-radius: 999px;
+        padding: 6px 9px;
+        background: rgba(8, 14, 24, 0.58);
+        color: #bfdbfe;
+        font-size: 12px;
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .analysis-technical-details {
+        margin-top: 10px;
+        border-top: 1px solid rgba(130, 159, 204, 0.16);
+        padding-top: 8px;
+      }
+
+      .analysis-technical-details summary {
+        width: fit-content;
+        color: #93a8c7;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .analysis-technical-grid {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+        color: #9fb3d1;
+        font-size: 12px;
+      }
+
+      .analysis-filter-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        margin-top: 12px;
+      }
+
+      .analysis-filter-controls {
+        display: flex;
+        align-items: end;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .project-artifact-meta {
+        margin-top: 2px;
+        color: #8ea4c5;
+        font-size: 11px;
+      }
+
+      .results-mode-stack {
+        min-height: 0;
+        height: 100%;
+        display: grid;
+        grid-template-rows: auto auto auto minmax(0, 1fr);
+        gap: 0;
+        overflow: hidden;
+      }
+
+      .scenario-definition-strip {
+        padding: 12px 20px;
+        border-bottom: 1px solid rgba(130, 159, 204, 0.22);
+        background: rgba(15, 23, 42, 0.72);
+      }
+
+      .scenario-definition-strip-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        font-weight: 900;
+      }
+
+      .scenario-definition-details {
+        max-height: 360px;
+        overflow: auto;
+        padding: 12px 20px;
+        border-bottom: 1px solid rgba(130, 159, 204, 0.18);
+        background: rgba(6, 12, 22, 0.82);
+      }
+
+      .scenario-definition-details .flow-node {
+        width: 100% !important;
+        min-height: auto;
+        position: relative;
+      }
+
+      .results-mode-action-row {
+        justify-content: flex-end;
+        padding: 12px 20px 0;
+      }
+
+      .results-mode-stack .results-mode-main {
+        min-height: 0;
+        overflow: auto;
+        padding: 0 20px 20px;
+      }
+
+      .results-mode-stack .analysis-shell {
+        padding-top: 0;
+      }
+
+      .modal-body .model-run-management-pane {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        box-shadow: none;
+      }
+
+      .analysis-header-card .segmented-control {
+        border-color: rgba(96, 165, 250, 0.38);
+        background: rgba(8, 14, 24, 0.66);
+      }
+
+      .analysis-header-card .seg-button.active {
+        background: linear-gradient(135deg, #2563eb 0%, #2d6bcd 100%);
+        border-color: rgba(147, 197, 253, 0.68);
+        color: #f8fbff;
+        box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
       }
 
       @keyframes archGlimmer {
@@ -3518,8 +4065,7 @@
           order: -1;
         }
 
-        .architecture-run-topbar,
-        .results-mode-grid {
+        .architecture-run-topbar {
           grid-template-columns: 1fr;
           overflow: visible;
         }
@@ -3567,7 +4113,6 @@
           max-height: none;
         }
 
-        .results-settings-panel,
         .results-mode-main,
         .flow-model-shell,
         .d3-architecture-core {
@@ -3645,7 +4190,6 @@
 
         .workspace-map-grid,
         .dashboard-hero,
-        .dashboard-empty-hero,
         .header-grid {
           grid-template-columns: 1fr;
         }
@@ -3665,21 +4209,107 @@
           gap: 4px;
         }
       }
+
     </style>
+    <link rel="stylesheet" href="./design-phases/figma-phase-1.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-2-results.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-3-datasets.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-4-accessibility.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-5-project-workspace.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-6-model-configuration.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-7-creation-dialogs.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-8-landing-content.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-9-system-feedback.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-10-methodology.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-11-results-widgets.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-12-project-dataset-actions.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-13-run-management-icon.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-14-map-navigation.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-15-cognitive-load.css?v=header-account-2" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-16-focus-and-density.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-17-guided-workspace.css" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-18-typography-system.css?v=proxima-native-2" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-19-entity-flowers.css?v=model-slices-4" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-20-project-information.css?v=project-back-3" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-21-project-archive.css?v=archive-section-1" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-22-workspace-overview.css?v=workspace-overview-2" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-24-rich-comparison.css?v=rich-comparison-2" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-25-comparison-navigation.css?v=comparison-navigation-1" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-26-project-card-spacing.css?v=project-card-spacing-1" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-27-model-navigation-controls.css?v=model-navigation-controls-3" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-28-draft-state.css?v=draft-state-1" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-29-validation-checks.css?v=validation-checks-1" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-30-run-technical-execution.css?v=run-technical-execution-1" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-31-bottom-node-drag.css?v=bottom-node-drag-1" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-32-model-tab-hierarchy.css?v=model-tab-hierarchy-1" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-33-run-setup-groups.css?v=run-setup-groups-1" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-34-results-utilities.css?v=results-utilities-2" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-35-map-distribution-overlay.css?v=map-distribution-overlay-2" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-36-results-scope-layout.css?v=results-scope-layout-2" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-37-technical-details.css?v=technical-details-1" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-38-input-bottom-spacing.css?v=input-bottom-spacing-1" />
+    <link rel="stylesheet" href="./design-phases/figma-phase-39-model-results-actions.css?v=model-results-actions-1" />
+    <link rel="stylesheet" href="./styles/platform-components.css?v=platform-reliability-1" />
   </head>
   <body>
-    <div id="root"></div>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
-    <script src="https://unpkg.com/d3-delaunay@6/dist/d3-delaunay.min.js"></script>
-    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <div id="root">
+      <main class="startup-shell">
+        <section class="startup-card">
+          <small>Energy Development Modeling</small>
+          <h1>Loading EDIM</h1>
+          <p>Starting the local frontend shell and connecting it to the backend runtime.</p>
+        </section>
+      </main>
+    </div>
+    <div id="startup-error" class="startup-error" hidden>
+      <small>Frontend startup error</small>
+      <h1>The app did not finish loading.</h1>
+      <p id="startup-error-message">A browser-side startup error occurred.</p>
+      <pre id="startup-error-detail"></pre>
+    </div>
+    <script>
+      (function () {
+        function showStartupError(error, detail) {
+          var panel = document.getElementById("startup-error");
+          var message = document.getElementById("startup-error-message");
+          var output = document.getElementById("startup-error-detail");
+          if (!panel || !message || !output) return;
+          var text = typeof error === "string" ? error : (error && (error.message || error.reason || error.type)) || "Unknown frontend startup error.";
+          var stack = detail || (error && error.stack) || "";
+          message.textContent = text;
+          output.textContent = stack;
+          panel.hidden = false;
+        }
+
+        window.EDIM_SHOW_STARTUP_ERROR = showStartupError;
+        window.addEventListener("error", function (event) {
+          showStartupError(event.error || event.message, event.filename ? event.filename + ":" + event.lineno + ":" + event.colno : "");
+        });
+        window.addEventListener("unhandledrejection", function (event) {
+          showStartupError(event.reason || "Unhandled promise rejection");
+        });
+        window.setTimeout(function () {
+          if (!window.EDIM_APP_MOUNTED) {
+            showStartupError(
+              "The frontend did not mount within 8 seconds.",
+              "Check that the static bundle includes the local React, ReactDOM, Leaflet, Turf, and D3 runtime assets."
+            );
+          }
+        }, 8000);
+      })();
+    </script>
+    <script src="./vendor/react/react.production.min.js" onerror="window.EDIM_SHOW_STARTUP_ERROR && window.EDIM_SHOW_STARTUP_ERROR('Failed to load the bundled React runtime.')"></script>
+    <script src="./vendor/react/react-dom.production.min.js" onerror="window.EDIM_SHOW_STARTUP_ERROR && window.EDIM_SHOW_STARTUP_ERROR('Failed to load the bundled ReactDOM runtime.')"></script>
+    <script src="./vendor/leaflet/leaflet.js" onerror="window.EDIM_SHOW_STARTUP_ERROR && window.EDIM_SHOW_STARTUP_ERROR('Failed to load the bundled Leaflet runtime.')"></script>
+    <script src="./vendor/d3/d3-delaunay.min.js" onerror="window.EDIM_SHOW_STARTUP_ERROR && window.EDIM_SHOW_STARTUP_ERROR('Failed to load the bundled d3-delaunay runtime.')"></script>
+    <script src="./vendor/turf/turf.min.js" onerror="window.EDIM_SHOW_STARTUP_ERROR && window.EDIM_SHOW_STARTUP_ERROR('Failed to load the bundled Turf runtime.')"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js" onerror="window.EDIM_SHOW_STARTUP_ERROR && window.EDIM_SHOW_STARTUP_ERROR('Failed to load Babel from the CDN.')"></script>
     <script src="./runtime-config.js"></script>
     <script src="./runtime-config.local.js"></script>
     <script src="./api-client.js"></script>
     <script type="text/babel" data-presets="env,react" src="./hero-visual.jsx"></script>
     <script type="text/babel" data-presets="env,react" src="./methodology/methodology.js"></script>
+    <script type="text/babel" data-presets="env,react" src="./domain/evidence.jsx"></script>
     <script type="text/babel" data-presets="env,react" src="./app.jsx"></script>
   </body>
 </html>

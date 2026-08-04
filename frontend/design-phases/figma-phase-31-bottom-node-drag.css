@@ -1,0 +1,38 @@
+/*
+ * Phase 31: movable flow modules can be dragged from either vertical edge.
+ */
+
+.flow-node-drag-footer {
+  position: relative;
+  z-index: 2;
+  min-height: 18px;
+  display: grid;
+  place-items: center;
+  margin-top: -8px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.flow-node-drag-footer::before {
+  content: "";
+  width: 34px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(173, 186, 204, 0.34);
+  transition: width 120ms ease, background 120ms ease;
+}
+
+.flow-node-drag-footer:hover::before {
+  width: 42px;
+  background: var(--flow-node-accent, rgba(103, 232, 249, 0.72));
+}
+
+.flow-node.dragging .flow-node-drag-footer {
+  cursor: grabbing;
+}
+
+.flow-node.dragging .flow-node-drag-footer::before {
+  width: 42px;
+  background: var(--flow-node-accent, rgba(103, 232, 249, 0.9));
+}

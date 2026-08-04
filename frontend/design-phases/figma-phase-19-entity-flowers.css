@@ -1,0 +1,217 @@
+/*
+ * Figma exploration, Phase 19.
+ *
+ * Deterministic project and model identity visuals. Diffuse seeded gradient
+ * fields encode architecture, scenario, configuration, status, and result
+ * scope. Projects crop complete model circles into lightly feathered sectors.
+ */
+
+.entity-identity-visual {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 50%;
+  shape-rendering: geometricPrecision;
+}
+
+.entity-identity-shape {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 260ms ease, opacity 180ms ease;
+}
+
+.identity-gradient-layer--core {
+  mix-blend-mode: screen;
+}
+
+.identity-gradient-layer--accent {
+  mix-blend-mode: screen;
+}
+
+.identity-gradient-layer--haze,
+.identity-gradient-layer--status,
+.identity-gradient-layer--project-empty {
+  mix-blend-mode: screen;
+}
+
+.project-identity-sector {
+  isolation: isolate;
+}
+
+.project-identity-sector-field {
+  opacity: 1;
+  mix-blend-mode: normal;
+}
+
+.project-card-visual-wrap,
+.project-model-card-visual {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Project compositions */
+
+.projects-overview-panel .project-card {
+  position: relative;
+  isolation: isolate;
+  min-height: 184px;
+  display: grid;
+  align-content: start;
+  overflow: hidden;
+}
+
+.project-card-visual-wrap {
+  position: absolute;
+  top: 42px;
+  right: 10px;
+  z-index: 0;
+  width: 104px;
+  height: 104px;
+  opacity: 0.96;
+  filter: saturate(1.08);
+  transition: transform 260ms ease, opacity 180ms ease, filter 180ms ease;
+}
+
+.project-card > :not(.project-card-visual-wrap) {
+  position: relative;
+  z-index: 1;
+}
+
+.project-card .project-card-header {
+  padding-right: 0;
+}
+
+.project-card .project-card-context,
+.project-card .project-card-updated,
+.project-card > .muted {
+  max-width: calc(100% - 104px);
+}
+
+.project-card .project-card-footer {
+  align-self: end;
+  margin-top: 16px;
+}
+
+.project-card:hover .project-card-visual-wrap,
+.project-card:focus-visible .project-card-visual-wrap {
+  transform: scale(1.045) rotate(3deg);
+  opacity: 1;
+  filter: saturate(1.18) brightness(1.06);
+}
+
+.project-card:hover .project-identity-sector-field,
+.project-card:focus-visible .project-identity-sector-field {
+  opacity: 1;
+}
+
+.project-card:has(.project-title-edit-row) .project-card-visual-wrap {
+  opacity: 0.2;
+}
+
+/* Individual model identities */
+
+.project-workspace-page .project-model-card {
+  position: relative;
+  isolation: isolate;
+  min-height: 170px;
+  padding-right: 96px;
+  overflow: hidden;
+}
+
+.project-model-card > :not(.project-model-card-visual) {
+  position: relative;
+  z-index: 1;
+}
+
+.project-model-card-visual {
+  position: absolute;
+  top: 48px;
+  right: 10px;
+  z-index: 0;
+  width: 78px;
+  height: 78px;
+  opacity: 0.98;
+  filter: saturate(1.08);
+  transition: transform 240ms ease, filter 180ms ease;
+}
+
+.project-model-card:hover .project-model-card-visual,
+.project-model-card:focus-visible .project-model-card-visual {
+  transform: scale(1.06) rotate(4deg);
+  filter: saturate(1.18) brightness(1.06);
+}
+
+.project-model-card .project-model-card-head {
+  min-width: 0;
+}
+
+.project-model-card .project-model-card-head > div:first-child {
+  min-width: 0;
+}
+
+.project-model-card .project-model-card-actions {
+  min-height: 30px;
+}
+
+.entity-identity-shape--running,
+.entity-identity-shape--queued {
+  animation: entity-identity-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes entity-identity-breathe {
+  0%,
+  100% {
+    opacity: 0.82;
+    transform: scale(0.98);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.025);
+  }
+}
+
+@media (max-width: 760px) {
+  .projects-overview-panel .project-card {
+    min-height: 180px;
+  }
+
+  .project-card-visual-wrap {
+    top: 52px;
+    right: 8px;
+    width: 92px;
+    height: 92px;
+  }
+
+  .project-card .project-card-context,
+  .project-card .project-card-updated,
+  .project-card > .muted {
+    max-width: calc(100% - 90px);
+  }
+
+  .project-workspace-page .project-model-card {
+    min-height: 166px;
+    padding-right: 92px;
+  }
+
+  .project-model-card-visual {
+    top: 46px;
+    right: 8px;
+    width: 76px;
+    height: 76px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entity-identity-shape--running,
+  .entity-identity-shape--queued {
+    animation: none;
+  }
+
+  .project-card-visual-wrap,
+  .project-model-card-visual,
+  .entity-identity-shape {
+    transition: none;
+  }
+}

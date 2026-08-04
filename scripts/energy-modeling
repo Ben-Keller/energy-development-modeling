@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "${SOURCE}" ]]; do
+  SOURCE_DIR="$(cd "$(dirname "${SOURCE}")" && pwd)"
+  SOURCE="$(readlink "${SOURCE}")"
+  [[ "${SOURCE}" != /* ]] && SOURCE="${SOURCE_DIR}/${SOURCE}"
+done
+SCRIPT_DIR="$(cd "$(dirname "${SOURCE}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PYTHON_BIN="${EDIM_PYTHON:-${REPO_ROOT}/backend/.venv/bin/python}"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  cat >&2 <<MSG
+EDIM Python environment was not found at:
+  ${PYTHON_BIN}
+
+Create it with:
+  cd "${REPO_ROOT}"
+  python3.11 -m venv backend/.venv
+  source backend/.venv/bin/activate
+  pip3 install -r backend/requirements.txt
+  pip3 install --no-build-isolation -e ./model_runtime
+MSG
+  exit 1
+fi
+
+exec "${PYTHON_BIN}" "${REPO_ROOT}/scripts/run_local.py" "$@"

@@ -1,0 +1,345 @@
+/* Phase 39: consolidate model-level actions in the results title pane. */
+
+.results-mode-stack {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.results-mode-stack .results-mode-main {
+  grid-column: 1;
+  grid-row: 1;
+  padding-top: 12px;
+}
+
+.results-mode-stack .analysis-title-row {
+  align-items: flex-start;
+}
+
+.results-mode-stack .analysis-title-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.results-mode-stack .analysis-title-actions {
+  width: 152px;
+  max-width: 152px;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
+.analysis-title-actions > button,
+.analysis-output-action-pair > .analysis-utility-menu > summary {
+  width: 100%;
+  min-height: 34px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.analysis-model-tool-button,
+.analysis-duplicate-model-button {
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.analysis-duplicate-model-button {
+  order: -2;
+}
+
+.analysis-output-action-pair {
+  width: 100%;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.analysis-output-action-pair .analysis-download-menu {
+  width: 100%;
+}
+
+.analysis-output-action-pair .analysis-download-menu > summary {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.analysis-download-chevron {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  opacity: 0.72;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.analysis-download-menu[open] .analysis-download-chevron {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+.analysis-inline-technical-execution {
+  max-width: 920px;
+  margin-top: 11px;
+}
+
+.analysis-inline-technical-execution .technical-execution-panel {
+  gap: 6px;
+}
+
+.analysis-inline-technical-execution .technical-execution-grid {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.analysis-inline-technical-execution .technical-execution-grid > div {
+  min-width: 108px;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 1px 12px 1px 0;
+  margin: 0 12px 6px 0;
+  border: 0;
+  border-right: 1px solid rgba(173, 186, 204, 0.16);
+  border-radius: 0;
+  background: transparent;
+}
+
+.analysis-inline-technical-execution .technical-execution-grid > div:last-child {
+  border-right: 0;
+}
+
+.analysis-inline-technical-execution .technical-execution-grid span {
+  font-size: 9px;
+}
+
+.analysis-inline-technical-execution .technical-execution-grid strong {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.analysis-inline-technical-execution .technical-execution-note {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8296b1;
+  font-size: 10px;
+}
+
+.analysis-technical-details-button {
+  border-color: rgba(72, 148, 255, 0.72);
+  background: rgba(41, 108, 211, 0.14);
+  color: #dceaff;
+}
+
+.analysis-model-title-edit {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0.78;
+}
+
+.analysis-model-title-edit:hover,
+.analysis-model-title-edit:focus-visible {
+  border-color: rgba(173, 186, 204, 0.14);
+  background: rgba(255, 255, 255, 0.045);
+  opacity: 1;
+}
+
+.analysis-model-title-edit-icon {
+  width: 13px;
+  height: 13px;
+  display: block;
+  opacity: 0.82;
+}
+
+.technical-execution-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.technical-execution-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.technical-execution-grid > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid rgba(173, 186, 204, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.technical-execution-grid span {
+  color: #91a5bf;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.technical-execution-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #eef5ff;
+  font-size: 13px;
+}
+
+.technical-execution-note {
+  margin: 0;
+}
+
+.run-readiness-action-row,
+.run-record-utility-row,
+.selected-run-action-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 8px;
+}
+
+.modal-body .results-technical-summary {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(72, 148, 255, 0.42);
+  border-radius: 6px;
+  background: rgba(14, 29, 50, 0.74);
+}
+
+.modal-body .results-technical-summary .analysis-technical-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.modal-body .results-technical-summary .analysis-technical-grid > span {
+  min-width: 0;
+  padding: 9px;
+  overflow-wrap: anywhere;
+  border: 1px solid rgba(173, 186, 204, 0.13);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #bdc9d9;
+}
+
+.results-mode-stack .results-section-tab-row {
+  width: 100%;
+  justify-content: center;
+  padding: 0;
+}
+
+.results-mode-stack .results-section-tabs {
+  width: min(100%, 820px);
+  padding: 5px;
+  border-color: rgba(96, 165, 250, 0.5);
+  border-radius: 8px;
+  background: rgba(6, 12, 22, 0.86);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.results-mode-stack .results-section-tabs .seg-button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 42px;
+  padding: 9px 16px;
+  border-radius: 6px;
+  color: #c6d5e9;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.results-mode-stack .results-section-tabs .seg-button.active {
+  color: #ffffff;
+  border-color: rgba(147, 197, 253, 0.78);
+  background: linear-gradient(135deg, #2563eb 0%, #3679dc 100%);
+  box-shadow: 0 5px 14px rgba(37, 99, 235, 0.28);
+}
+
+.results-technical-details-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.results-technical-detail-section {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(173, 186, 204, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.results-technical-detail-section > .card {
+  margin-top: 8px !important;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.results-technical-warning-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #dce4ed;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.results-technical-warning-list li + li {
+  margin-top: 5px;
+}
+
+@media (max-width: 960px) {
+  .results-mode-stack .analysis-title-row {
+    flex-direction: column;
+  }
+
+  .results-mode-stack .analysis-title-actions {
+    width: min(100%, 180px);
+    max-width: 180px;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 600px) {
+  .technical-execution-grid,
+  .modal-body .results-technical-summary .analysis-technical-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-inline-technical-execution .technical-execution-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 10px;
+  }
+
+  .analysis-inline-technical-execution .technical-execution-grid > div {
+    min-width: 0;
+    margin: 0;
+    padding-right: 8px;
+  }
+
+  .results-mode-stack .results-section-tabs {
+    display: flex;
+    gap: 3px;
+  }
+
+  .results-mode-stack .results-section-tabs .seg-button {
+    width: 100%;
+    min-height: 38px;
+    padding: 7px 3px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .analysis-model-tool-button,
+  .analysis-duplicate-model-button {
+    flex: 1 1 calc(50% - 6px);
+  }
+}

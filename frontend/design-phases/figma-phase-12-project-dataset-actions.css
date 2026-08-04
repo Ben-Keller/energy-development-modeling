@@ -1,0 +1,232 @@
+/*
+ * Figma exploration, Phase 12.
+ *
+ * Project and dataset action hierarchy, complete frontend dataset workflows,
+ * and an 8/16 spacing rhythm. Removing this stylesheet restores Phase 3
+ * presentation while leaving the API-ready controls functional.
+ */
+
+.projects-overview-panel,
+.dataset-management-view {
+  --action-space-1: 8px;
+  --action-space-2: 16px;
+}
+
+.projects-overview-header {
+  gap: var(--action-space-2) !important;
+}
+
+.project-overview-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--action-space-1);
+}
+
+.dataset-management-view {
+  gap: var(--action-space-2);
+}
+
+.dataset-management-actions .primary-action-button,
+.dataset-primary-row-action {
+  border-color: rgba(125, 211, 252, 0.48);
+  border-radius: 6px;
+  background: #1687b7;
+  color: #f5fbff;
+  box-shadow: none;
+}
+
+.dataset-table th:first-child,
+.dataset-table td:first-child {
+  width: 36%;
+}
+
+.dataset-table th:last-child,
+.dataset-table td:last-child {
+  width: 190px;
+}
+
+.dataset-table-actions {
+  justify-content: flex-end;
+  gap: var(--action-space-1);
+  flex-wrap: nowrap;
+}
+
+.dataset-primary-row-action {
+  min-width: 104px;
+}
+
+.dataset-overflow-menu {
+  position: relative;
+}
+
+.dataset-overflow-menu > summary {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(173, 186, 204, 0.28);
+  border-radius: 6px;
+  background: transparent;
+  color: #d7dee8;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+  list-style: none;
+  cursor: pointer;
+}
+
+.dataset-overflow-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dataset-overflow-menu[open] > summary {
+  border-color: rgba(103, 232, 249, 0.58);
+  background: rgba(56, 189, 248, 0.09);
+}
+
+.dataset-overflow-menu-body {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 172px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid rgba(173, 186, 204, 0.3);
+  border-radius: 8px;
+  background: #111820;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42);
+}
+
+.dataset-overflow-menu-body button,
+.dataset-overflow-menu-body a {
+  width: 100%;
+  min-height: 30px;
+  justify-content: flex-start;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #d7dee8;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+}
+
+.dataset-overflow-menu-body button:hover:not(:disabled),
+.dataset-overflow-menu-body a:hover {
+  background: rgba(255, 255, 255, 0.06);
+  text-decoration: none;
+}
+
+.dataset-overflow-menu-body .danger-menu-button {
+  color: #fca5a5;
+}
+
+.modal-body .dataset-action-form input[type="file"] {
+  width: 100%;
+  min-height: 38px;
+  padding: 6px;
+  border: 1px solid rgba(173, 186, 204, 0.26);
+  border-radius: 6px;
+  background: #0e141b;
+  color: #bac4d1;
+}
+
+.modal-body .dataset-action-form input[type="file"]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 4px 8px;
+  border: 1px solid rgba(173, 186, 204, 0.3);
+  border-radius: 4px;
+  background: #1b232d;
+  color: #e8edf3;
+  font: inherit;
+  cursor: pointer;
+}
+
+.dataset-action-summary {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(173, 186, 204, 0.16);
+}
+
+.dataset-action-summary b {
+  color: #eef3f8;
+  font-size: 13px;
+}
+
+.dataset-action-summary span {
+  color: #9da9b8;
+  font-size: 11px;
+}
+
+.dataset-modal-message {
+  margin: 0;
+  font-size: 12px;
+}
+
+.dataset-details-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.dataset-details-list > div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(173, 186, 204, 0.12);
+}
+
+.dataset-details-list dt {
+  color: #9da9b8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dataset-details-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #e0e6ee;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .projects-overview-header {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .project-overview-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dataset-table-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 440px) {
+  .project-overview-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .project-overview-actions .primary-action-button {
+    width: 100%;
+  }
+
+  .dataset-details-list > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}

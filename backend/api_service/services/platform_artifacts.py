@@ -22,7 +22,12 @@ from .artifact_storage import (
     resolve_local_platform_storage_ref,
 )
 from .dataset_repository import normalize_scope_id
-from .reporting import build_project_report_markdown, build_project_report_source_data
+from .reporting import (
+    aggregate_evidence,
+    build_project_report_markdown,
+    build_project_report_source_data,
+    evidence_from_summary,
+)
 from .users import DEFAULT_USER_ID
 
 
@@ -121,6 +126,14 @@ def build_project_export_artifact(
 ) -> Dict[str, Any]:
     path = generated_exports_dir(settings) / f"{export_id}.zip"
     selected_run_ids = [str(row.get("run_id") or "") for row in run_records if row.get("run_id")]
+    run_evidence = [
+        {
+            "run_id": run_id,
+            **evidence_from_summary(load_run_summary_for_report(settings, run_id)),
+        }
+        for run_id in selected_run_ids
+    ]
+    evidence = aggregate_evidence(run_evidence)
     with ZipFile(path, "w", ZIP_DEFLATED) as zf:
         uploaded_dataset_files = zip_uploaded_dataset_snapshots(run_records, zf)
         zf.writestr(
@@ -134,6 +147,13 @@ def build_project_export_artifact(
                     "created_by_user_id": created_by_user_id,
                     "created_at": created_at,
                     "uploaded_dataset_files": uploaded_dataset_files,
+                    "evidence": evidence,
+                    "run_evidence": run_evidence,
+                    "usage_notice": (
+                        "EXPLORATORY OUTPUT: review model quality and provenance before policy use."
+                        if evidence.get("requires_acknowledgement")
+                        else "Review model quality and provenance before policy use."
+                    ),
                 },
                 indent=2,
                 sort_keys=True,
@@ -141,6 +161,16 @@ def build_project_export_artifact(
         )
         zf.writestr("project.json", json.dumps(project, indent=2, sort_keys=True))
         zf.writestr("runs.json", json.dumps(run_records, indent=2, sort_keys=True))
+        zf.writestr(
+            "EVIDENCE_STATUS.txt",
+            (
+                "EXPLORATORY OUTPUT\n\n"
+                "One or more included models use placeholder inputs or have material consistency gaps. "
+                "These outputs are not policy-grade and require analyst review.\n"
+                if evidence.get("requires_acknowledgement")
+                else f"Evidence status: {evidence.get('status', 'not_evaluated')}\n"
+            ),
+        )
         zf.writestr(
             "datasets/uploaded_dataset_manifest.json",
             json.dumps(uploaded_dataset_files, indent=2, sort_keys=True),
@@ -157,6 +187,8 @@ def build_project_export_artifact(
                     zf.write(source_data_path, f"reports/{source_data_path.name}")
     return {
         "path": path,
+        "evidence": evidence,
+        "run_evidence": run_evidence,
         "storage_ref": local_platform_storage_ref(
             settings,
             path,

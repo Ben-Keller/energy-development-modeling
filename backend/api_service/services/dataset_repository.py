@@ -35,6 +35,9 @@ class DatasetRepository(Protocol):
         role: str = "",
     ) -> List[Dict[str, Any]]: ...
 
+    def create_input_dataset(self, payload: Dict[str, Any], *, user_id: str) -> Dict[str, Any]: ...
+    def update_input_dataset(self, dataset_id: str, payload: Dict[str, Any], *, user_id: str) -> Dict[str, Any]: ...
+    def attach_dataset_to_project(self, dataset_id: str, version_id: str, project_id: str, *, user_id: str) -> Dict[str, Any]: ...
     def download_response_for_dataset(self, dataset_id: str, *, user_id: str) -> Response: ...
     def download_response_for_version(self, dataset_id: str, version_id: str, *, user_id: str) -> Response: ...
     def register_upload(self, dataset_id: str, filename: str, content: bytes, *, user_id: str) -> Dict[str, Any]: ...
@@ -97,10 +100,40 @@ class LocalDatasetRepository(DatasetRepository):
                     "size_bytes": stat.st_size if stat else None,
                     "active_version_id": row.get("active_version_id", ""),
                     "versioned_override": bool(row.get("versioned_override", False)),
+                    "project_ids": list(row.get("project_ids") or []),
                     "download_url": f"/api/input-datasets/{row['id']}/download",
                 }
             )
         return rows
+
+    def create_input_dataset(self, payload: Dict[str, Any], *, user_id: str) -> Dict[str, Any]:
+        create_input_dataset_metadata(self._settings, payload, user_id=user_id)
+        return self._dataset_descriptor(str(payload.get("dataset_id") or ""), user_id=user_id, fallback_label=str(payload.get("label") or ""))
+
+    def update_input_dataset(self, dataset_id: str, payload: Dict[str, Any], *, user_id: str) -> Dict[str, Any]:
+        update_input_dataset_metadata(self._settings, dataset_id, payload, user_id=user_id)
+        return self._dataset_descriptor(dataset_id, user_id=user_id)
+
+    def attach_dataset_to_project(self, dataset_id: str, version_id: str, project_id: str, *, user_id: str) -> Dict[str, Any]:
+        return attach_dataset_version_to_project(
+            self._settings,
+            dataset_id,
+            version_id,
+            project_id,
+            user_id=user_id,
+        )
+
+    def _dataset_descriptor(self, dataset_id: str, *, user_id: str, fallback_label: str = "") -> Dict[str, Any]:
+        rows = self.list_input_datasets(user_id=user_id)
+        if dataset_id:
+            dataset = next((row for row in rows if row.get("id") == dataset_id), None)
+            if dataset:
+                return dataset
+        if fallback_label:
+            dataset = next((row for row in rows if row.get("label") == fallback_label), None)
+            if dataset:
+                return dataset
+        raise HTTPException(status_code=404, detail="Input dataset not found.")
 
     def download_response_for_dataset(self, dataset_id: str, *, user_id: str) -> Response:
         dataset = resolve_input_dataset(self._settings, dataset_id, user_id=user_id)
@@ -374,6 +407,10 @@ def _active_versions_path(settings: Settings, user_id: str = "local_user") -> Pa
     return _dataset_uploads_dir(settings, user_id=user_id) / "active_versions.json"
 
 
+def _dataset_catalog_path(settings: Settings, user_id: str = "local_user") -> Path:
+    return _dataset_uploads_dir(settings, user_id=user_id) / "dataset_catalog.json"
+
+
 def _load_json(path: Path, default: Any) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -397,6 +434,21 @@ def _load_active_versions(settings: Settings, user_id: str = "local_user") -> Di
 
 def _write_active_versions(settings: Settings, active: Dict[str, Dict[str, Any]], user_id: str = "local_user") -> None:
     _write_json(_active_versions_path(settings, user_id=user_id), active)
+
+
+def _load_dataset_catalog(settings: Settings, user_id: str = "local_user") -> Dict[str, Dict[str, Any]]:
+    raw = _load_json(_dataset_catalog_path(settings, user_id=user_id), {})
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(dataset_id): dict(metadata)
+        for dataset_id, metadata in raw.items()
+        if _valid_dataset_id(str(dataset_id)) and isinstance(metadata, dict)
+    }
+
+
+def _write_dataset_catalog(settings: Settings, catalog: Dict[str, Dict[str, Any]], user_id: str = "local_user") -> None:
+    _write_json(_dataset_catalog_path(settings, user_id=user_id), catalog)
 
 
 def _repo_root(settings: Settings) -> Path:
@@ -444,10 +496,20 @@ def _resolve_manifest_datasets(settings: Settings) -> List[Dict[str, Any]]:
 
 def build_input_dataset_catalog(settings: Settings, user_id: str = "local_user") -> List[Dict[str, Any]]:
     base_rows = _resolve_manifest_datasets(settings)
+    user_catalog = _load_dataset_catalog(settings, user_id=user_id)
     active = _load_active_versions(settings, user_id=user_id)
     out: List[Dict[str, Any]] = []
     for row in base_rows:
         dataset_id = str(row.get("id", ""))
+        metadata = user_catalog.get(dataset_id) or {}
+        row = {
+            **row,
+            **{
+                key: metadata[key]
+                for key in ("label", "layer", "role")
+                if key in metadata
+            },
+        }
         base_path = Path(row["path"])
         active_row = active.get(dataset_id) if isinstance(active.get(dataset_id), dict) else None
         if active_row and active_row.get("path"):
@@ -460,11 +522,141 @@ def build_input_dataset_catalog(settings: Settings, user_id: str = "local_user")
                     "active_version_id": str(active_row.get("version_id", "")),
                     "active_version_created_at": str(active_row.get("created_at", "")),
                     "versioned_override": True,
+                    "project_ids": list(active_row.get("project_ids") or []),
                 }
             )
         else:
-            out.append({**row, "source_path": base_path, "active_version_id": "", "versioned_override": False})
+            out.append({**row, "source_path": base_path, "active_version_id": "", "versioned_override": False, "project_ids": []})
+    base_ids = {str(row.get("id") or "") for row in base_rows}
+    for dataset_id, metadata in user_catalog.items():
+        if dataset_id in base_ids or not metadata.get("created"):
+            continue
+        base_path = _dataset_uploads_dir(settings, user_id=user_id) / dataset_id / "unuploaded"
+        active_row = active.get(dataset_id) if isinstance(active.get(dataset_id), dict) else None
+        active_path = Path(str(active_row.get("path"))) if active_row and active_row.get("path") else base_path
+        out.append(
+            {
+                "id": dataset_id,
+                "label": str(metadata.get("label") or dataset_id),
+                "layer": str(metadata.get("layer") or "model"),
+                "role": str(metadata.get("role") or ""),
+                "path": active_path,
+                "source_path": base_path,
+                "required": False,
+                "scope": "user",
+                "upload_policy": "project_override",
+                "user_upload_listable": True,
+                "active_version_id": str((active_row or {}).get("version_id") or ""),
+                "active_version_created_at": str((active_row or {}).get("created_at") or ""),
+                "versioned_override": bool(active_row),
+                "project_ids": list((active_row or {}).get("project_ids") or []),
+            }
+        )
     return out
+
+
+def _slug_dataset_id(label: str) -> str:
+    dataset_id = re.sub(r"[^a-z0-9]+", "_", label.strip().lower()).strip("_")[:80]
+    return dataset_id or f"dataset_{uuid.uuid4().hex[:8]}"
+
+
+def create_input_dataset_metadata(
+    settings: Settings,
+    payload: Dict[str, Any],
+    *,
+    user_id: str = "local_user",
+) -> Dict[str, Any]:
+    label = str(payload.get("label") or "").strip()
+    layer = str(payload.get("layer") or "").strip()
+    role = str(payload.get("role") or "").strip()
+    if not label or not layer or not role:
+        raise HTTPException(status_code=400, detail="Dataset label, layer, and role are required.")
+    existing_ids = {str(row.get("id") or "") for row in build_input_dataset_catalog(settings, user_id=user_id)}
+    base_id = _slug_dataset_id(label)
+    dataset_id = base_id
+    suffix = 2
+    while dataset_id in existing_ids:
+        dataset_id = f"{base_id[:72]}_{suffix}"
+        suffix += 1
+    catalog = _load_dataset_catalog(settings, user_id=user_id)
+    now = datetime_utc_now()
+    metadata = {
+        "id": dataset_id,
+        "label": label,
+        "layer": layer,
+        "role": role,
+        "created": True,
+        "created_at": now,
+        "updated_at": now,
+    }
+    catalog[dataset_id] = metadata
+    _write_dataset_catalog(settings, catalog, user_id=user_id)
+    payload["dataset_id"] = dataset_id
+    return metadata
+
+
+def update_input_dataset_metadata(
+    settings: Settings,
+    dataset_id: str,
+    payload: Dict[str, Any],
+    *,
+    user_id: str = "local_user",
+) -> Dict[str, Any]:
+    dataset = resolve_input_dataset(settings, dataset_id, user_id=user_id)
+    allowed = {
+        key: str(payload.get(key) or "").strip()
+        for key in ("label", "layer", "role")
+        if key in payload
+    }
+    if not allowed or any(not value for value in allowed.values()):
+        raise HTTPException(status_code=400, detail="At least one non-empty dataset field is required.")
+    catalog = _load_dataset_catalog(settings, user_id=user_id)
+    previous = dict(catalog.get(dataset_id) or {})
+    metadata = {
+        **previous,
+        "id": dataset_id,
+        "label": str(dataset.get("label") or dataset_id),
+        "layer": str(dataset.get("layer") or "model"),
+        "role": str(dataset.get("role") or ""),
+        **allowed,
+        "created": bool(previous.get("created", False)),
+        "updated_at": datetime_utc_now(),
+    }
+    if previous.get("created_at"):
+        metadata["created_at"] = previous["created_at"]
+    catalog[dataset_id] = metadata
+    _write_dataset_catalog(settings, catalog, user_id=user_id)
+    return metadata
+
+
+def attach_dataset_version_to_project(
+    settings: Settings,
+    dataset_id: str,
+    version_id: str,
+    project_id: str,
+    *,
+    user_id: str = "local_user",
+) -> Dict[str, Any]:
+    resolve_input_dataset(settings, dataset_id, user_id=user_id)
+    metadata = resolve_dataset_version(settings, dataset_id, version_id, user_id=user_id)
+    project_id = normalize_scope_id(project_id, "")
+    if not project_id:
+        raise HTTPException(status_code=400, detail="Project id is required.")
+    project_ids = sorted({*[str(value) for value in metadata.get("project_ids") or [] if value], project_id})
+    metadata = {**metadata, "project_ids": project_ids}
+    metadata_path = _dataset_uploads_dir(settings, user_id=user_id) / dataset_id / f"{version_id}.json"
+    _write_json(metadata_path, metadata)
+    active = _load_active_versions(settings, user_id=user_id)
+    if str((active.get(dataset_id) or {}).get("version_id") or "") == version_id:
+        active[dataset_id] = metadata
+        _write_active_versions(settings, active, user_id=user_id)
+    return {
+        "ok": True,
+        "project_id": project_id,
+        "dataset_id": dataset_id,
+        "version_id": version_id,
+        "project_ids": project_ids,
+    }
 
 
 def resolve_input_dataset(settings: Settings, dataset_id: str, user_id: str = "local_user") -> Dict[str, Any]:
@@ -559,6 +751,7 @@ def register_dataset_upload(settings: Settings, dataset_id: str, filename: str, 
         "created_at": datetime_utc_now(),
         "scope": "user_override",
         "user_id": normalize_scope_id(user_id, "local_user"),
+        "project_ids": [],
         "validation": validation,
     }
     _write_json(versions_dir / f"{version_id}.json", metadata)

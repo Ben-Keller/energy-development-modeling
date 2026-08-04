@@ -1,0 +1,79 @@
+/*
+ * Phase 32: model tabs lead with the human-readable model name and retain
+ * the model number as a larger secondary identifier.
+ */
+
+.global-run-tab-bar .run-tab {
+  width: 220px;
+  min-width: 180px;
+  max-width: 250px;
+  min-height: 48px;
+  justify-content: flex-start;
+  padding: 7px 12px;
+}
+
+.global-run-tab-bar .run-tab-text {
+  width: 100%;
+  gap: 3px;
+  line-height: 1.1;
+}
+
+.global-run-tab-bar .run-tab-title {
+  width: 100%;
+  overflow: hidden;
+  color: #f1f5f9;
+  font-family: var(--edim-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-run-tab-bar .run-tab-subtitle {
+  width: 100%;
+  max-width: none;
+  overflow: hidden;
+  color: #a9b5c4;
+  font-family: var(--edim-font-body);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-run-tab-bar .run-tab.active .run-tab-title {
+  color: #ffffff;
+}
+
+.global-run-tab-bar .run-tab.active .run-tab-subtitle {
+  color: #c5d3e2;
+}
+
+.global-run-tab-bar .run-tab-title,
+.global-run-tab-bar .run-tab-renaming {
+  cursor: text;
+}
+
+.global-run-tab-bar .run-tab-rename-input {
+  width: 100%;
+  min-width: 0;
+  height: 25px;
+  padding: 2px 6px;
+  border: 1px solid #60a5fa;
+  border-radius: 4px;
+  outline: 0;
+  color: #ffffff;
+  background: #0b1422;
+  font-family: var(--edim-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+}
+
+@media (max-width: 760px) {
+  .global-run-tab-bar .run-tab {
+    width: min(220px, 72vw);
+    min-width: min(180px, 58vw);
+  }
+}

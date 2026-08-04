@@ -25,6 +25,8 @@ frontend/runtime-config.local.js
 /build/
 /dist/
 /static/
+frontend/test-results/
+frontend/playwright-report/
 
 # Raw source images are large and not used by the app; keep optimized webp assets instead.
 frontend/assets/photos/
@@ -38,6 +40,7 @@ outputs/runs/
 outputs/platform/
 outputs/dataset_uploads/
 outputs/figures/
+outputs/local_app.*
 
 # Local environment files
 .env

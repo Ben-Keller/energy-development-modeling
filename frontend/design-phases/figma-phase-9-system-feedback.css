@@ -1,0 +1,229 @@
+/*
+ * Figma exploration, Phase 9.
+ *
+ * Shared system feedback, status labels, and empty states. Removing this
+ * stylesheet restores the previous visual treatment without changing any
+ * workflow logic or application structure.
+ */
+
+:root {
+  --edim-status-neutral: #94a3b8;
+  --edim-status-info: #38bdf8;
+  --edim-status-success: #34d399;
+  --edim-status-warning: #fbbf24;
+  --edim-status-danger: #fb7185;
+}
+
+div.warn,
+div.ok {
+  border-radius: 6px;
+  padding: 9px 11px;
+  background: #14191f;
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: inset 3px 0 0 var(--feedback-accent);
+}
+
+div.warn {
+  --feedback-accent: var(--edim-status-warning);
+  border-color: rgba(251, 191, 36, 0.34);
+  color: #f7dca1;
+}
+
+div.ok {
+  --feedback-accent: var(--edim-status-success);
+  border-color: rgba(52, 211, 153, 0.32);
+  color: #bcebd7;
+}
+
+div.flow-inline-status {
+  min-height: 32px;
+  margin: 0;
+  padding: 7px 10px;
+}
+
+.badge {
+  --status-accent: var(--edim-status-neutral);
+  min-height: 21px;
+  gap: 5px;
+  border-color: rgba(173, 186, 204, 0.24);
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: #10161d;
+  color: #c5ced9;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.badge::before {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: var(--status-accent);
+  content: "";
+}
+
+.badge-neutral {
+  --status-accent: var(--edim-status-neutral);
+}
+
+.badge-queued {
+  --status-accent: var(--edim-status-info);
+  color: #c8e8f5;
+}
+
+.badge-running,
+.badge-warning {
+  --status-accent: var(--edim-status-warning);
+  color: #f7dca1;
+}
+
+.badge-succeeded {
+  --status-accent: var(--edim-status-success);
+  color: #bcebd7;
+}
+
+.badge-failed,
+.badge-cancelled {
+  --status-accent: var(--edim-status-danger);
+  color: #f4c2ca;
+}
+
+.overall-run-status {
+  --status-accent: var(--edim-status-neutral);
+  min-height: 28px;
+  border-color: rgba(173, 186, 204, 0.24);
+  border-radius: 6px;
+  padding: 5px 8px 5px 10px;
+  background: #10161d;
+  color: #c5ced9;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  box-shadow: inset 3px 0 0 var(--status-accent);
+}
+
+.overall-run-status.queued {
+  --status-accent: var(--edim-status-info);
+  border-color: rgba(56, 189, 248, 0.3);
+  background: #10161d;
+  color: #c8e8f5;
+}
+
+.overall-run-status.running {
+  --status-accent: var(--edim-status-warning);
+  border-color: rgba(251, 191, 36, 0.3);
+  background: #10161d;
+  color: #f7dca1;
+}
+
+.overall-run-status.succeeded {
+  --status-accent: var(--edim-status-success);
+  border-color: rgba(52, 211, 153, 0.3);
+  background: #10161d;
+  color: #bcebd7;
+}
+
+.overall-run-status.failed,
+.overall-run-status.cancelled {
+  --status-accent: var(--edim-status-danger);
+  border-color: rgba(251, 113, 133, 0.3);
+  background: #10161d;
+  color: #f4c2ca;
+}
+
+.validation-status-pill,
+.arch-status-pill {
+  border-color: rgba(173, 186, 204, 0.24);
+  border-radius: 4px;
+  background: #10161d;
+  letter-spacing: 0;
+}
+
+.validation-status-pill {
+  padding: 3px 6px;
+  font-size: 10px;
+}
+
+.arch-status-pill {
+  min-height: 25px;
+  gap: 5px;
+  padding: 4px 6px;
+  font-size: 10px;
+}
+
+.validation-status-pill.ok,
+.arch-status-pill.ready,
+.arch-status-pill.loaded,
+.arch-status-pill.completed {
+  border-color: rgba(52, 211, 153, 0.3);
+  background: #10161d;
+  color: #bcebd7;
+}
+
+.validation-status-pill.warn,
+.arch-status-pill.running {
+  border-color: rgba(251, 191, 36, 0.3);
+  background: #10161d;
+  color: #f7dca1;
+}
+
+.arch-status-pill.pending {
+  color: #aeb8c5;
+}
+
+.dataset-empty-state,
+.compact-placeholder-card,
+.dashboard-note:not(.project-card) {
+  min-height: 92px;
+  display: grid;
+  align-content: center;
+  border: 1px solid rgba(173, 186, 204, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  background: #111820;
+  color: #dfe6ee;
+  box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.52);
+}
+
+.dataset-empty-state > div:first-child,
+.dashboard-note:not(.project-card) > div:first-child {
+  font-size: 13px;
+  font-weight: 800 !important;
+}
+
+.dataset-empty-state .muted,
+.compact-placeholder-card,
+.dashboard-note:not(.project-card) .muted {
+  color: #9da9b8;
+  line-height: 1.5;
+}
+
+.dataset-no-results {
+  color: #9da9b8;
+  font-size: 12px;
+}
+
+.project-workspace-page .project-secondary-panel > .muted {
+  min-height: 36px;
+  display: grid;
+  align-content: center;
+  margin-top: 10px;
+  border: 1px solid rgba(173, 186, 204, 0.14);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.018);
+  color: #9da9b8;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .dataset-empty-state,
+  .compact-placeholder-card,
+  .dashboard-note:not(.project-card) {
+    min-height: 80px;
+    padding: 14px;
+  }
+}
