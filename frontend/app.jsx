@@ -1,10 +1,36 @@
-const { useEffect, useMemo, useRef, useState } = React;
+const { useEffect, useId, useMemo, useRef, useState } = React;
 
 const API_BASE = String(window.EDIM_API_BASE || window.location.origin || "").trim().replace(/\/+$/, "");
 const ACTIVE_STATUSES = new Set(["queued", "running"]);
 const TERMINAL_JOB_STATUSES = new Set(["succeeded", "failed", "cancelled"]);
 const RESET_JOB_STATUSES = new Set(["draft"]);
 const RUN_CONFIG_LOCK_STATUSES = new Set(["queued", "running", "succeeded"]);
+
+function handleTablistKeyDown(event, currentIndex, itemCount, onSelect) {
+  const keyOffsets = {
+    ArrowRight: 1,
+    ArrowDown: 1,
+    ArrowLeft: -1,
+    ArrowUp: -1,
+  };
+  let nextIndex = null;
+  if (Object.prototype.hasOwnProperty.call(keyOffsets, event.key)) {
+    nextIndex = (currentIndex + keyOffsets[event.key] + itemCount) % itemCount;
+  } else if (event.key === "Home") {
+    nextIndex = 0;
+  } else if (event.key === "End") {
+    nextIndex = itemCount - 1;
+  }
+  if (nextIndex === null || itemCount < 1) return;
+
+  event.preventDefault();
+  const tablist = event.currentTarget.closest('[role="tablist"]');
+  onSelect(nextIndex);
+  window.requestAnimationFrame(() => {
+    const tabs = tablist ? tablist.querySelectorAll('[role="tab"]') : [];
+    if (tabs[nextIndex]) tabs[nextIndex].focus();
+  });
+}
 
 const DEFAULT_LEVERS = {
   demand_multiplier: 1.0,
@@ -19,7 +45,7 @@ const ENERGY_MODEL_OPTIONS = [
 
 const PROJECT_TYPE_OPTIONS = [
   { value: "energy-only", projectType: "energy", label: "Energy" },
-  { value: "energy-development", projectType: "energy-development", label: "Energy-development" },
+  { value: "energy-development", projectType: "energy-development", label: "Energy-Development" },
 ];
 
 const PROJECT_GEOGRAPHY_OPTIONS = [
@@ -195,16 +221,16 @@ const ARCHITECTURE_BOXES = [
     id: "outputs",
     type: "output",
     title: "Integrated outputs",
-    subtitle: "Downloadable run artifacts, diagnostics, and dashboard-ready results",
+    subtitle: "Downloadable model artifacts, diagnostics, and dashboard-ready results",
     stages: ["build_integrated", "complete"],
   },
 ];
 
 const DEFAULT_FLOW_NODE_LAYOUT = {
-  scenario: { x: 40, y: 30, w: 1400, h: 650 },
-  calliope_data: { x: 40, y: 820, w: 176, h: 170 },
+  scenario: { x: 40, y: 30, w: 980, h: 650 },
+  calliope_data: { x: 40, y: 820, w: 360, h: 170 },
   adapter: { x: 505, y: 820, w: 470, h: 150 },
-  mrio_data: { x: 1040, y: 820, w: 191, h: 170 },
+  mrio_data: { x: 1040, y: 820, w: 390, h: 170 },
   calliope: { x: 72, y: 1100, w: 380, h: 150 },
   bridge: { x: 515, y: 1240, w: 390, h: 140 },
   mrio: { x: 1015, y: 1265, w: 410, h: 155 },
@@ -223,9 +249,274 @@ const DEFAULT_FLOW_EDGES = [
   { from: "mrio", to: "outputs", label: "development results" },
 ];
 
+const IO_WIRE_TYPE_STYLES = {
+  aggregate: { label: "Aggregate flow", color: "#67e8f9" },
+  scenario: { label: "Scenario package", color: "#67e8f9" },
+  catalog: { label: "Catalog / metadata", color: "#38bdf8" },
+  control: { label: "Controls / levers", color: "#a78bfa" },
+  manifest: { label: "Manifest", color: "#818cf8" },
+  "energy-config": { label: "Energy config", color: "#60a5fa" },
+  "energy-scenario": { label: "Energy scenario", color: "#2563eb" },
+  "energy-network": { label: "Network / grid", color: "#14b8a6" },
+  technology: { label: "Technology data", color: "#2dd4bf" },
+  "time-series": { label: "Time series", color: "#0ea5e9" },
+  geospatial: { label: "Geography", color: "#34d399" },
+  "mrio-scenario": { label: "MRIO scenario", color: "#f472b6" },
+  "mrio-shock": { label: "MRIO-direct shock", color: "#fb7185" },
+  mapping: { label: "Mapping", color: "#facc15" },
+  calibration: { label: "Calibration", color: "#f59e0b" },
+  validation: { label: "Validation", color: "#c084fc" },
+  "energy-output": { label: "Energy output", color: "#22c55e" },
+  "bridge-shock": { label: "Bridge shock", color: "#f97316" },
+  "development-output": { label: "Development output", color: "#84cc16" },
+  diagnostic: { label: "Diagnostic", color: "#94a3b8" },
+  report: { label: "Report", color: "#e2e8f0" },
+  package: { label: "Package / export", color: "#f8fafc" },
+};
+
+const IO_WIRE_GROUP_STYLES = {
+  aggregate: { label: "Aggregate flow", color: "#67e8f9" },
+  "scenario-definition": { label: "Scenario definition", color: "#5eead4" },
+  "energy-input-package": { label: "Energy input package", color: "#38bdf8" },
+  "energy-runtime": { label: "Energy runtime instructions", color: "#818cf8" },
+  "energy-results": { label: "Solved energy outputs", color: "#22c55e" },
+  "bridge-exchange": { label: "Bridge exchange package", color: "#fb923c" },
+  "mrio-input-package": { label: "MRIO input package", color: "#f472b6" },
+  "mrio-direct-assumptions": { label: "MRIO-direct assumptions", color: "#fb7185" },
+  "geography-mapping": { label: "Geography / mapping", color: "#34d399" },
+  "development-results": { label: "Development outputs", color: "#84cc16" },
+  "diagnostics-artifacts": { label: "Diagnostics / artifacts", color: "#94a3b8" },
+};
+
+const DATA_WIRE_GROUP_STYLES = {
+  "data-scenario": { label: "Scenario data", color: "#22d3ee" },
+  "data-energy-config": { label: "Energy config", color: "#60a5fa" },
+  "data-energy-scenario": { label: "Energy scenario settings", color: "#2563eb" },
+  "data-network-spatial": { label: "Grid / geography", color: "#14b8a6" },
+  "data-technology": { label: "Technology assumptions", color: "#2dd4bf" },
+  "data-time-series": { label: "Resource / demand series", color: "#0ea5e9" },
+  "data-mrio-scenario": { label: "MRIO scenario / shocks", color: "#fb7185" },
+  "data-mapping": { label: "Sector/geography mapping", color: "#fde047" },
+  "data-calibration": { label: "Economic calibration", color: "#f59e0b" },
+  "data-energy-output": { label: "Energy results", color: "#22c55e" },
+  "data-bridge-output": { label: "Bridge shocks", color: "#fb923c" },
+  "data-development-output": { label: "Development results", color: "#a3e635" },
+};
+
+const INFORMATION_LAYER_ORDER = [
+  "aggregate",
+  "scenario-definition",
+  "energy-input-package",
+  "energy-runtime",
+  "energy-results",
+  "bridge-exchange",
+  "mrio-input-package",
+  "mrio-direct-assumptions",
+  "geography-mapping",
+  "development-results",
+  "diagnostics-artifacts",
+];
+
+const DATA_WIRE_GROUP_ORDER = [
+  "aggregate",
+  "data-scenario",
+  "data-energy-config",
+  "data-energy-scenario",
+  "data-network-spatial",
+  "data-technology",
+  "data-time-series",
+  "data-mrio-scenario",
+  "data-mapping",
+  "data-calibration",
+  "data-energy-output",
+  "data-bridge-output",
+  "data-development-output",
+];
+
+const DATA_IO_WIRE_TYPES = new Set([
+  "scenario",
+  "control",
+  "energy-config",
+  "energy-scenario",
+  "energy-network",
+  "technology",
+  "time-series",
+  "geospatial",
+  "mrio-scenario",
+  "mrio-shock",
+  "mapping",
+  "calibration",
+  "energy-output",
+  "bridge-shock",
+  "development-output",
+]);
+
+function normalizeIoWireType(type) {
+  const key = String(type || "aggregate").trim().toLowerCase();
+  return IO_WIRE_TYPE_STYLES[key] ? key : "aggregate";
+}
+
+function ioWireGroup(type) {
+  const normalized = normalizeIoWireType(type);
+  if (normalized === "aggregate") return "aggregate";
+  if (["scenario", "control", "catalog"].includes(normalized)) return "scenario-definition";
+  if (["energy-config", "energy-scenario", "energy-network", "technology", "time-series"].includes(normalized)) return "energy-input-package";
+  if (["geospatial", "mapping"].includes(normalized)) return "geography-mapping";
+  if (["mrio-scenario", "mrio-shock", "calibration"].includes(normalized)) return "mrio-input-package";
+  if (normalized === "energy-output") return "energy-results";
+  if (normalized === "bridge-shock") return "bridge-exchange";
+  if (normalized === "development-output") return "development-results";
+  if (["manifest", "validation", "diagnostic", "report", "package"].includes(normalized)) return "diagnostics-artifacts";
+  return "aggregate";
+}
+
+function ioInformationLayer(type, explicitLayer) {
+  const explicit = String(explicitLayer || "").trim();
+  if (explicit && IO_WIRE_GROUP_STYLES[explicit]) return explicit;
+  return ioWireGroup(type);
+}
+
+function ioWireDataGroup(type) {
+  const normalized = normalizeIoWireType(type);
+  if (["scenario", "control"].includes(normalized)) return "data-scenario";
+  if (normalized === "energy-config") return "data-energy-config";
+  if (normalized === "energy-scenario") return "data-energy-scenario";
+  if (["energy-network", "geospatial"].includes(normalized)) return "data-network-spatial";
+  if (normalized === "technology") return "data-technology";
+  if (normalized === "time-series") return "data-time-series";
+  if (["mrio-scenario", "mrio-shock"].includes(normalized)) return "data-mrio-scenario";
+  if (normalized === "mapping") return "data-mapping";
+  if (normalized === "calibration") return "data-calibration";
+  if (normalized === "energy-output") return "data-energy-output";
+  if (normalized === "bridge-shock") return "data-bridge-output";
+  if (normalized === "development-output") return "data-development-output";
+  return ioWireGroup(normalized);
+}
+
+function ioWireStyle(type) {
+  return DATA_WIRE_GROUP_STYLES[type] || IO_WIRE_GROUP_STYLES[type] || IO_WIRE_GROUP_STYLES[ioWireGroup(type)] || IO_WIRE_GROUP_STYLES.aggregate;
+}
+
+function ioWireSourceStyle(type) {
+  return IO_WIRE_TYPE_STYLES[normalizeIoWireType(type)] || IO_WIRE_TYPE_STYLES.aggregate;
+}
+
+function buildScenarioWireContext(scenarioKey, scenarioSelections) {
+  const parsed = parseScenarioDimensions(scenarioKey) || {};
+  const selections = scenarioSelections || {};
+  const family = parsed.family || selections.family || "";
+  return {
+    scenarioKey: String(scenarioKey || ""),
+    family,
+    scenarioFamily: family,
+    pathway: parsed.pathway || selections.pathway || "",
+    generation: parsed.generation || selections.generation || "",
+    transmission: parsed.transmission || selections.transmission || "",
+    policy: typeof parsed.policy === "boolean" ? parsed.policy : Boolean(selections.policy),
+  };
+}
+
+function activeWhenLabel(activeWhen) {
+  if (!activeWhen || typeof activeWhen !== "object") return "";
+  if (Array.isArray(activeWhen.anyOf)) {
+    return activeWhen.anyOf.map(activeWhenLabel).filter(Boolean).join(" or ");
+  }
+  if (Array.isArray(activeWhen.allOf)) {
+    return activeWhen.allOf.map(activeWhenLabel).filter(Boolean).join(" and ");
+  }
+  return Object.entries(activeWhen)
+    .filter(([key]) => key !== "anyOf" && key !== "allOf")
+    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(" / ") : String(value)}`)
+    .join(", ");
+}
+
+function conditionValueMatches(actual, expected) {
+  if (Array.isArray(expected)) return expected.some((item) => conditionValueMatches(actual, item));
+  if (typeof expected === "boolean") return Boolean(actual) === expected;
+  return String(actual || "").toLowerCase() === String(expected || "").toLowerCase();
+}
+
+function activeWhenMatches(activeWhen, context) {
+  if (!activeWhen || typeof activeWhen !== "object") return true;
+  if (Array.isArray(activeWhen.anyOf)) {
+    return activeWhen.anyOf.some((rule) => activeWhenMatches(rule, context));
+  }
+  if (Array.isArray(activeWhen.allOf)) {
+    return activeWhen.allOf.every((rule) => activeWhenMatches(rule, context));
+  }
+  const fieldMap = {
+    scenarioKey: context.scenarioKey,
+    scenario_key: context.scenarioKey,
+    family: context.family,
+    scenarioFamily: context.scenarioFamily,
+    scenario_family: context.scenarioFamily,
+    pathway: context.pathway,
+    generation: context.generation,
+    transmission: context.transmission,
+    policy: context.policy,
+  };
+  return Object.entries(activeWhen).every(([key, expected]) => {
+    if (key === "anyOf" || key === "allOf") return true;
+    return conditionValueMatches(fieldMap[key], expected);
+  });
+}
+
+function normalizeIoLayer(layer, parent, index) {
+  const layerId = String((layer && (layer.id || layer.key || layer.path)) || `${parent.id}-layer-${index + 1}`).trim();
+  const layerLabel = String((layer && (layer.label || layer.name || layer.path)) || layerId).trim();
+  return {
+    id: layerId,
+    label: layerLabel,
+    type: normalizeIoWireType((layer && layer.type) || parent.type),
+    activeWhen: (layer && (layer.activeWhen || layer.active_when)) || null,
+    informationLayer: String((layer && (layer.informationLayer || layer.information_layer)) || "").trim(),
+    purpose: String((layer && layer.purpose) || "").trim(),
+    granularity: String((layer && layer.granularity) || "").trim(),
+    dataGroup: String((layer && (layer.dataGroup || layer.data_group)) || "").trim(),
+    dataGroupLabel: String((layer && (layer.dataGroupLabel || layer.data_group_label)) || "").trim(),
+    variantLabel: String((layer && (layer.variantLabel || layer.variant_label)) || "").trim(),
+    parentId: parent.id,
+    parentLabel: parent.label,
+  };
+}
+
+function normalizeEdgeIo(edge) {
+  const rawRows = Array.isArray(edge && edge.io)
+    ? edge.io
+    : Array.isArray(edge && edge.ios)
+      ? edge.ios
+      : Array.isArray(edge && edge.wires)
+        ? edge.wires
+        : [];
+  return rawRows
+    .map((row, index) => {
+      const id = String((row && (row.id || row.io_id || row.key)) || `io-${index + 1}`).trim();
+      const label = String((row && (row.label || row.name)) || id).trim();
+      return {
+        id,
+        label,
+        type: normalizeIoWireType(row && row.type),
+        activeWhen: (row && (row.activeWhen || row.active_when)) || null,
+        informationLayer: String((row && (row.informationLayer || row.information_layer)) || "").trim(),
+        purpose: String((row && row.purpose) || "").trim(),
+        granularity: String((row && row.granularity) || "").trim(),
+        dataGroup: String((row && (row.dataGroup || row.data_group)) || "").trim(),
+        dataGroupLabel: String((row && (row.dataGroupLabel || row.data_group_label)) || "").trim(),
+        variantLabel: String((row && (row.variantLabel || row.variant_label)) || "").trim(),
+        layers: Array.isArray(row && (row.layers || row.dataLayers))
+          ? (row.layers || row.dataLayers)
+              .map((layer, layerIndex) => normalizeIoLayer(layer, { id, label, type: normalizeIoWireType(row && row.type) }, layerIndex))
+              .filter((layer) => layer.id && layer.label)
+          : [],
+      };
+    })
+    .filter((row) => row.id && row.label);
+}
+
 const DEFAULT_FLOW_CANVAS_SIZE = { width: 1480, height: 1740 };
+const FLOW_CANVAS_NODE_PADDING = 96;
 const DEFAULT_FLOW_NODE_ORDER = ["scenario", "calliope_data", "adapter", "mrio_data", "calliope", "bridge", "mrio", "outputs"];
-const DEFAULT_FIXED_FLOW_NODES = ["scenario"];
+const DEFAULT_FIXED_FLOW_NODES = [];
 
 function defaultFlowDefinition() {
   return {
@@ -268,9 +559,10 @@ function normalizeMainUiFlow(flow) {
             from: String(edge && edge.from ? edge.from : "").trim(),
             to: String(edge && edge.to ? edge.to : "").trim(),
             label: String(edge && edge.label ? edge.label : "").trim(),
+            io: normalizeEdgeIo(edge),
           }))
           .filter((edge) => edge.from && edge.to)
-      : DEFAULT_FLOW_EDGES.map((edge) => ({ ...edge })),
+      : DEFAULT_FLOW_EDGES.map((edge) => ({ ...edge, io: normalizeEdgeIo(edge) })),
     order,
     fixedNodes: Array.isArray(flow.fixedNodes) ? flow.fixedNodes.map((id) => String(id)) : [...DEFAULT_FIXED_FLOW_NODES],
   };
@@ -289,12 +581,39 @@ function normalizeFlowDefinition(flow) {
     return {
       canvas: flow.canvas || { ...DEFAULT_FLOW_CANVAS_SIZE },
       nodes,
-      edges: Array.isArray(flow.edges) ? flow.edges.map((edge) => ({ ...edge })) : DEFAULT_FLOW_EDGES.map((edge) => ({ ...edge })),
+      edges: Array.isArray(flow.edges)
+        ? flow.edges.map((edge) => ({ ...edge, io: normalizeEdgeIo(edge) }))
+        : DEFAULT_FLOW_EDGES.map((edge) => ({ ...edge, io: normalizeEdgeIo(edge) })),
       order: Array.isArray(flow.order) && flow.order.length ? [...flow.order] : order,
       fixedNodes: Array.isArray(flow.fixedNodes) ? flow.fixedNodes.map((id) => String(id)) : [...DEFAULT_FIXED_FLOW_NODES],
     };
   }
   return defaultFlowDefinition();
+}
+
+function centerExpandedFlowNode(definition, nodeId) {
+  const rect = definition && definition.nodes ? definition.nodes[nodeId] : null;
+  const canvas = definition && definition.canvas ? definition.canvas : DEFAULT_FLOW_CANVAS_SIZE;
+  if (!rect) return definition;
+
+  const baseWidth = Number(rect.w) || 320;
+  const expandedWidth = baseWidth + Math.min(120, Math.max(48, Math.round(baseWidth * 0.16)));
+  let canvasWidth = Number(canvas.width) || DEFAULT_FLOW_CANVAS_SIZE.width;
+  Object.values(definition.nodes || {}).forEach((nodeRect) => {
+    const nodeX = Number(nodeRect && nodeRect.x);
+    const nodeWidth = Number(nodeRect && nodeRect.w);
+    if (!Number.isFinite(nodeX) || !Number.isFinite(nodeWidth)) return;
+    canvasWidth = Math.max(canvasWidth, nodeX + nodeWidth + FLOW_CANVAS_NODE_PADDING);
+  });
+  const centeredX = Math.max(12, Math.round((canvasWidth - expandedWidth) / 2));
+
+  return {
+    ...definition,
+    nodes: {
+      ...definition.nodes,
+      [nodeId]: { ...rect, x: centeredX },
+    },
+  };
 }
 
 function defaultArchitectureCatalog() {
@@ -304,8 +623,8 @@ function defaultArchitectureCatalog() {
     architectures: [
       {
         id: DEFAULT_MODEL_ARCHITECTURE_ID,
-        label: "Energy-development",
-        shortLabel: "Energy + development",
+        label: "Energy-Development",
+        shortLabel: "Energy-Development",
         description: "Full EDIM architecture linking the energy model, bridge, and MRIO/development impacts.",
         requiresMrio: true,
         requiresBridge: true,
@@ -429,7 +748,7 @@ function projectTypeLabel(project) {
   const option =
     PROJECT_TYPE_OPTIONS.find((row) => row.value === architectureId) ||
     PROJECT_TYPE_OPTIONS.find((row) => row.projectType === projectType);
-  return option ? option.label : projectType || architectureId || "Energy-development";
+  return option ? option.label : projectType || architectureId || "Energy-Development";
 }
 
 function projectGeographyLabel(value) {
@@ -514,6 +833,576 @@ function displayStatus(status) {
   return STATUS_THEME[key] || { label: status || "Unknown", className: "badge badge-neutral" };
 }
 
+const evidenceComponents = window.EDIM_EVIDENCE || {};
+const EvidenceBadge = evidenceComponents.EvidenceBadge || function EvidenceBadgeFallback({ status }) {
+  const normalized = String(status || "not_evaluated").trim().toLowerCase();
+  if (normalized === "exploratory_only" || normalized === "not_evaluated") return null;
+  return <StatusBadge status={normalized} />;
+};
+const evidenceFromSummary = evidenceComponents.evidenceFromSummary || (() => ({ status: "not_evaluated", score: 0 }));
+const evidenceFromModel = evidenceComponents.evidenceFromModel || ((model) => ({
+  status: String((model && model.evidence_status) || "not_evaluated"),
+  score: Number(model && model.evidence_score) || 0,
+  summary: String((model && model.evidence_summary) || ""),
+}));
+const ENTITY_VISUAL_STATUS_COLORS = {
+  draft: "#91A0B7",
+  queued: "#F2C14E",
+  running: "#4CB6E8",
+  succeeded: "#48C78E",
+  failed: "#F06B67",
+};
+
+function visualHash(value) {
+  const text = String(value || "");
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function visualRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6D2B79F5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function visualPolar(radius, angle, center = 50) {
+  return {
+    x: center + Math.cos(angle) * radius,
+    y: center + Math.sin(angle) * radius,
+  };
+}
+
+function visualSectorPath(startAngle, endAngle, radius = 54) {
+  const span = Math.max(0, endAngle - startAngle);
+  const start = visualPolar(radius, startAngle);
+  const end = visualPolar(radius, endAngle);
+  const largeArc = span > Math.PI ? 1 : 0;
+  return [
+    "M 50 50",
+    `L ${start.x.toFixed(2)} ${start.y.toFixed(2)}`,
+    `A ${radius} ${radius} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`,
+    "Z",
+  ].join(" ");
+}
+
+function visualSmoothClosedPath(points) {
+  if (!Array.isArray(points) || points.length < 3) return "";
+  const size = points.length;
+  const commands = [`M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`];
+  for (let index = 0; index < size; index += 1) {
+    const previous = points[(index - 1 + size) % size];
+    const current = points[index];
+    const next = points[(index + 1) % size];
+    const afterNext = points[(index + 2) % size];
+    const firstControl = {
+      x: current.x + (next.x - previous.x) / 6,
+      y: current.y + (next.y - previous.y) / 6,
+    };
+    const secondControl = {
+      x: next.x - (afterNext.x - current.x) / 6,
+      y: next.y - (afterNext.y - current.y) / 6,
+    };
+    commands.push(
+      `C ${firstControl.x.toFixed(2)} ${firstControl.y.toFixed(2)} ${secondControl.x.toFixed(2)} ${secondControl.y.toFixed(2)} ${next.x.toFixed(2)} ${next.y.toFixed(2)}`
+    );
+  }
+  return `${commands.join(" ")} Z`;
+}
+
+function visualContourPath(seed, {
+  center = 50,
+  baseRadius = 30,
+  variance = 6,
+  eccentricity = 2,
+  pointCount = 56,
+} = {}) {
+  const random = visualRandom(seed);
+  const knotCount = 9 + Math.floor(random() * 5);
+  let radialNoise = Array.from({ length: knotCount }, () => random() * 2 - 1);
+  for (let pass = 0; pass < 2; pass += 1) {
+    radialNoise = radialNoise.map((value, index) => (
+      radialNoise[(index - 1 + knotCount) % knotCount]
+      + value * 2
+      + radialNoise[(index + 1) % knotCount]
+    ) / 4);
+  }
+  const centerOffsetAngle = random() * Math.PI * 2;
+  const offsetX = Math.cos(centerOffsetAngle) * eccentricity;
+  const offsetY = Math.sin(centerOffsetAngle) * eccentricity;
+  const points = Array.from({ length: pointCount }, (_, index) => {
+    const angle = (index / pointCount) * Math.PI * 2;
+    const knotPosition = (index / pointCount) * knotCount;
+    const knotIndex = Math.floor(knotPosition) % knotCount;
+    const nextKnot = (knotIndex + 1) % knotCount;
+    const local = knotPosition - Math.floor(knotPosition);
+    const eased = local * local * (3 - 2 * local);
+    const noise = radialNoise[knotIndex] * (1 - eased) + radialNoise[nextKnot] * eased;
+    const radius = Math.max(4, Math.min(42, baseRadius + variance * noise * 1.9));
+    const point = visualPolar(radius, angle, center);
+    return {
+      x: point.x + offsetX,
+      y: point.y + offsetY,
+    };
+  });
+  return visualSmoothClosedPath(points);
+}
+
+function visualHsl(hue, saturation, lightness) {
+  const normalizedHue = ((Number(hue) % 360) + 360) % 360;
+  return `hsl(${normalizedHue.toFixed(1)}, ${saturation}%, ${lightness}%)`;
+}
+
+function visualColorHarmony(seed, sequence = 0) {
+  const random = visualRandom(seed);
+  const baseHue = (seed % 360 + sequence * 137.508) % 360;
+  const analogousDirection = random() > 0.5 ? 1 : -1;
+  const analogousHue = baseHue + analogousDirection * (28 + random() * 24);
+  const complementHue = baseHue + 166 + random() * 28;
+  return {
+    primary: visualHsl(baseHue, 76, 57),
+    analogous: visualHsl(analogousHue, 72, 62),
+    complement: visualHsl(complementHue, 74, 58),
+    highlight: visualHsl(baseHue + analogousDirection * 12, 84, 78),
+    shadow: visualHsl(baseHue + 8, 52, 17),
+  };
+}
+
+function modelVisualDescriptor(row) {
+  const source = row && typeof row === "object" ? row : {};
+  const configuration = runConfigurationPayload(source);
+  const architectureId = String(source.architecture_id || configuration.model_architecture_id || "energy-development");
+  const scenarioKey = String(source.scenario_key || configuration.energy_scenario_key || "");
+  const targetScenarioId = String(source.target_scenario_id || configuration.mrio_scenario_id || "");
+  const targetYear = Number(source.target_year || configuration.target_year) || null;
+  const levers = configuration.levers && typeof configuration.levers === "object" ? configuration.levers : {};
+  const artifactCount = Number(source.artifact_count)
+    || (Array.isArray(source.artifact_catalog) ? source.artifact_catalog.length : 0);
+  const summaryAvailable = Boolean(source.summary_available || source.summary);
+  const kpiScopeCount = Number(source.kpi_scope_count)
+    || (summaryAvailable ? (architectureId === "energy-development" ? 8 : 5) : 0);
+  const adjustedLeverCount = Object.entries(levers).filter(([key, value]) => {
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_LEVERS, key)) return true;
+    const parsed = Number(value);
+    return !Number.isFinite(parsed) || Math.abs(parsed - Number(DEFAULT_LEVERS[key])) > 1e-9;
+  }).length;
+  return {
+    runId: String(source.run_id || ""),
+    projectRunNumber: Number(source.project_run_number || source.run_number) || 0,
+    status: normalizeStatus(source.status) || "draft",
+    architectureId,
+    scenarioKey,
+    targetScenarioId,
+    targetYear,
+    runProfile: String(source.run_profile || configuration.run_profile || "dev"),
+    leverCount: source.lever_count == null ? adjustedLeverCount : Number(source.lever_count) || 0,
+    artifactCount,
+    kpiScopeCount,
+    summaryAvailable,
+    evidenceStatus: String(source.evidence_status || "not_evaluated"),
+    evidenceScore: Number(source.evidence_score) || 0,
+  };
+}
+
+function modelVisualSeed(descriptor) {
+  return [
+    descriptor.runId,
+    descriptor.projectRunNumber,
+    descriptor.architectureId,
+    descriptor.scenarioKey,
+    descriptor.targetScenarioId,
+    descriptor.targetYear,
+    descriptor.runProfile,
+  ].join("|");
+}
+
+function ModelIdentityShape({
+  descriptor,
+  subdued = false,
+  blurFilterIds = null,
+  idNamespace = "",
+}) {
+  const seed = visualHash(modelVisualSeed(descriptor));
+  const idKey = idNamespace ? `${seed}-${visualHash(idNamespace)}` : String(seed);
+  const random = visualRandom(seed);
+  const integrated = descriptor.architectureId === "energy-development";
+  const semanticPaletteSeed = visualHash([
+    descriptor.architectureId,
+    descriptor.scenarioKey,
+    descriptor.targetScenarioId,
+    descriptor.runProfile,
+  ].join("|"));
+  const harmony = visualColorHarmony(semanticPaletteSeed, Math.max(0, descriptor.projectRunNumber - 1));
+  const statusColor = ENTITY_VISUAL_STATUS_COLORS[descriptor.status] || ENTITY_VISUAL_STATUS_COLORS.draft;
+  const kpiReach = Math.min(4.5, descriptor.kpiScopeCount * 0.42);
+  const leverVariance = Math.min(3.5, descriptor.leverCount * 0.65);
+  const outerContour = visualContourPath(seed ^ 0x9E3779B9, {
+    baseRadius: 29 + kpiReach,
+    variance: 4.6 + leverVariance,
+    eccentricity: integrated ? 2.8 : 1.4,
+  });
+  const innerContour = visualContourPath(seed ^ 0x85EBCA6B, {
+    baseRadius: 17 + Math.min(3, descriptor.artifactCount * 0.25),
+    variance: 4.2 + (descriptor.projectRunNumber % 3),
+    eccentricity: 1.8,
+    pointCount: 44,
+  });
+  const accentContour = visualContourPath(seed ^ 0xC2B2AE35, {
+    baseRadius: 10 + Math.min(4, descriptor.leverCount * 0.7),
+    variance: 3.2 + Math.min(2.5, descriptor.kpiScopeCount * 0.2),
+    eccentricity: 7,
+    pointCount: 40,
+  });
+  const anchorAngle = random() * Math.PI * 2;
+  const anchor = visualPolar(12 + random() * 13, anchorAngle);
+  const gradientAngle = random() * Math.PI * 2;
+  const gradientVector = {
+    x1: 50 - Math.cos(gradientAngle) * 48,
+    y1: 50 - Math.sin(gradientAngle) * 48,
+    x2: 50 + Math.cos(gradientAngle) * 48,
+    y2: 50 + Math.sin(gradientAngle) * 48,
+  };
+  const mainGradientId = `identity-main-${idKey}`;
+  const coreGradientId = `identity-core-${idKey}`;
+  const accentGradientId = `identity-accent-${idKey}`;
+  const statusGradientId = `identity-status-${idKey}`;
+  const hazeFilterId = (blurFilterIds && blurFilterIds.haze) || `identity-haze-${idKey}`;
+  const softFilterId = (blurFilterIds && blurFilterIds.soft) || `identity-soft-${idKey}`;
+  const detailFilterId = (blurFilterIds && blurFilterIds.detail) || `identity-detail-${idKey}`;
+  return (
+    <g className={`entity-identity-shape entity-identity-shape--${descriptor.status}`}>
+      <defs>
+        <linearGradient
+          id={mainGradientId}
+          gradientUnits="userSpaceOnUse"
+          x1={gradientVector.x1}
+          y1={gradientVector.y1}
+          x2={gradientVector.x2}
+          y2={gradientVector.y2}
+        >
+          <stop offset="0%" stopColor={harmony.primary} stopOpacity="0.72" />
+          <stop offset="52%" stopColor={harmony.analogous} />
+          <stop offset="100%" stopColor={harmony.complement} stopOpacity="0.68" />
+        </linearGradient>
+        <radialGradient id={coreGradientId} cx="36%" cy="30%" r="74%">
+          <stop offset="0%" stopColor={harmony.highlight} />
+          <stop offset="42%" stopColor={harmony.primary} stopOpacity="0.92" />
+          <stop offset="78%" stopColor={harmony.complement} stopOpacity="0.56" />
+          <stop offset="100%" stopColor={harmony.complement} stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={accentGradientId} cx="42%" cy="38%" r="68%">
+          <stop offset="0%" stopColor={harmony.highlight} stopOpacity="0.9" />
+          <stop offset="42%" stopColor={harmony.analogous} stopOpacity="0.7" />
+          <stop offset="76%" stopColor={harmony.primary} stopOpacity="0.24" />
+          <stop offset="100%" stopColor={harmony.primary} stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={statusGradientId} cx="38%" cy="34%" r="68%">
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.82" />
+          <stop offset="28%" stopColor={statusColor} stopOpacity="0.9" />
+          <stop offset="68%" stopColor={statusColor} stopOpacity="0.38" />
+          <stop offset="100%" stopColor={harmony.shadow} stopOpacity="0" />
+        </radialGradient>
+        {blurFilterIds ? null : (
+          <>
+            <filter id={hazeFilterId} x="-35%" y="-35%" width="170%" height="170%">
+              <feGaussianBlur stdDeviation={subdued ? "5.2" : "4.4"} />
+            </filter>
+            <filter id={softFilterId} x="-25%" y="-25%" width="150%" height="150%">
+              <feGaussianBlur stdDeviation={subdued ? "3.1" : "2.35"} />
+            </filter>
+            <filter id={detailFilterId} x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation={subdued ? "2.4" : "1.65"} />
+            </filter>
+          </>
+        )}
+      </defs>
+      <path
+        d={outerContour}
+        fill={`url(#${mainGradientId})`}
+        fillOpacity={subdued ? 0.34 : 0.52}
+        filter={`url(#${hazeFilterId})`}
+        className="identity-gradient-layer identity-gradient-layer--haze"
+      />
+      <path
+        d={outerContour}
+        fill={`url(#${mainGradientId})`}
+        fillOpacity={subdued ? 0.58 : 0.82}
+        filter={`url(#${softFilterId})`}
+      />
+      <path
+        d={innerContour}
+        fill={`url(#${coreGradientId})`}
+        fillOpacity={subdued ? 0.5 : 0.78}
+        filter={`url(#${detailFilterId})`}
+        className="identity-gradient-layer identity-gradient-layer--core"
+      />
+      <path
+        d={accentContour}
+        fill={`url(#${accentGradientId})`}
+        fillOpacity={subdued ? 0.44 : 0.76}
+        filter={`url(#${detailFilterId})`}
+        className="identity-gradient-layer identity-gradient-layer--accent"
+      />
+      <ellipse
+        cx={anchor.x}
+        cy={anchor.y}
+        rx={integrated ? "11" : "9"}
+        ry={integrated ? "8.6" : "7.2"}
+        fill={`url(#${accentGradientId})`}
+        fillOpacity={subdued ? 0.4 : 0.66}
+        filter={`url(#${detailFilterId})`}
+        transform={`rotate(${seed % 180} ${anchor.x.toFixed(2)} ${anchor.y.toFixed(2)})`}
+      />
+      <circle
+        cx={anchor.x}
+        cy={anchor.y}
+        r={integrated ? "7.2" : "6.2"}
+        fill={`url(#${statusGradientId})`}
+        fillOpacity={subdued ? 0.58 : 0.84}
+        filter={`url(#${detailFilterId})`}
+        className="identity-gradient-layer identity-gradient-layer--status"
+      />
+    </g>
+  );
+}
+
+function ModelIdentityCircleField({
+  descriptor,
+  className = "",
+  idNamespace = "model",
+  subdued = false,
+}) {
+  const seed = visualHash(modelVisualSeed(descriptor));
+  const idKey = `${seed}-${visualHash(idNamespace)}`;
+  const harmony = visualColorHarmony(
+    visualHash([
+      descriptor.architectureId,
+      descriptor.scenarioKey,
+      descriptor.targetScenarioId,
+      descriptor.runProfile,
+    ].join("|")),
+    Math.max(0, descriptor.projectRunNumber - 1)
+  );
+  const backdropId = `model-identity-backdrop-${idKey}`;
+  return (
+    <g
+      className={`model-identity-circle-field ${className}`.trim()}
+      data-model-circle={descriptor.runId || String(descriptor.projectRunNumber)}
+    >
+      <defs>
+        <radialGradient id={backdropId} cx="34%" cy="28%" r="78%">
+          <stop offset="0%" stopColor={harmony.primary} stopOpacity="0.34" />
+          <stop offset="48%" stopColor={harmony.shadow} stopOpacity="0.78" />
+          <stop offset="100%" stopColor="#060B13" />
+        </radialGradient>
+      </defs>
+      <circle cx="50" cy="50" r="46" fill={`url(#${backdropId})`} />
+      <ModelIdentityShape
+        descriptor={descriptor}
+        subdued={subdued}
+        idNamespace={idNamespace}
+      />
+      <circle cx="50" cy="50" r="45" fill="#FFFFFF" fillOpacity="0.025" />
+    </g>
+  );
+}
+
+function ModelIdentityVisual({ run, className = "" }) {
+  const descriptor = modelVisualDescriptor(run);
+  const label = `${runLabel(run)} visual: ${displayStatus(descriptor.status).label}, ${descriptor.architectureId}, ${descriptor.kpiScopeCount} result indicators`;
+  const seed = visualHash(modelVisualSeed(descriptor));
+  const clipId = `model-identity-clip-${seed}`;
+  return (
+    <svg
+      className={`entity-identity-visual model-identity-visual ${className}`.trim()}
+      viewBox="0 0 100 100"
+      role="img"
+      aria-label={label}
+      data-identity-revision={String(seed)}
+    >
+      <title>{label}</title>
+      <defs>
+        <clipPath id={clipId}>
+          <circle cx="50" cy="50" r="46" />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clipId})`}>
+        <ModelIdentityCircleField
+          descriptor={descriptor}
+          idNamespace={`model-${descriptor.runId || descriptor.projectRunNumber}`}
+        />
+      </g>
+    </svg>
+  );
+}
+
+function projectVisualData(project) {
+  const summary = project && project.visual_summary && typeof project.visual_summary === "object"
+    ? project.visual_summary
+    : {};
+  const models = Array.isArray(summary.models) ? summary.models.map(modelVisualDescriptor) : [];
+  const modelCount = Number(summary.model_count) || models.length;
+  const completedCount = Number(summary.completed_count) || 0;
+  const fingerprints = new Set(models.map((model) => [
+    model.architectureId,
+    model.scenarioKey,
+    model.targetScenarioId,
+    model.targetYear,
+    model.runProfile,
+    model.leverCount,
+  ].join("|")));
+  const variationScore = summary.variation_score == null
+    ? (modelCount <= 1 ? 0 : (fingerprints.size - 1) / (modelCount - 1))
+    : Number(summary.variation_score) || 0;
+  return {
+    models,
+    modelCount,
+    completedCount,
+    activeCount: Number(summary.active_count) || 0,
+    failedCount: Number(summary.failed_count) || 0,
+    kpiScopeCount: Number(summary.kpi_scope_count) || 0,
+    variationScore,
+    evidenceStatus: String(summary.evidence_status || "not_evaluated"),
+    exploratoryModelCount: Number(summary.exploratory_model_count) || 0,
+    analystReviewModelCount: Number(summary.analyst_review_model_count) || 0,
+  };
+}
+
+function ProjectIdentityVisual({ project, className = "" }) {
+  const data = projectVisualData(project);
+  const projectSeed = [
+    project && project.project_id,
+    project && project.geography,
+    project && project.project_type,
+    project && project.model_architecture_id,
+  ].join("|");
+  const seed = visualHash(projectSeed);
+  const sectorModels = data.models;
+  const sectorCount = sectorModels.length;
+  const sectorSpan = sectorCount ? (Math.PI * 2) / sectorCount : Math.PI * 2;
+  const sectorPhase = -Math.PI / 2;
+  const sectorOverlap = Math.min(0.018, sectorSpan * 0.025);
+  const sectorFeatherFilterId = `project-sector-feather-${seed}`;
+  const sectors = sectorModels.map((descriptor, index) => {
+    const startAngle = sectorPhase + index * sectorSpan - sectorOverlap;
+    const endAngle = sectorPhase + (index + 1) * sectorSpan + sectorOverlap;
+    const sectorMaskId = `project-sector-mask-${seed}-${index}`;
+    return (
+      <g
+        key={descriptor.runId || `${descriptor.projectRunNumber}-${index}`}
+        className="project-identity-sector"
+        mask={`url(#${sectorMaskId})`}
+        data-project-sector={String(index + 1)}
+        data-project-run={descriptor.runId}
+      >
+        <defs>
+          <mask
+            id={sectorMaskId}
+            x="0"
+            y="0"
+            width="100"
+            height="100"
+            maskUnits="userSpaceOnUse"
+          >
+            <rect x="0" y="0" width="100" height="100" fill="#000000" />
+            {sectorCount === 1 ? (
+              <circle
+                cx="50"
+                cy="50"
+                r="52"
+                fill="#FFFFFF"
+              />
+            ) : (
+              <path
+                d={visualSectorPath(startAngle, endAngle)}
+                fill="#FFFFFF"
+                filter={`url(#${sectorFeatherFilterId})`}
+              />
+            )}
+          </mask>
+        </defs>
+        <ModelIdentityCircleField
+          descriptor={descriptor}
+          className="project-identity-sector-field"
+          idNamespace={`project-${seed}-${index}`}
+          subdued={sectorCount > 12}
+        />
+      </g>
+    );
+  });
+  const clipId = `project-identity-clip-${seed}`;
+  const emptyFieldId = `project-empty-field-${seed}`;
+  const revisionSeed = visualHash([
+    data.modelCount,
+    data.completedCount,
+    data.activeCount,
+    data.failedCount,
+    data.kpiScopeCount,
+    data.variationScore.toFixed(4),
+    ...data.models.map((descriptor) => [
+      modelVisualSeed(descriptor),
+      descriptor.status,
+      descriptor.leverCount,
+      descriptor.artifactCount,
+      descriptor.kpiScopeCount,
+    ].join(":")),
+  ].join("|"));
+  const label = `${(project && project.title) || "Project"} visual: ${data.modelCount} models, ${data.completedCount} complete, ${Math.round(data.variationScore * 100)} percent variation`;
+  return (
+    <svg
+      className={`entity-identity-visual project-identity-visual ${className}`.trim()}
+      viewBox="0 0 100 100"
+      role="img"
+      aria-label={label}
+      data-identity-revision={String(revisionSeed)}
+      data-sector-count={String(sectorCount)}
+    >
+      <title>{label}</title>
+      <defs>
+        <radialGradient id={emptyFieldId} cx="38%" cy="34%" r="70%">
+          <stop offset="0%" stopColor="#8492A6" stopOpacity="0.54" />
+          <stop offset="52%" stopColor="#263244" stopOpacity="0.46" />
+          <stop offset="100%" stopColor="#060B13" stopOpacity="0" />
+        </radialGradient>
+        <filter
+          id={sectorFeatherFilterId}
+          x="-20%"
+          y="-20%"
+          width="140%"
+          height="140%"
+          colorInterpolationFilters="sRGB"
+        >
+          <feGaussianBlur stdDeviation={sectorCount > 12 ? "0.62" : "0.85"} />
+        </filter>
+        <clipPath id={clipId}>
+          <circle cx="50" cy="50" r="46" />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clipId})`}>
+        <circle cx="50" cy="50" r="46" fill="#060B13" />
+        {sectorCount ? sectors : (
+          <circle
+            cx="50"
+            cy="50"
+            r="31"
+            fill={`url(#${emptyFieldId})`}
+            className="identity-gradient-layer identity-gradient-layer--project-empty"
+          />
+        )}
+        <circle cx="50" cy="50" r="45" fill="#FFFFFF" fillOpacity="0.025" />
+      </g>
+    </svg>
+  );
+}
+
 function runExecutionId(row) {
   return String((row && (row.execution_id || row.run_id)) || "");
 }
@@ -556,6 +1445,13 @@ function projectRunToDisplayRun(row) {
     project_id: String((row && row.project_id) || request.project_id || ""),
     project_run_number: runProjectNumber(row) || 0,
     run_name: String((row && row.run_name) || request.run_name || ""),
+    model_id: String((row && row.model_id) || runId),
+    model_number: Number((row && row.model_number) || runProjectNumber(row) || 0),
+    model_name: String((row && row.model_name) || (row && row.run_name) || request.run_name || ""),
+    latest_execution_id: String((row && row.latest_execution_id) || executionId),
+    evidence_status: String((row && row.evidence_status) || "not_evaluated"),
+    evidence_score: Number((row && row.evidence_score) || 0),
+    evidence_summary: String((row && row.evidence_summary) || ""),
     status,
     stage: String((row && row.stage) || status),
     progress: toNumber(row && row.progress),
@@ -600,10 +1496,25 @@ function runLabel(row) {
   return name ? `${base}: ${name}` : base;
 }
 
+function modelDisplayName(row) {
+  const name = runCustomName(row);
+  if (name) return name;
+  const number = runProjectNumber(row);
+  return number ? `Model ${number}` : "Untitled model";
+}
+
+function modelNumberLabel(row) {
+  const number = runProjectNumber(row);
+  return number ? `Model ${number}` : "Model";
+}
+
 function runMetadataLine(row) {
   if (!row) return "-";
   const parts = [];
-  if (row.request && row.request.energy_scenario_key) parts.push(row.request.energy_scenario_key);
+  if (row.request && row.request.energy_scenario_key) {
+    const scenarioLabel = String(row.request.energy_scenario_key).replace(/_/g, " ").trim();
+    parts.push(scenarioLabel ? `${scenarioLabel.charAt(0).toUpperCase()}${scenarioLabel.slice(1)}` : "");
+  }
   if (row.request && row.request.target_year) parts.push(String(row.request.target_year));
   if (row.created_at) parts.push(formatTimestamp(row.created_at));
   return parts.length ? parts.join(" · ") : "-";
@@ -630,6 +1541,414 @@ function extractComparableMetrics(summary) {
     };
   });
   return out;
+}
+
+const COMPARISON_OUTPUT_SECTIONS = [
+  { key: "overview", label: "Outcomes", shortLabel: "Outcomes" },
+  { key: "energy", label: "Energy system", shortLabel: "Energy" },
+  { key: "cost_reliability", label: "Cost & reliability", shortLabel: "Cost" },
+  { key: "development", label: "Development", shortLabel: "Development" },
+  { key: "regional", label: "Regional & spatial", shortLabel: "Regional" },
+  { key: "assumptions", label: "Assumptions & quality", shortLabel: "Quality" },
+  { key: "outputs", label: "Output files", shortLabel: "Files" },
+];
+
+function comparisonHumanize(value) {
+  const text = String(value == null ? "" : value).replace(/[_-]+/g, " ").trim();
+  return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : "Not specified";
+}
+
+function comparisonRecords(payload, ...path) {
+  let current = payload;
+  for (const key of path) {
+    if (!current || typeof current !== "object") return [];
+    current = current[key];
+  }
+  return Array.isArray(current) ? current : [];
+}
+
+function comparisonNumeric(value) {
+  if (value === "" || value == null || typeof value === "boolean") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function comparisonFormatValue(value, unit = "") {
+  if (value == null || value === "") return "-";
+  const numeric = comparisonNumeric(value);
+  if (numeric == null) return String(value);
+  const normalizedUnit = String(unit || "").toLowerCase();
+  if (normalizedUnit === "share" || normalizedUnit === "ratio") return `${(numeric * 100).toFixed(1)}%`;
+  if (normalizedUnit === "count") return Math.round(numeric).toLocaleString();
+  return compact(numeric);
+}
+
+function comparisonRowsForSummary(summary, run) {
+  const payload = summary && typeof summary === "object" ? summary : {};
+  const integrated = payload.integrated_results && typeof payload.integrated_results === "object"
+    ? payload.integrated_results
+    : {};
+  const diagnostics = payload.summary_diagnostics && typeof payload.summary_diagnostics === "object"
+    ? payload.summary_diagnostics
+    : {};
+  const development = payload.development_impacts && typeof payload.development_impacts === "object"
+    ? payload.development_impacts
+    : {};
+  const configuration = runConfigurationPayload(run || {});
+  const rows = Object.fromEntries(COMPARISON_OUTPUT_SECTIONS.map((section) => [section.key, []]));
+
+  function add(section, group, key, label, value, unit = "", resolution = "") {
+    if (!Object.prototype.hasOwnProperty.call(rows, section) || value == null || value === "") return;
+    rows[section].push({
+      key: `${group}:${key}`,
+      group,
+      label,
+      value,
+      unit,
+      resolution,
+    });
+  }
+
+  function addNumericObject(section, group, object, definitions, resolution = "") {
+    const source = object && typeof object === "object" ? object : {};
+    definitions.forEach(([key, label, unit = ""]) => {
+      const value = comparisonNumeric(source[key]);
+      if (value != null) add(section, group, key, label, value, unit, resolution);
+    });
+  }
+
+  function addAggregatedRecords(section, group, records, dimensions, {
+    valueKey = "value",
+    labelPrefix = "",
+    unit = "",
+    resolution = "",
+  } = {}) {
+    const aggregated = new Map();
+    (Array.isArray(records) ? records : []).forEach((record) => {
+      if (!record || typeof record !== "object") return;
+      const labels = dimensions.map((dimension) => String(record[dimension] || "").trim()).filter(Boolean);
+      if (!labels.length) return;
+      const value = comparisonNumeric(record[valueKey]);
+      if (value == null) return;
+      const dimensionKey = labels.join(" / ");
+      aggregated.set(dimensionKey, (aggregated.get(dimensionKey) || 0) + value);
+    });
+    aggregated.forEach((value, dimensionKey) => {
+      const label = labelPrefix ? `${labelPrefix}: ${comparisonHumanize(dimensionKey)}` : comparisonHumanize(dimensionKey);
+      add(section, group, `${labelPrefix}:${dimensionKey}`, label, value, unit, resolution);
+    });
+  }
+
+  function addMultiMetricRecords(section, group, records, dimensions, definitions, resolution = "") {
+    (Array.isArray(records) ? records : []).forEach((record, index) => {
+      if (!record || typeof record !== "object") return;
+      const dimensionLabel = dimensions
+        .map((dimension) => String(record[dimension] || "").trim())
+        .filter(Boolean)
+        .join(" / ") || `Row ${index + 1}`;
+      definitions.forEach(([key, label, unit = ""]) => {
+        const value = comparisonNumeric(record[key]);
+        if (value == null) return;
+        add(
+          section,
+          group,
+          `${dimensionLabel}:${key}`,
+          `${comparisonHumanize(dimensionLabel)} · ${label}`,
+          value,
+          unit,
+          resolution
+        );
+      });
+    });
+  }
+
+  Object.values(extractComparableMetrics(payload)).forEach((metric) => {
+    add("overview", "Integrated outcomes", metric.key, metric.label, metric.value, metric.unit, "Global or native model resolution");
+  });
+
+  const systemStructure = diagnostics.system_structure || {};
+  addNumericObject("overview", "System composition", systemStructure, [
+    ["renewable_generation_share", "Renewable generation share", "share"],
+    ["zero_carbon_generation_share", "Zero-carbon generation share", "share"],
+    ["fossil_generation_share", "Fossil generation share", "share"],
+    ["renewable_capacity_share", "Renewable capacity share", "share"],
+    ["zero_carbon_capacity_share", "Zero-carbon capacity share", "share"],
+    ["fossil_capacity_share", "Fossil capacity share", "share"],
+  ], "Global");
+
+  addAggregatedRecords(
+    "energy",
+    "Generation by technology",
+    comparisonRecords(payload, "generation_by_tech", "records"),
+    ["techs"],
+    { unit: "model energy", resolution: "Technology / timestep, aggregated for comparison" }
+  );
+  addAggregatedRecords(
+    "energy",
+    "Installed capacity",
+    comparisonRecords(payload, "capacity_by_tech", "records"),
+    ["techs"],
+    { unit: "model capacity", resolution: "Technology" }
+  );
+  addAggregatedRecords(
+    "energy",
+    "New capacity",
+    comparisonRecords(payload, "new_capacity_by_tech", "records"),
+    ["techs"],
+    { unit: "model capacity", resolution: "Technology" }
+  );
+  addAggregatedRecords(
+    "energy",
+    "Generation groups",
+    comparisonRecords(systemStructure, "generation_by_group", "records"),
+    ["tech_group"],
+    { unit: "model energy", resolution: "Technology group" }
+  );
+  addAggregatedRecords(
+    "energy",
+    "Capacity groups",
+    comparisonRecords(systemStructure, "capacity_by_group", "records"),
+    ["tech_group"],
+    { unit: "model capacity", resolution: "Technology group" }
+  );
+
+  addAggregatedRecords(
+    "cost_reliability",
+    "System cost classes",
+    comparisonRecords(payload, "system_cost", "records"),
+    ["costs"],
+    { unit: "model cost", resolution: "Global cost class" }
+  );
+  addAggregatedRecords(
+    "cost_reliability",
+    "Cost components",
+    comparisonRecords(diagnostics, "cost_decomposition", "component_records"),
+    ["costs", "component", "tech_group"],
+    { unit: "model cost", resolution: "Cost class / component / technology group" }
+  );
+  addNumericObject("cost_reliability", "Reliability", diagnostics.reliability, [
+    ["demand_total", "Total demand", "model energy"],
+    ["unserved_total", "Unserved energy", "model energy"],
+    ["unserved_energy_share", "Unserved energy share", "share"],
+    ["hours_with_unserved", "Hours with unserved demand", "count"],
+    ["max_unserved_hour", "Maximum hourly unserved demand", "model energy"],
+  ], "Global");
+  addNumericObject("cost_reliability", "Physical emissions", diagnostics.physical_emissions, [
+    ["total_emissions", "Total physical emissions", "tCO2"],
+    ["factor_coverage_share", "Emission-factor coverage", "share"],
+    ["factor_method_gap_share", "Emission-method gap", "share"],
+  ], "Global");
+  addAggregatedRecords(
+    "cost_reliability",
+    "Emissions by technology",
+    comparisonRecords(diagnostics, "physical_emissions", "by_tech", "records"),
+    ["techs"],
+    { unit: "tCO2", resolution: "Technology" }
+  );
+
+  addNumericObject("development", "Development drivers", integrated.development_drivers, [
+    ["capex_effect_musd", "Investment effect", "MUSD"],
+    ["opex_effect_musd", "Operating effect", "MUSD"],
+    ["reliability_penalty_proxy", "Reliability penalty proxy", "MUSD"],
+    ["import_leakage_musd", "Import leakage", "MUSD"],
+  ], "Global or region-coupled");
+  const developmentIndicators = integrated.development_indicators || payload.development_indicators || {};
+  (comparisonRecords(developmentIndicators, "records")).forEach((record) => {
+    const indicatorKey = String(record.indicator_id || record.indicator_name || "").trim();
+    if (!indicatorKey) return;
+    const value = record.status === "unavailable" ? "Unavailable" : record.value;
+    add(
+      "development",
+      "Development indicators",
+      indicatorKey,
+      String(record.indicator_name || comparisonHumanize(indicatorKey)),
+      value,
+      String(record.unit || ""),
+      "Configured indicator mapping"
+    );
+  });
+  const sourceChannels = integrated.source_channels || {};
+  ["selected_totals", "combined_totals"].forEach((channelKey) => {
+    const channel = sourceChannels[channelKey] || development[channelKey] || {};
+    Object.entries(channel).forEach(([key, value]) => {
+      const numeric = comparisonNumeric(value);
+      if (numeric == null) return;
+      add(
+        "development",
+        channelKey === "selected_totals" ? "Selected development totals" : "Combined channel totals",
+        `${channelKey}:${key}`,
+        comparisonHumanize(key),
+        numeric,
+        key.includes("musd") ? "MUSD" : key.includes("jobs") ? "jobs" : "",
+        "Development channel total"
+      );
+    });
+  });
+
+  const regionalDevelopment = comparisonRecords(integrated, "regional_development", "records").length
+    ? comparisonRecords(integrated, "regional_development", "records")
+    : comparisonRecords(development, "by_region", "records");
+  addMultiMetricRecords("regional", "Development by region", regionalDevelopment, ["region", "mario_region"], [
+    ["jobs_total", "Jobs", "jobs"],
+    ["gva_total_musd", "GVA", "MUSD"],
+    ["household_income_proxy_musd", "Household income", "MUSD"],
+    ["shock_value_musd", "Shock value", "MUSD"],
+  ], "Region");
+  addMultiMetricRecords(
+    "regional",
+    "Development by region and supplier",
+    comparisonRecords(development, "by_region_supplier", "records"),
+    ["region", "mario_region", "supplier_sector"],
+    [
+      ["jobs_total", "Jobs", "jobs"],
+      ["gva_total_musd", "GVA", "MUSD"],
+      ["household_income_proxy_musd", "Household income", "MUSD"],
+      ["shock_value_musd", "Shock value", "MUSD"],
+    ],
+    "Region / supplier sector"
+  );
+  addMultiMetricRecords(
+    "regional",
+    "Supplier sectors",
+    comparisonRecords(development, "by_supplier_sector", "records"),
+    ["supplier_sector", "mario_sector"],
+    [
+      ["jobs_total", "Jobs", "jobs"],
+      ["gva_total_musd", "GVA", "MUSD"],
+      ["household_income_proxy_musd", "Household income", "MUSD"],
+      ["shock_value_musd", "Shock value", "MUSD"],
+      ["total_shock_musd", "Total shock", "MUSD"],
+    ],
+    "Supplier sector"
+  );
+  addMultiMetricRecords(
+    "regional",
+    "Pool energy balance",
+    comparisonRecords(diagnostics, "energy_balance", "records"),
+    ["pool"],
+    [
+      ["generation", "Generation", "model energy"],
+      ["demand", "Demand", "model energy"],
+      ["unserved", "Unserved", "model energy"],
+      ["imports", "Imports", "model energy"],
+      ["exports", "Exports", "model energy"],
+      ["balance_gap_share", "Balance gap", "share"],
+    ],
+    "Power pool"
+  );
+  addMultiMetricRecords(
+    "regional",
+    "Inter-pool trade",
+    comparisonRecords(diagnostics, "trade_matrix", "net_by_pool", "records"),
+    ["pool"],
+    [
+      ["imports", "Imports", "model energy"],
+      ["exports", "Exports", "model energy"],
+      ["value", "Net exports", "model energy"],
+    ],
+    "Power pool"
+  );
+  addAggregatedRecords(
+    "regional",
+    "Emissions by pool",
+    comparisonRecords(diagnostics, "physical_emissions", "by_pool", "records"),
+    ["pool"],
+    { unit: "tCO2", resolution: "Power pool" }
+  );
+
+  add("assumptions", "Model configuration", "architecture", "Model architecture", payload.model_architecture_id || configuration.model_architecture_id);
+  add("assumptions", "Model configuration", "energy_scenario", "Energy scenario", payload.energy_scenario_key || configuration.energy_scenario_key);
+  add("assumptions", "Model configuration", "target_pathway", "Target pathway", payload.mrio_scenario_id || configuration.mrio_scenario_id || "Not applicable");
+  add("assumptions", "Model configuration", "target_year", "Target year", payload.target_year || configuration.target_year);
+  add("assumptions", "Model configuration", "run_profile", "Execution profile", payload.run_profile || configuration.run_profile);
+  Object.entries(configuration.levers || {}).forEach(([key, value]) => {
+    const normalized = comparisonNumeric(value);
+    add("assumptions", "Model levers", `lever:${key}`, comparisonHumanize(key), normalized == null ? String(value) : normalized);
+  });
+  const selectedAssumptions = ((integrated.scenario_assumptions || payload.scenario_assumptions || {}).selected_values) || {};
+  Object.entries(selectedAssumptions).forEach(([key, record]) => {
+    const source = record && typeof record === "object" ? record : { value_numeric: record };
+    const value = comparisonNumeric(source.value_numeric);
+    add(
+      "assumptions",
+      "Scenario assumptions",
+      `assumption:${key}`,
+      String(source.label || comparisonHumanize(key)),
+      value == null ? String(source.value || source.value_text || "") : value,
+      String(source.unit || ""),
+      "Scenario assumption"
+    );
+  });
+  const confidence = integrated.development_confidence || {};
+  addNumericObject("assumptions", "Data and coupling quality", confidence, [
+    ["mapping_coverage_share", "Mapping coverage", "share"],
+    ["unmapped_mapping_share", "Unmapped share", "share"],
+    ["warnings_count", "Warnings", "count"],
+    ["mario_runtime_seconds", "Development runtime", "seconds"],
+    ["placeholder_input_row_count", "Placeholder input rows", "count"],
+    ["development_indicators_available_count", "Available development indicators", "count"],
+    ["development_indicators_unavailable_count", "Unavailable development indicators", "count"],
+  ], "Execution diagnostic");
+  const modelQuality = integrated.model_quality || {};
+  add("assumptions", "Data and coupling quality", "quality_status", "Model quality status", modelQuality.status || "Not reported");
+  add("assumptions", "Data and coupling quality", "quality_issues", "Quality issues", Array.isArray(modelQuality.issues) ? modelQuality.issues.length : 0, "count");
+  const runMetadata = diagnostics.run_metadata || {};
+  [
+    ["solver", "Solver"],
+    ["termination_condition", "Termination condition"],
+    ["calliope_version", "Calliope version"],
+    ["solution_time_seconds", "Energy solve time", "seconds"],
+    ["objective_function_value", "Objective value", ""],
+  ].forEach(([key, label, unit = ""]) => {
+    const value = runMetadata[key];
+    if (value != null && value !== "") add("assumptions", "Execution", key, label, value, unit, "Execution");
+  });
+  comparisonRecords(integrated, "metric_resolution", "records").forEach((record) => {
+    const key = String(record.metric_key || record.label || "").trim();
+    if (!key) return;
+    add(
+      "assumptions",
+      "Output resolution",
+      `resolution:${key}`,
+      String(record.label || comparisonHumanize(key)),
+      [record.native_resolution, record.filtered_resolution].filter(Boolean).join(" → "),
+      "",
+      String(record.notes || "")
+    );
+  });
+
+  return rows;
+}
+
+function buildComparisonDatasets(selectedRuns, summaries) {
+  const datasets = Object.fromEntries(COMPARISON_OUTPUT_SECTIONS.map((section) => [section.key, []]));
+  const indexes = Object.fromEntries(COMPARISON_OUTPUT_SECTIONS.map((section) => [section.key, new Map()]));
+  (selectedRuns || []).forEach((run) => {
+    const runId = String(run && run.run_id || "");
+    if (!runId) return;
+    const runRows = comparisonRowsForSummary(summaries[runId], run);
+    COMPARISON_OUTPUT_SECTIONS.forEach((section) => {
+      (runRows[section.key] || []).forEach((row) => {
+        if (!indexes[section.key].has(row.key)) {
+          indexes[section.key].set(row.key, {
+            key: row.key,
+            group: row.group,
+            label: row.label,
+            unit: row.unit,
+            resolution: row.resolution,
+            values: {},
+          });
+        }
+        indexes[section.key].get(row.key).values[runId] = row.value;
+      });
+    });
+  });
+  COMPARISON_OUTPUT_SECTIONS.forEach((section) => {
+    datasets[section.key] = Array.from(indexes[section.key].values()).sort((left, right) => (
+      left.group.localeCompare(right.group) || left.label.localeCompare(right.label)
+    ));
+  });
+  return datasets;
 }
 
 function toNumber(value, defaultValue = 0) {
@@ -2045,7 +3364,8 @@ function resolveScenarioKey(selectorModel, selections) {
 
 function toErrorMessage(err, defaultMessage) {
   if (err && typeof err.message === "string" && err.message.trim()) {
-    return err.message;
+    const requestSuffix = err.requestId ? ` Request ID: ${err.requestId}.` : "";
+    return `${err.message}${requestSuffix}`;
   }
   return defaultMessage;
 }
@@ -2087,6 +3407,9 @@ const FRONTEND_REQUIRED_ENDPOINTS = [
   "GET /api/runs/{run_id}/logs",
   "POST /api/runs/{run_id}/export",
   "GET /api/input-datasets",
+  "POST /api/input-datasets",
+  "PATCH /api/input-datasets/{dataset_id}",
+  "POST /api/projects/{project_id}/datasets",
   "GET /api/input-datasets/{dataset_id}/download",
   "POST /api/input-datasets/{dataset_id}/upload",
   "GET /api/input-datasets/{dataset_id}/versions",
@@ -2235,6 +3558,27 @@ function evaluateSystemManifest(manifest, target) {
       const suffix = qs.toString() ? `?${qs.toString()}` : "";
       return (await apiGet(`/api/input-datasets${suffix}`, "Failed to load input datasets")).datasets || [];
     },
+    // Forward-compatible dataset-library contracts. The local backend can add
+    // these endpoints without requiring another frontend workflow redesign.
+    createInputDataset: async (payload) => {
+      const response = await apiPost("/api/input-datasets", payload, "Failed to create input dataset");
+      return response.dataset || response;
+    },
+    updateInputDataset: async (datasetId, payload) => {
+      const response = await apiPatch(
+        `/api/input-datasets/${encodeURIComponent(datasetId)}`,
+        payload,
+        "Failed to update input dataset"
+      );
+      return response.dataset || response;
+    },
+    attachInputDatasetToProject: async (projectId, payload) => {
+      return apiPost(
+        `/api/projects/${encodeURIComponent(projectId)}/datasets`,
+        payload,
+        "Failed to add dataset to project"
+      );
+    },
     inputDatasetDownloadUrl: (datasetId) => downloadUrl(`/api/input-datasets/${encodeURIComponent(datasetId)}/download`),
     inputDatasetVersionDownloadUrl: (datasetId, versionId) => downloadUrl(`/api/input-datasets/${encodeURIComponent(datasetId)}/versions/${encodeURIComponent(versionId)}/download`),
     fetchInputDatasetVersions: async (datasetId) => {
@@ -2355,7 +3699,7 @@ function evaluateSystemManifest(manifest, target) {
 
   const DEFAULT_OUTPUT_ARTIFACTS = [
     { key: "results_csv", label: "Integrated results CSV" },
-    { key: "report_markdown", label: "Run report Markdown" },
+    { key: "report_markdown", label: "Model report Markdown" },
     { key: "exchange_bundle_zip", label: "Exchange bundle ZIP" },
     { key: "scenario_package_json", label: "Unified scenario package JSON" },
     { key: "energy_input_manifest_json", label: "Energy input manifest JSON" },
@@ -2411,7 +3755,7 @@ const ResultsModule = (() => {
             {artifact.href ? (
               <a href={artifact.href} download>Download</a>
             ) : (
-              <span className="muted" style={{ fontSize: 12 }}>Available after run</span>
+              <span className="muted" style={{ fontSize: 12 }}>Available after execution</span>
             )}
           </div>
         ))}
@@ -2500,7 +3844,7 @@ const WorkspaceDataComponents = (() => {
       <div className="diagram-dataset-list">
         {disabled ? (
           <div className="diagram-note" style={{ marginBottom: 8 }}>
-            {disabledMessage || "Inputs are locked for this selected run. Duplicate the configuration to edit dataset versions."}
+            {disabledMessage || "Inputs are locked for this model. Duplicate the model to edit dataset versions."}
           </div>
         ) : null}
         {datasetMessage ? <div className="diagram-note" style={{ marginBottom: 8 }}>{datasetMessage}</div> : null}
@@ -2610,13 +3954,58 @@ function StatusBadge({ status }) {
 }
 
 function Modal({ title, subtitle = "", onClose, children, wide = false }) {
+  const dialogRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  const previousActiveRef = useRef(document.activeElement);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const previousActive = previousActiveRef.current;
+    window.setTimeout(() => {
+      if (dialogRef.current && !dialogRef.current.contains(document.activeElement)) {
+        dialogRef.current.focus();
+      }
+    }, 0);
+    function handleKeyDown(event) {
+      if (event.key === "Escape" && typeof onCloseRef.current === "function") onCloseRef.current();
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((node) => node.offsetParent !== null);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+      if (previousActive && typeof previousActive.focus === "function") previousActive.focus();
+    };
+  }, []);
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+    <div className="modal-backdrop" role="presentation" onMouseDown={() => {
+      if (typeof onCloseRef.current === "function") onCloseRef.current();
+    }}>
       <div
+        ref={dialogRef}
         className={`modal-card${wide ? " wide" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="modal-header">
@@ -2633,6 +4022,29 @@ function Modal({ title, subtitle = "", onClose, children, wide = false }) {
         <div className="modal-body">{children}</div>
       </div>
     </div>
+  );
+}
+
+function DetailDialogButton({
+  label,
+  title = label,
+  subtitle = "Model information",
+  children,
+  className = "secondary-action-button",
+  wide = false,
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className={className} onClick={() => setOpen(true)}>
+        {label}
+      </button>
+      {open ? (
+        <Modal title={title} subtitle={subtitle} wide={wide} onClose={() => setOpen(false)}>
+          {children}
+        </Modal>
+      ) : null}
+    </>
   );
 }
 
@@ -2707,7 +4119,12 @@ function environmentPlaceholderDiagnostics(environmentSetup) {
   };
 }
 
-function ValidationDiagnosticsSummary({ environmentSetup, loading = false, compactMode = false }) {
+function ValidationDiagnosticsSummary({
+  environmentSetup,
+  loading = false,
+  compactMode = false,
+  onOpenDetails = null,
+}) {
   const setupSummary = environmentSetupSummary(environmentSetup);
   const placeholders = environmentPlaceholderDiagnostics(environmentSetup);
   const attentionChecks = setupSummary.checks.filter((row) => String(row && row.status).toLowerCase() !== "ok");
@@ -2737,7 +4154,7 @@ function ValidationDiagnosticsSummary({ environmentSetup, loading = false, compa
       }}
     >
       <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>Validation diagnostics</div>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>Validation checks</div>
         <span style={{ color: statusColor, fontSize: 12, fontWeight: 700 }}>{status}</span>
       </div>
       <div className="row muted" style={{ marginTop: 8, fontSize: 12, gap: 10 }}>
@@ -2757,45 +4174,53 @@ function ValidationDiagnosticsSummary({ environmentSetup, loading = false, compa
           ))}
           {attentionChecks.length > 4 ? (
             <div className="muted" style={{ fontSize: 11 }}>
-              {attentionChecks.length - 4} more validation diagnostics are available in Run readiness details.
+              {attentionChecks.length - 4} more validation checks are available in the full technical readiness diagnostic.
             </div>
           ) : null}
         </div>
-      ) : environmentSetup ? (
-        <div className="muted" style={{ marginTop: 8, fontSize: 11 }}>
-          No validation warnings or errors are reported for the current setup.
-        </div>
-      ) : (
+      ) : !environmentSetup ? (
         <div className="muted" style={{ marginTop: 8, fontSize: 11 }}>
           Validation results will appear after the readiness check completes.
         </div>
-      )}
-      <div className={placeholders.files.length || placeholders.rowCount > 0 || placeholders.scenarioPlaceholderActive ? "warn" : "ok"} style={{ marginTop: 8, marginBottom: 0, fontSize: 11 }}>
-        {placeholders.files.length ? (
-          <>
-            Placeholder expert datasets: <code>{placeholders.files.join(", ")}</code>{" "}
-            ({placeholders.rowCount} rows).
-          </>
-        ) : placeholders.rowCount > 0 ? (
-          <>
-            Placeholder expert dataset rows reported: <code>{placeholders.rowCount}</code>.
-          </>
-        ) : !environmentSetup ? (
-          <>Placeholder diagnostics will appear after the readiness check completes.</>
-        ) : (
-          <>No placeholder expert datasets were reported.</>
-        )}
-        {placeholders.scenarioPlaceholderActive ? (
-          <div style={{ marginTop: 4 }}>
-            Scenario assumptions: {placeholders.scenarioPlaceholderCheck.message || "placeholder rows reported"}
-          </div>
-        ) : null}
-      </div>
+      ) : null}
+      {placeholders.files.length || placeholders.rowCount > 0 || placeholders.scenarioPlaceholderActive ? (
+        <div className="warn" style={{ marginTop: 8, marginBottom: 0, fontSize: 11 }}>
+          {placeholders.files.length ? (
+            <>
+              Placeholder expert datasets: <code>{placeholders.files.join(", ")}</code>{" "}
+              ({placeholders.rowCount} rows).
+            </>
+          ) : placeholders.rowCount > 0 ? (
+            <>
+              Placeholder expert dataset rows reported: <code>{placeholders.rowCount}</code>.
+            </>
+          ) : (
+            <>Scenario assumption placeholders were reported.</>
+          )}
+          {placeholders.scenarioPlaceholderActive ? (
+            <div style={{ marginTop: 4 }}>
+              Scenario assumptions: {placeholders.scenarioPlaceholderCheck.message || "placeholder rows reported"}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {typeof onOpenDetails === "function" ? (
+        <button
+          type="button"
+          className="technical-readiness-button"
+          onClick={onOpenDetails}
+        >
+          Open full technical readiness diagnostic
+        </button>
+      ) : null}
     </div>
   );
 }
 
 function LeverControl({ label, value, min, max, step, onChange, tooltip = "", disabled = false }) {
+  const controlId = useId();
+  const rangeId = `${controlId}-range`;
+  const valueId = `${controlId}-value`;
   const clamp = (v) => Math.min(max, Math.max(min, v));
   const apply = (raw) => {
     const parsed = Number.parseFloat(raw);
@@ -2804,7 +4229,7 @@ function LeverControl({ label, value, min, max, step, onChange, tooltip = "", di
   };
   return (
     <div style={{ marginBottom: 10 }}>
-      <label className="lever-label" title={tooltip || undefined}>
+      <div className="lever-label" title={tooltip || undefined}>
         <span>{label}</span>
         {tooltip ? (
           <span
@@ -2818,9 +4243,11 @@ function LeverControl({ label, value, min, max, step, onChange, tooltip = "", di
             <span className="info-tooltip-panel">{tooltip}</span>
           </span>
         ) : null}
-      </label>
+      </div>
       <div className="row" style={{ marginTop: 6 }}>
+        <label className="sr-only" htmlFor={rangeId}>{label} slider</label>
         <input
+          id={rangeId}
           type="range"
           min={min}
           max={max}
@@ -2830,7 +4257,9 @@ function LeverControl({ label, value, min, max, step, onChange, tooltip = "", di
           onChange={(e) => apply(e.target.value)}
           style={{ flex: 1, minWidth: 220 }}
         />
+        <label className="sr-only" htmlFor={valueId}>{label} value</label>
         <input
+          id={valueId}
           type="number"
           min={min}
           max={max}
@@ -2868,562 +4297,78 @@ function pathwayLabel(pathway) {
   return normalized || "-";
 }
 
-function ModelStructurePanel({ style = null, columns = "1fr 1fr 1fr" }) {
-  return (
-    <div className="card" style={style || undefined}>
-      <h3 style={{ marginTop: 0, fontSize: 16 }}>Model structure and data flow</h3>
-      <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-        Current runtime architecture: user-defined run parameters and scenario source data are separate input
-        streams into one unified adapter layer. The adapter outputs directly to the selected Energy Model and to the MRIO runtime,
-        while the Energy Model also feeds integrated results directly for energy-side metrics. Calliope is the active executable energy model.
-      </div>
-      <div className="grid" style={{ gridTemplateColumns: columns }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>1) Separate input streams to the adapter</div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            The architecture separates what the user chooses from the source data that defines available scenarios.
-            Both streams enter the unified adapter layer rather than flowing through a visible scenario-package box.
-          </div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            <code>scenario_package.json</code> still exists as a persisted run artifact for audit and rerun
-            traceability, but it is not the conceptual routing node in the diagram.
-          </div>
-          <div style={{ overflowX: "auto", marginTop: 8 }}>
-            <table className="panel-table">
-              <thead>
-                <tr>
-                  <th>Input stream</th>
-                  <th>Contents</th>
-                  <th>Used by</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>User selections</td>
-                  <td>Energy pathway, MRIO report scenario, target year, profile, policy levers</td>
-                  <td>Unified adapter layer and run artifact provenance</td>
-                </tr>
-                <tr>
-                  <td>Scenario data</td>
-                  <td>Energy metadata, engine scenario key, structured scenario-target assumptions</td>
-                  <td>Unified adapter layer and scenario catalog</td>
-                </tr>
-                <tr>
-                  <td>Energy model static data</td>
-                  <td>Technology files, topology, demand/resource time series</td>
-                  <td>Selected Energy Model directly</td>
-                </tr>
-                <tr>
-                  <td>MRIO input datasets</td>
-                  <td>Employment, GVA, development, uncertainty, supplier-sector coefficients</td>
-                  <td>MRIO runtime directly</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>2) Unified adapter to model runtimes</div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            The separate energy and MRIO-direct adapter boxes are now represented as one adapter layer. That layer
-            resolves user parameters against scenario source data, then outputs model-specific inputs directly to
-            the selected Energy Model and the MRIO runtime.
-          </div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            It still writes <code>scenario/energy_input_manifest.json</code>,{" "}
-            <code>scenario/mrio_direct_inputs.json</code>, <code>scenario/mrio_direct_shocks.csv</code>, and
-            <code>scenario_package.json</code> as inspectable artifacts.
-          </div>
-          <div style={{ overflowX: "auto", marginTop: 8 }}>
-            <table className="panel-table">
-              <thead>
-                <tr>
-                  <th>Adapter output</th>
-                  <th>Target model</th>
-                  <th>Meaning</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Energy runtime patch</td>
-                  <td>Energy Model</td>
-                  <td>Selects override, profile, solver/time subset, and lever mappings</td>
-                </tr>
-                <tr>
-                  <td>Energy input manifest</td>
-                  <td>Energy model artifacts</td>
-                  <td>Documents the resolved energy scenario inputs used for the run</td>
-                </tr>
-                <tr>
-                  <td>MRIO shock payload</td>
-                  <td>MRIO runtime</td>
-                  <td>Report-derived A/Z, E, and Y heuristic shock rows and provenance</td>
-                </tr>
-                <tr>
-                  <td>Scenario package artifact</td>
-                  <td>Audit/debugging</td>
-                  <td>Records both user parameters and source scenario references without acting as the visible routing box</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>3) Energy Model, bridge, MRIO, and integrated results</div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            The Energy Model has two visible output paths: one to the bridge layer for MRIO exchange artifacts, and one
-            directly to integrated results for energy-side metrics, charts, and spatial diagnostics.
-          </div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            The MRIO runtime has three input streams: bridge artifacts from the Energy Model, the adapter-derived MRIO
-            scenario payload, and general MRIO input datasets. <code>selected_totals</code> still default to the
-            bridge channel on overlaps.
-          </div>
-          <div style={{ overflowX: "auto", marginTop: 8 }}>
-            <table className="panel-table">
-              <thead>
-                <tr>
-                  <th>Runtime stream</th>
-                  <th>Artifacts / source</th>
-                  <th>Meaning</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Energy Model to bridge</td>
-                  <td><code>exchange/investment_shocks.csv</code>, <code>operating_shocks.csv</code></td>
-                  <td>CAPEX and OPEX/fuel shocks mapped from energy-model technologies to MRIO sectors</td>
-                </tr>
-                <tr>
-                  <td>Adapter to MRIO</td>
-                  <td><code>scenario/mrio_direct_inputs.json</code>, <code>mrio_direct_shocks.csv</code></td>
-                  <td>Report-derived A/Z, E, and Y scenario payload outside the energy-model boundary</td>
-                </tr>
-                <tr>
-                  <td>MRIO datasets</td>
-                  <td><code>inputs/mario_inputs/*.csv</code> and development coefficients</td>
-                  <td>Employment, GVA, supplier-sector, uncertainty, and development-model coefficients</td>
-                </tr>
-                <tr>
-                  <td>MRIO to results</td>
-                  <td><code>development_impacts.json</code>, <code>coupling_manifest.json</code></td>
-                  <td>Bridge, MRIO-direct, selected totals, combined diagnostics, and overlap warnings</td>
-                </tr>
-                <tr>
-                  <td>Energy Model to results</td>
-                  <td><code>integrated_results.json</code>, <code>exchange_bundle.zip</code></td>
-                  <td>Direct energy-side final metrics plus dashboard contract, source channels, and provenance</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function RankedBars({
   records,
   labelKey,
   valueKey,
-  limit = 12,
-  filterText = "",
-  emptyMessage = "No records for this run.",
+  controlsLabel = "chart",
+  emptyMessage = "No records for this execution.",
+  normalizedFilter = false,
 }) {
-  const rows = useMemo(() => {
-    const filter = String(filterText || "").trim().toLowerCase();
-    return (records || [])
+  const [limit, setLimit] = useState("10");
+  const normalizedRows = useMemo(
+    () => (records || [])
       .map((r) => ({
         label: String(r && r[labelKey] != null ? r[labelKey] : ""),
         value: toNumber(r && r[valueKey]),
       }))
       .filter((r) => r.label)
-      .filter((r) => (!filter ? true : r.label.toLowerCase().includes(filter)))
-      .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
-      .slice(0, limit);
-  }, [records, labelKey, valueKey, limit, filterText]);
-
-  if (!rows.length) {
-    return <div className="muted">{emptyMessage}</div>;
-  }
-
+      .sort((a, b) => Math.abs(b.value) - Math.abs(a.value)),
+    [records, labelKey, valueKey]
+  );
+  const rankedLimit = Math.max(5, Math.round(toNumber(limit, 10)));
+  const rows = normalizedRows.slice(0, rankedLimit);
+  const showLimit = normalizedRows.length > 10;
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.value)), 1);
+  const displayLabel = (value) => String(value || "")
+    .replace(/_/g, " ")
+    .replace(/:/g, " · ")
+    .replace(/\bpp\b/gi, "plant")
+    .replace(/\s+/g, " ")
+    .trim();
 
   return (
-    <div className="hbar-wrap">
-      {rows.map((row, idx) => {
-        const share = Math.max(0.02, Math.abs(row.value) / maxAbs);
-        return (
-          <div className="hbar-row" key={`${row.label}-${idx}`}>
-            <div title={row.label} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {row.label}
-            </div>
-            <div className="hbar-track">
-              <div
-                className={`hbar-fill ${row.value < 0 ? "negative" : ""}`}
-                style={{ width: `${Math.round(share * 100)}%` }}
-              />
-            </div>
-            <div style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{compact(row.value)}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ScenarioSetupPanel({
-  scenarios,
-  scenarioKey,
-  targetScenarios,
-  mrioShockMappings,
-  mrioScenarioId,
-  targetYears,
-  targetYear,
-  energyModelEngine,
-  selectorModel,
-  scenarioSelections,
-  selectedScenario,
-  levers,
-  runProfile,
-  environmentSetup,
-  environmentSetupLoading,
-  running,
-  queueSubmitting,
-  onScenarioChange,
-  onMrioScenarioChange,
-  onTargetYearChange,
-  onEnergyModelEngineChange,
-  onScenarioSelectionChange,
-  onSetLevers,
-  onSetRunProfile,
-  onApplyTemplateLevers,
-  onRun,
-  onResetLevers,
-  dashboardMode = false,
-  style = null,
-}) {
-  const showStructuredSelector = Boolean(
-    selectorModel && (selectorModel.hasTransmissionOnly || selectorModel.hasPathway2040)
-  );
-  const packageOptions = availablePackagesForPathway(selectorModel, scenarioSelections.pathway);
-  const selectedPackage = scenarioPackage(
-    scenarioSelections.generation,
-    scenarioSelections.transmission
-  );
-  const activePackage = packageOptions.includes(selectedPackage)
-    ? selectedPackage
-    : packageOptions[0] || "legacy_legacy";
-  const selectedTargetScenario = (targetScenarios || []).find((s) => s.scenario_id === mrioScenarioId) || null;
-  const targetProfiles = (selectedTargetScenario && selectedTargetScenario.target_profiles) || {};
-  const southAfricaTarget = targetProfiles.south_africa || {};
-  const restOfAfricaTarget = targetProfiles.rest_of_africa_placeholder || {};
-  const shockMapping = (mrioShockMappings || [])[0] || {};
-  const shockCategories = Array.isArray(shockMapping.shock_categories) ? shockMapping.shock_categories : [];
-  const [activeGeneration, activeTransmission] = String(activePackage).split("_");
-  const policyAvailable = Boolean(
-    showStructuredSelector &&
-      scenarioSelections &&
-      scenarioSelections.family === "pathway_2040" &&
-      selectorModel.tupleToScenario.has(
-        scenarioTuple(
-          scenarioSelections.pathway,
-          activeGeneration,
-          activeTransmission,
-          true
-        )
-      )
-  );
-
-  return (
-    <div
-      className="grid"
-      style={{
-        gridTemplateColumns: dashboardMode ? "1fr" : "1.2fr 0.8fr",
-        marginTop: dashboardMode ? 0 : 14,
-        ...(style || {}),
-      }}
-    >
-      <div className="card">
-        <div className="row">
-          <div style={{ flex: 1, minWidth: 320 }}>
-            <label>Scenario setup</label>
-            {showStructuredSelector ? (
-              <div style={{ marginTop: 8 }}>
-                <div
-                  style={{
-                    border: "1px solid #2a3a58",
-                    borderRadius: 10,
-                    padding: "10px 10px 12px",
-                    background: "#0d182c",
-                  }}
-                >
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>Step 1: Main model selector</div>
-                  <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                    Choose the model family first, then configure the details below.
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    <label>Main scenario type</label>
-                    <select
-                      value={scenarioSelections.family}
-                      onChange={(e) => onScenarioSelectionChange({ family: e.target.value })}
-                      style={{ width: "100%" }}
-                    >
-                      {selectorModel.hasPathway2040 ? (
-                        <option value="pathway_2040">2040 pathway scenarios</option>
-                      ) : null}
-                      {selectorModel.hasTransmissionOnly ? (
-                        <option value="transmission_only">Transmission-only scenario</option>
-                      ) : null}
-                    </select>
-                  </div>
-                </div>
-
-                {showStructuredSelector ? (
-                  <div
-                    style={{
-                      marginTop: 10,
-                      border: "1px solid #22324f",
-                      borderRadius: 10,
-                      padding: "10px 10px 12px",
-                      background: "#0b1424",
-                    }}
-                  >
-                    <div style={{ fontWeight: 700, fontSize: 13 }}>Step 2: Additional scenario details</div>
-                    <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                      These settings define the integrated target pathway used by the energy model and MRIO-direct
-                      shock adapter. The MRIO section below only explains how those targets become A/Z, E, and Y shocks.
-                    </div>
-                    <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", marginTop: 8 }}>
-                      <div>
-                        <label>Target pathway</label>
-                        <select
-                          value={mrioScenarioId || ""}
-                          onChange={(e) => onMrioScenarioChange && onMrioScenarioChange(e.target.value)}
-                          style={{ width: "100%" }}
-                        >
-                          {(targetScenarios || []).map((s) => (
-                            <option key={s.scenario_id} value={s.scenario_id}>
-                              {s.scenario_id} - {s.short_label || s.label || s.scenario_type || "Target pathway"}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label>Target year</label>
-                        <select
-                          value={Number(targetYear || 2030)}
-                          onChange={(e) => onTargetYearChange && onTargetYearChange(Number(e.target.value))}
-                          style={{ width: "100%" }}
-                        >
-                          {(targetYears || [2030, 2050]).map((year) => (
-                            <option key={year} value={Number(year)}>
-                              {year}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      {scenarioSelections.family === "pathway_2040" ? (
-                        <>
-                          <div>
-                            <label>Demand pathway</label>
-                            <select
-                              value={scenarioSelections.pathway}
-                              onChange={(e) => onScenarioSelectionChange({ pathway: e.target.value })}
-                              style={{ width: "100%" }}
-                            >
-                              {selectorModel.pathways.map((path) => (
-                                <option key={path} value={path}>
-                                  {pathwayLabel(path)}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label>Energy build package</label>
-                            <select
-                              value={activePackage}
-                              onChange={(e) => {
-                                const code = String(e.target.value || "");
-                                const parts = code.split("_");
-                                const generation = parts[0] || "legacy";
-                                const transmission = parts[1] || "legacy";
-                                onScenarioSelectionChange({ generation, transmission });
-                              }}
-                              style={{ width: "100%" }}
-                            >
-                              {packageOptions.map((code) => (
-                                <option key={code} value={code}>
-                                  {SCENARIO_PACKAGE_LABELS[code] || code}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label>Policy package</label>
-                            <select
-                              value={scenarioSelections.policy ? "on" : "off"}
-                              onChange={(e) => onScenarioSelectionChange({ policy: e.target.value === "on" })}
-                              style={{ width: "100%" }}
-                              disabled={!policyAvailable}
-                            >
-                              <option value="off">Standard</option>
-                              {policyAvailable ? <option value="on">Policy push</option> : null}
-                            </select>
-                          </div>
-                        </>
-                      ) : null}
-                    </div>
-                    {selectedTargetScenario ? (
-                      <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                        Target data: South Africa uses <code>{southAfricaTarget.source_report_scenario_id || "-"}</code>{" "}
-                        ({southAfricaTarget.renewable_share_2030 || "-"} RE by 2030; fossil delta{" "}
-                        {southAfricaTarget.fossil_delta_2030 || "-"}). Other African countries use{" "}
-                        <code>{restOfAfricaTarget.source_report_scenario_id || "-"}</code> placeholders (
-                        {restOfAfricaTarget.renewable_share_2030 || "-"} RE by 2030; fossil delta{" "}
-                        {restOfAfricaTarget.fossil_delta_2030 || "-"}).
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div style={{ marginTop: 6 }}>
-                <select value={scenarioKey} onChange={(e) => onScenarioChange(e.target.value)} style={{ width: "100%" }}>
-                  {(scenarios || []).map((s) => (
-                    <option key={s.key} value={s.key}>
-                      {s.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {showStructuredSelector && scenarioSelections.family === "pathway_2040" ? (
-              <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                Pathway sets demand trajectory; build package sets generation/transmission expansion; target pathway
-                sets country-level renewable/fossil policy targets; policy adds optional constraints when available.
-              </div>
-            ) : null}
-            <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-              Resolved scenario key: <code>{scenarioKey || "-"}</code>
-            </div>
-            {selectedScenario && selectedScenario.description ? (
-              <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
-                {selectedScenario.description}
-              </div>
-            ) : null}
-            {selectedScenario && selectedScenario.policy_question ? (
-              <div style={{ marginTop: 8, fontSize: 13 }}>
-                <b>Policy question:</b> {selectedScenario.policy_question}
-              </div>
-            ) : null}
-            {selectedScenario && selectedScenario.expected_tradeoff ? (
-              <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-                Expected tradeoff: {selectedScenario.expected_tradeoff}
-              </div>
-            ) : null}
-            {selectedScenario && selectedScenario.tags && selectedScenario.tags.length ? (
-              <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                Tags: {selectedScenario.tags.join(", ")}
-              </div>
-            ) : null}
-            <div
-              style={{
-                marginTop: 12,
-                border: "1px solid #28405f",
-                borderRadius: 10,
-                padding: "10px 10px 12px",
-                background: "#0b1424",
-              }}
+    <div className="ranked-bars">
+      {showLimit ? (
+        <div className="ranked-bars-display-controls" role="group" aria-label={`${controlsLabel} display controls`}>
+          <label>
+            <span className="sr-only">Rows shown for {controlsLabel}</span>
+            <select
+              value={limit}
+              onChange={(event) => setLimit(event.target.value)}
+              aria-label={`Rows shown for ${controlsLabel}`}
             >
-              <div style={{ fontWeight: 700, fontSize: 13 }}>MRIO shock mapping</div>
-              <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                The selected target pathway is mapped into MRIO-direct shocks here. This section does not set country
-                targets; it documents the shock adapter used to translate targets into MRIO A/Z, E, and Y rows.
-              </div>
-              <div className="dashboard-note" style={{ marginTop: 8 }}>
-                <div style={{ fontWeight: 700 }}>{shockMapping.label || "A/Z, E, and Y heuristic shock mapping"}</div>
-                <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                  Method: <code>{shockMapping.mapping_id || "mrio_direct_heuristic"}</code>. Quality ceiling:{" "}
-                  <code>{shockMapping.model_quality_ceiling || "analyst_review"}</code>.
-                </div>
-              </div>
-              {shockCategories.length ? (
-                <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
-                  {shockCategories.map((row, idx) => (
-                    <div key={`${row.shock_type || row.mario_parameter || idx}`} className="muted" style={{ fontSize: 12 }}>
-                      <b>{row.shock_type || "Shock"}</b>: <code>{row.mario_parameter || "-"}</code> -{" "}
-                      {row.description || "Report-derived shock category."}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              {mrioScenarioId ? (
-                <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                  Resolved integrated package: <code>{scenarioKey || "-"}</code> + target{" "}
-                  <code>{mrioScenarioId}</code> @ <code>{Number(targetYear || 2030)}</code>. National placeholder
-                  expansion and shock rows are recorded in run diagnostics.
-                </div>
-              ) : null}
-            </div>
-          </div>
-          <div style={{ minWidth: 220 }}>
-            <label>Run mode</label>
-            <div className="row" style={{ marginTop: 6 }}>
-              <select value={runProfile} onChange={(e) => onSetRunProfile(e.target.value)}>
-                <option value="dev">Dev profile (short subset)</option>
-                <option value="analysis">Analysis profile (extended subset)</option>
-                <option value="full">Full profile (no subset)</option>
-              </select>
-            </div>
-          </div>
+              <option value="10">Top 10</option>
+              <option value="15">Top 15</option>
+              <option value="20">Top 20</option>
+              <option value="30">Top 30</option>
+            </select>
+          </label>
         </div>
-      </div>
-      <div className="card">
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>Policy levers</h2>
-        <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-          Start with defaults, then change only what you need.
+      ) : null}
+      {rows.length ? (
+        <div className="hbar-wrap">
+          {rows.map((row, idx) => {
+            const share = Math.max(0.02, Math.abs(row.value) / maxAbs);
+            return (
+              <div className="hbar-row" key={`${row.label}-${idx}`}>
+                <div title={row.label} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {displayLabel(row.label)}
+                </div>
+                <div className="hbar-track">
+                  <div
+                    className={`hbar-fill ${row.value < 0 ? "negative" : ""}`}
+                    style={{ width: `${Math.round(share * 100)}%` }}
+                  />
+                </div>
+                <div style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{compact(row.value)}</div>
+              </div>
+            );
+          })}
         </div>
-        <LeverControl
-          label="Renewables CAPEX multiplier"
-          tooltip={POLICY_LEVER_TOOLTIPS.renewables_capex_multiplier}
-          value={levers.renewables_capex_multiplier}
-          min={0.7}
-          max={1.5}
-          step={0.05}
-          onChange={(v) => onSetLevers({ ...levers, renewables_capex_multiplier: v })}
-        />
-        <LeverControl
-          label="Fossil variable cost multiplier"
-          tooltip={POLICY_LEVER_TOOLTIPS.fossil_fuel_price_multiplier}
-          value={levers.fossil_fuel_price_multiplier}
-          min={0.7}
-          max={1.8}
-          step={0.05}
-          onChange={(v) => onSetLevers({ ...levers, fossil_fuel_price_multiplier: v })}
-        />
-        <LeverControl
-          label="Carbon price (USD/tCO2)"
-          tooltip={POLICY_LEVER_TOOLTIPS.carbon_price_usd_per_tco2}
-          value={levers.carbon_price_usd_per_tco2}
-          min={0}
-          max={300}
-          step={10}
-          onChange={(v) => onSetLevers({ ...levers, carbon_price_usd_per_tco2: v })}
-        />
-        <LeverControl
-          label="Demand multiplier"
-          tooltip={POLICY_LEVER_TOOLTIPS.demand_multiplier}
-          value={levers.demand_multiplier}
-          min={0.8}
-          max={1.4}
-          step={0.05}
-          onChange={(v) => onSetLevers({ ...levers, demand_multiplier: v })}
-        />
-      </div>
+      ) : (
+        <div className="muted">{normalizedFilter ? "No matching records." : emptyMessage}</div>
+      )}
     </div>
   );
 }
@@ -3488,7 +4433,7 @@ function ActiveJobPanel({ activeJob, onCancel, style = null }) {
           <div className="muted">{activeJob.stage}</div>
           <button
             type="button"
-            style={{ background: "#6f3d3d", padding: "6px 10px", fontSize: 12 }}
+            className="danger-outline-button"
             onClick={onCancel}
             disabled={!canCancel}
           >
@@ -3521,7 +4466,7 @@ function ActiveJobPanel({ activeJob, onCancel, style = null }) {
   );
 }
 
-function SelectedJobDetailsPanel({ job, style = null }) {
+function SelectedJobDetailsPanel({ job, style = null, showOutputLinks = true }) {
   if (!job) return null;
   const isActive = isActiveStatus(job.status);
   const summary = job.summary || null;
@@ -3544,7 +4489,7 @@ function SelectedJobDetailsPanel({ job, style = null }) {
         <span>Energy: <code>{(job.request && job.request.energy_scenario_key) || "-"}</code></span>
         <span>Target: <code>{(job.request && job.request.mrio_scenario_id) || "-"}</code></span>
         <span>Year: <code>{(job.request && job.request.target_year) || "-"}</code></span>
-        <span>Run profile: <code>{(job.request && job.request.run_profile) || "-"}</code></span>
+        <span>Execution profile: <code>{(job.request && job.request.run_profile) || "-"}</code></span>
         <span>Progress: <code>{Math.round(toNumber(job.progress) * 100)}%</code></span>
         {job.queue_position != null ? <span>Queue position: <code>{job.queue_position}</code></span> : null}
         {job.worker_pid ? <span>Worker PID: <code>{job.worker_pid}</code></span> : null}
@@ -3570,7 +4515,7 @@ function SelectedJobDetailsPanel({ job, style = null }) {
         </div>
       ) : null}
 
-      {hasOutputs ? (
+      {showOutputLinks && hasOutputs ? (
         <div className="row" style={{ marginTop: 10 }}>
           {job.artifacts && job.artifacts.csv_url ? (
             <a href={toApiUrl(job.artifacts.csv_url)} target="_blank" rel="noreferrer">Results CSV</a>
@@ -3579,17 +4524,94 @@ function SelectedJobDetailsPanel({ job, style = null }) {
             <a href={toApiUrl(job.artifacts.summary_url)} target="_blank" rel="noreferrer">Summary JSON</a>
           ) : null}
           {reportHref ? (
-            <a href={reportHref} target="_blank" rel="noreferrer">Run report</a>
+            <a href={reportHref} target="_blank" rel="noreferrer">Model report</a>
           ) : null}
           {exchangeBundleHref ? (
             <a href={exchangeBundleHref} target="_blank" rel="noreferrer">Exchange bundle ZIP</a>
           ) : null}
         </div>
-      ) : (
+      ) : showOutputLinks ? (
         <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-          Outputs will appear here when this run reaches <code>succeeded</code>.
+          Outputs will appear here when this execution reaches <code>succeeded</code>.
         </div>
-      )}
+      ) : null}
+    </div>
+  );
+}
+
+function TechnicalExecutionPanel({
+  selectedArchitecture,
+  selectedEnergyModel,
+  scenarioKey,
+  requiresMrio,
+  mrioScenarioId,
+  selectedTargetScenario,
+  targetYear,
+  runProfile,
+  shockMapping,
+  showShockMapping = true,
+}) {
+  const runProfileLabels = {
+    dev: "Dev profile",
+    analysis: "Analysis profile",
+    full: "Full profile",
+  };
+  const architectureLabel = selectedArchitecture
+    ? selectedArchitecture.shortLabel || selectedArchitecture.label
+    : "-";
+  const energyModelLabel = selectedEnergyModel
+    ? selectedEnergyModel.label || selectedEnergyModel.value
+    : "-";
+  const targetLabel = selectedTargetScenario
+    ? selectedTargetScenario.label || selectedTargetScenario.short_label || selectedTargetScenario.scenario_id
+    : "";
+  const mappingId = shockMapping && shockMapping.mapping_id
+    ? shockMapping.mapping_id
+    : "mrio_direct_heuristic";
+
+  return (
+    <div className="technical-execution-panel">
+      <div className="technical-execution-grid">
+        <div><span>Architecture</span><strong>{architectureLabel}</strong></div>
+        <div><span>Energy model</span><strong>{energyModelLabel}</strong></div>
+        <div><span>Input package</span><strong>{scenarioKey || "Unresolved"}</strong></div>
+        {requiresMrio ? <div><span>Target pathway</span><strong>{mrioScenarioId || "Unresolved"}</strong></div> : null}
+        <div><span>Target year</span><strong>{Number(targetYear || 2030)}</strong></div>
+        <div><span>Execution profile</span><strong>{runProfileLabels[runProfile] || runProfile || "-"}</strong></div>
+      </div>
+      {requiresMrio && showShockMapping ? (
+        <div className="diagram-note technical-execution-note">
+          MRIO shock mapping: <code>{mappingId}</code>
+          {targetLabel ? ` · ${targetLabel}` : ""}
+        </div>
+      ) : !requiresMrio ? (
+        <div className="diagram-note technical-execution-note">
+          Energy-only mode excludes MRIO inputs, development stages, and MRIO output artifacts.
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DraftSavePanel({ job, onSave, saving = false }) {
+  if (!job || normalizeStatus(job.status) !== "draft") return null;
+  const editedAt = job.updated_at || job.created_at;
+  return (
+    <div className="draft-save-panel">
+      <div className="draft-save-meta">
+        <span>Last edited</span>
+        <time dateTime={editedAt || undefined}>
+          {editedAt ? new Date(editedAt).toLocaleString() : "Not saved yet"}
+        </time>
+      </div>
+      <button
+        type="button"
+        className="secondary-action-button"
+        onClick={onSave}
+        disabled={saving || typeof onSave !== "function"}
+      >
+        {saving ? "Saving..." : "Save draft"}
+      </button>
     </div>
   );
 }
@@ -3598,19 +4620,14 @@ function EnvironmentSetupPanel({
   environmentSetup,
   loading,
   onRun = null,
-  runName = "",
-  defaultRunName = "",
-  onRunNameChange = null,
   runDisabled = false,
   runDisabledReason = "",
   queueSubmitting = false,
   running = false,
+  technicalExecution = null,
   style = null,
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [validationOpen, setValidationOpen] = useState(false);
-  const [runNameEditing, setRunNameEditing] = useState(false);
-  const [runNameDraft, setRunNameDraft] = useState("");
 
   const setupSummary = environmentSetupSummary(environmentSetup);
   const checks = setupSummary.checks;
@@ -3633,90 +4650,35 @@ function EnvironmentSetupPanel({
       : environmentSetup
         ? { border: "1px solid #6f4d2c", background: "#2b2015", color: "#ffd7b0" }
         : { border: "1px solid #33466a", background: "#101827", color: "#bfd4f5" };
-  const displayRunName = String(runName || "").trim() || defaultRunName || "Optional run name";
-
-  useEffect(() => {
-    if (!runNameEditing) setRunNameDraft(String(runName || ""));
-  }, [runName, runNameEditing]);
-
-  function startRunNameEdit() {
-    setRunNameDraft(String(runName || ""));
-    setRunNameEditing(true);
-  }
-
-  function saveRunNameEdit() {
-    if (typeof onRunNameChange === "function") onRunNameChange(String(runNameDraft || "").trim());
-    setRunNameEditing(false);
-  }
-
-  function cancelRunNameEdit() {
-    setRunNameDraft(String(runName || ""));
-    setRunNameEditing(false);
-  }
-
   return (
-    <div className="card" style={{ marginTop: 14, ...(style || {}) }}>
+    <div className="card run-readiness-panel" style={{ marginTop: 14, ...(style || {}) }}>
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: 16 }}>Environment setup</h3>
+        <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: 16 }}>Execution readiness</h3>
         <div className="row" style={{ gap: 8 }}>
           {onRun ? (
             <button type="button" className="run-play-button" onClick={onRun} disabled={runDisabled}>
               <span aria-hidden="true">▶</span>
-              {queueSubmitting ? "Queuing..." : running ? "Queue another run" : "Run integrated model"}
+              {queueSubmitting ? "Queuing..." : running ? "Queue another execution" : "Run model"}
             </button>
           ) : null}
-          <button type="button" onClick={() => setDetailsOpen(true)} style={{ background: "#22304c", fontSize: 12, padding: "6px 10px" }}>
-            Open details
-          </button>
         </div>
       </div>
       <div style={{ ...statusStyle, borderRadius: 10, padding: "8px 10px", marginTop: 8, fontSize: 13 }}>
         {statusLabel}
       </div>
-      {onRunNameChange ? (
-        <div className="run-name-control">
-          <div className="scenario-readonly-label">Run name</div>
-          {runNameEditing ? (
-            <div className="project-title-edit-row run-name-edit-row">
-              <input
-                type="text"
-                value={runNameDraft}
-                maxLength={200}
-                placeholder={defaultRunName || "Optional run name"}
-                onChange={(event) => setRunNameDraft(event.target.value)}
-                autoFocus
-              />
-              <button type="button" onClick={saveRunNameEdit}>Save</button>
-              <button type="button" onClick={cancelRunNameEdit}>Cancel</button>
-            </div>
-          ) : (
-            <div className="run-name-display-row">
-              <div className="run-name-display">
-                <span>{displayRunName}</span>
-                {!String(runName || "").trim() && defaultRunName ? <span className="muted">Default</span> : null}
-              </div>
-              <button
-                type="button"
-                className="project-edit-icon"
-                aria-label="Edit run name"
-                title="Edit run name"
-                onClick={startRunNameEdit}
-              >
-                ✎
-              </button>
-            </div>
-          )}
+      {technicalExecution ? (
+        <div className="run-readiness-action-row">
+          <DetailDialogButton
+            label="Technical execution"
+            title="Technical execution"
+            subtitle="Resolved model configuration"
+          >
+            {technicalExecution}
+          </DetailDialogButton>
         </div>
       ) : null}
       <div className="muted environment-inline-summary">
         <span>{cleanCheckLine}</span>
-        {environmentSetup && environmentSetup.queue ? (
-          <>
-            <span>Queue usage: {toNumber(environmentSetup.queue.active_jobs)} / {toNumber(environmentSetup.queue.capacity)}</span>
-            <span>Solver: <code>{environmentSetup.solver_resolved || environmentSetup.solver_requested || "-"}</code></span>
-            <span>Placeholder rows: <code>{placeholders.rowCount}</code></span>
-          </>
-        ) : null}
       </div>
       {setupSummary.errors.length ? (
         <div className="warn" style={{ marginTop: 10, marginBottom: 0 }}>
@@ -3728,20 +4690,14 @@ function EnvironmentSetupPanel({
           {runDisabledReason}
         </div>
       ) : null}
-      <div className="validation-expander">
-        <button type="button" className="validation-toggle" onClick={() => setValidationOpen((prev) => !prev)}>
-          {validationOpen ? "Hide validation diagnostics" : "Show validation diagnostics"}
-        </button>
-        {validationOpen ? (
-          <ValidationDiagnosticsSummary
-            environmentSetup={environmentSetup}
-            loading={loading}
-            compactMode={true}
-          />
-        ) : null}
-      </div>
+      <ValidationDiagnosticsSummary
+        environmentSetup={environmentSetup}
+        loading={loading}
+        compactMode={true}
+        onOpenDetails={() => setDetailsOpen(true)}
+      />
       {detailsOpen ? (
-        <Modal title="Environment setup details" subtitle="Readiness checks" wide={true} onClose={() => setDetailsOpen(false)}>
+        <Modal title="Technical readiness diagnostic" subtitle="Validation checks" wide={true} onClose={() => setDetailsOpen(false)}>
           <div className="row" style={{ gap: 10, marginBottom: 12 }}>
             {statusCountItems.map((item) => (
               <MetricCard
@@ -3798,6 +4754,8 @@ function DuplicateConfigurationPanel({
   onDuplicateConfiguration,
   onDeleteRun,
   actionLoading = false,
+  technicalExecution = null,
+  showDuplicate = true,
   style = null,
 }) {
   if (!selectedJob) return null;
@@ -3812,40 +4770,55 @@ function DuplicateConfigurationPanel({
           <h3 style={{ marginTop: 0, marginBottom: 4, fontSize: 16 }}>Configuration locked</h3>
           <div className="muted" style={{ fontSize: 12 }}>
             {isActive
-              ? "This run is already queued or running from an immutable input snapshot."
+              ? "This model has an active execution using an immutable input snapshot."
               : isComplete
-                ? "This completed run is preserved as an immutable result record."
-                : "This run record is immutable."}
+                ? "This completed model is preserved as an immutable result record."
+                : "This model record is immutable."}
           </div>
           <div className="muted" style={{ fontSize: 11, marginTop: 5 }}>
             Selected: <code>{runLabel(selectedJob)}</code> <StatusBadge status={selectedJob.status} />
           </div>
         </div>
         <div className="run-record-action-row">
-          <button
-            type="button"
-            className="run-play-button"
-            onClick={onDuplicateConfiguration}
-            disabled={actionLoading}
-          >
-            Duplicate this configuration
-          </button>
+          {showDuplicate ? (
+            <button
+              type="button"
+              className="run-play-button"
+              onClick={onDuplicateConfiguration}
+              disabled={actionLoading}
+            >
+              Duplicate model
+            </button>
+          ) : null}
           <button
             type="button"
             className="danger-outline-button"
             onClick={onDeleteRun}
             disabled={actionLoading || !canDelete}
-            title={isActive ? "Cancel the active execution before deleting this run." : "Delete this run and its generated files."}
+            title={isActive ? "Cancel the active execution before deleting this model." : "Delete this model and its generated files."}
           >
-            Delete run
+            Delete model
           </button>
         </div>
       </div>
       <div className="diagram-note" style={{ marginTop: 10 }}>
         {isActive
-          ? "Cancel the active execution before deleting this run. Duplicating creates a new editable draft without changing the active run."
-          : "The duplicate becomes a new draft while the original run and its artifacts remain unchanged. Delete removes this run record and generated files."}
+          ? "Cancel the active execution before deleting this model. Duplicating creates a new editable draft without changing the active execution."
+          : showDuplicate
+            ? "The duplicate becomes a new model draft while the original model and its artifacts remain unchanged. Delete removes this model record and generated files."
+            : "Delete removes this model record and its generated files."}
       </div>
+      {technicalExecution ? (
+        <div className="run-record-utility-row">
+          <DetailDialogButton
+            label="Technical execution"
+            title="Technical execution"
+            subtitle="Resolved model configuration"
+          >
+            {technicalExecution}
+          </DetailDialogButton>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -3855,11 +4828,8 @@ function RunDiagnosticsCard({ confidence }) {
     ? confidence.placeholder_input_files
     : [];
   return (
-    <div className="card">
-      <h3 style={{ marginTop: 0, fontSize: 15 }}>Run-level diagnostics</h3>
-      <div className="muted" style={{ fontSize: 12 }}>
-        Scenario-wide diagnostics that do not change with map filtering.
-      </div>
+    <div className="card result-widget result-widget-extra-small result-widget-diagnostics">
+      <h3 style={{ marginTop: 0, fontSize: 15 }}>Execution diagnostics</h3>
       <div className="row muted" style={{ marginTop: 8, fontSize: 12 }}>
         <span>Coupling mode: <code>{String((confidence && confidence.coupling_mode) || "unknown")}</code></span>
         <span>Mapping coverage: {formatSharePercent(toNumber(confidence && confidence.mapping_coverage_share), 1)}</span>
@@ -3875,7 +4845,7 @@ function RunDiagnosticsCard({ confidence }) {
         </div>
       ) : (
         <div className="ok" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
-          No placeholder expert input files are listed in this run diagnostic payload.
+          No placeholder expert input files are listed in this execution diagnostic payload.
         </div>
       )}
     </div>
@@ -3888,7 +4858,7 @@ function ModelQualityCard({ modelQuality, confidence }) {
   const qualityIssues = Array.isArray(modelQuality && modelQuality.issues) ? modelQuality.issues : [];
   const qualityDiagnostics = (modelQuality && modelQuality.diagnostics) || {};
   return (
-    <div className="card">
+    <div className="card result-widget result-widget-small result-widget-quality">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
         <h3 style={{ marginTop: 0, fontSize: 15, marginBottom: 0 }}>Model quality</h3>
         {qualityStatus ? <span className={displayStatus(qualityStatus).className}>{displayStatus(qualityStatus).label}</span> : null}
@@ -3938,7 +4908,7 @@ function ModelQualityCard({ modelQuality, confidence }) {
         </div>
       ) : (
         <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-          No quality issues were synthesized for this run.
+          No quality issues were synthesized for this model.
         </div>
       )}
     </div>
@@ -3973,7 +4943,7 @@ function MetricResolutionCard({ metricResolution }) {
           ))}
         </div>
       ) : (
-        <div className="muted">Metric resolution metadata was not recorded for this run.</div>
+        <div className="muted">Metric resolution metadata was not recorded for this execution.</div>
       )}
     </div>
   );
@@ -3987,7 +4957,7 @@ function DevelopmentUncertaintyCard({ developmentUncertainty }) {
       ? developmentUncertainty.totals_bounds
       : null;
   return (
-    <div className="card">
+    <div className="card result-widget result-widget-extra-small result-widget-uncertainty">
       <h3 style={{ marginTop: 0, fontSize: 15 }}>Development uncertainty</h3>
       {uncertaintyBounds ? (
         <div className="row" style={{ gap: 10 }}>
@@ -4009,7 +4979,7 @@ function DevelopmentUncertaintyCard({ developmentUncertainty }) {
           />
         </div>
       ) : (
-        <div className="muted">Uncertainty bounds were not produced for this run.</div>
+        <div className="muted">Uncertainty bounds were not produced for this execution.</div>
       )}
       {developmentUncertainty && developmentUncertainty.method ? (
         <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
@@ -4046,7 +5016,7 @@ function ScenarioAssumptionsCard({ scenarioAssumptions, confidence }) {
           ))}
         </div>
       ) : (
-        <div className="muted">No matched scenario assumptions were recorded for this run.</div>
+        <div className="muted">No matched scenario assumptions were recorded for this model.</div>
       )}
     </div>
   );
@@ -4152,7 +5122,7 @@ function DevelopmentIndicatorsCard({ developmentIndicators, confidence }) {
           })}
         </div>
       ) : (
-        <div className="muted">No development indicators were recorded for this run.</div>
+        <div className="muted">No development indicators were recorded for this model.</div>
       )}
     </div>
   );
@@ -4168,11 +5138,15 @@ function SpatialResultsMapPanel({
   developmentByRegionRecords,
   spatialFilter,
   setSpatialFilter,
+  mapViewport,
+  onMapViewportChange,
 }) {
   const mapHostRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
   const fittedRunRef = useRef("");
+  const mapViewportRef = useRef(mapViewport);
+  const onMapViewportChangeRef = useRef(onMapViewportChange);
 
   const availableMapMetrics = useMemo(
     () => LOCATION_MAP_METRICS.filter((item) => includeDevelopment || item.scope !== "region"),
@@ -4186,6 +5160,18 @@ function SpatialResultsMapPanel({
     () => buildRegionLookup(developmentByRegionRecords),
     [developmentByRegionRecords]
   );
+  const mapExtentSignature = [
+    mapData && mapData.runId ? mapData.runId : "no-run",
+    String((mapData && mapData.geojson && mapData.geojson.features && mapData.geojson.features.length) || 0),
+    String((mapData && mapData.coverage && mapData.coverage.geoFeatureLocationCount) || 0),
+  ].join("|");
+  const mapExtentSignatureRef = useRef(mapExtentSignature);
+
+  useEffect(() => {
+    mapViewportRef.current = mapViewport;
+    onMapViewportChangeRef.current = onMapViewportChange;
+    mapExtentSignatureRef.current = mapExtentSignature;
+  }, [mapViewport, onMapViewportChange, mapExtentSignature]);
 
   function getFeatureInfo(feature) {
     const resolved = resolveFeatureRecord(feature, mapData);
@@ -4256,16 +5242,10 @@ function SpatialResultsMapPanel({
     const features = Array.isArray(mapData && mapData.geojson && mapData.geojson.features)
       ? mapData.geojson.features
       : [];
-    let matchedByLocation = 0;
-    let matchedByRegion = 0;
-    let unmatched = 0;
     const metricValues = [];
 
     features.forEach((feature) => {
       const info = getFeatureInfo(feature);
-      if (info.resolved.source === "location") matchedByLocation += 1;
-      else if (info.resolved.source === "region") matchedByRegion += 1;
-      else unmatched += 1;
       const value = info.metricValue;
       if (Number.isFinite(value)) metricValues.push(value);
     });
@@ -4276,57 +5256,11 @@ function SpatialResultsMapPanel({
 
     return {
       featureCount: features.length,
-      matchedByLocation,
-      matchedByRegion,
-      unmatched,
       minValue,
       maxValue,
-      metricValueCount: metricValues.length,
       histogramBins,
     };
   }, [mapData, metricMeta.key, regionLookup]);
-
-  const selectedFeatureInfo = useMemo(() => {
-    if (!spatialFilter || !mapData || !mapData.geojson || !Array.isArray(mapData.geojson.features)) return null;
-    const selectedLocation = normalizeLocationId(spatialFilter.locationId);
-    const selectedCountry = normalizeLocationId(
-      spatialFilter.countryIso3 || locationToParentCountry(selectedLocation)
-    );
-    const selectedRegion = normalizeRegionKey(spatialFilter.region);
-    let feature =
-      mapData.geojson.features.find((row) => extractGeoFeatureLocationId(row) === selectedLocation) || null;
-    if (!feature && selectedLocation && !isSubregionLocation(selectedLocation)) {
-      feature =
-        mapData.geojson.features.find((row) => {
-          const featureLocation = extractGeoFeatureLocationId(row);
-          if (!featureLocation) return false;
-          return (
-            featureLocation === selectedLocation ||
-            locationToParentCountry(featureLocation) === selectedLocation
-          );
-        }) || null;
-    }
-    if (!feature && selectedCountry) {
-      feature =
-        mapData.geojson.features.find((row) => {
-          const props = (row && row.properties) || {};
-          const featureCountry = normalizeLocationId(
-            firstNonEmpty(props, ["country_iso3", "iso3", "ISO_A3"]) ||
-              locationToParentCountry(extractGeoFeatureLocationId(row))
-          );
-          return featureCountry && featureCountry === selectedCountry;
-        }) || null;
-    }
-    if (!feature && selectedRegion) {
-      feature =
-        mapData.geojson.features.find((row) => {
-          const info = getFeatureInfo(row);
-          return info.regionKey && info.regionKey === selectedRegion;
-        }) || null;
-    }
-    if (!feature) return null;
-    return getFeatureInfo(feature);
-  }, [spatialFilter, mapData, mapMetric, regionLookup]);
 
   function layerBoundsForAvailableData(layer) {
     if (!layer || !window.L) return null;
@@ -4365,7 +5299,35 @@ function SpatialResultsMapPanel({
       zoomControl: true,
       attributionControl: false,
     });
-    map.setView([4, 20], 3);
+    const savedViewport = mapViewportRef.current;
+    const canRestoreViewport =
+      savedViewport &&
+      savedViewport.extentSignature === mapExtentSignatureRef.current &&
+      Number.isFinite(Number(savedViewport.latitude)) &&
+      Number.isFinite(Number(savedViewport.longitude)) &&
+      Number.isFinite(Number(savedViewport.zoom));
+    if (canRestoreViewport) {
+      map.setView(
+        [Number(savedViewport.latitude), Number(savedViewport.longitude)],
+        Number(savedViewport.zoom),
+        { animate: false }
+      );
+      fittedRunRef.current = mapExtentSignatureRef.current;
+    } else {
+      map.setView([4, 20], 3);
+    }
+    function persistViewport() {
+      const callback = onMapViewportChangeRef.current;
+      if (typeof callback !== "function") return;
+      const center = map.getCenter();
+      callback({
+        extentSignature: mapExtentSignatureRef.current,
+        latitude: center.lat,
+        longitude: center.lng,
+        zoom: map.getZoom(),
+      });
+    }
+    map.on("moveend", persistViewport);
     mapRef.current = map;
 
     return () => {
@@ -4373,11 +5335,34 @@ function SpatialResultsMapPanel({
         layerRef.current.remove();
         layerRef.current = null;
       }
+      map.off("moveend", persistViewport);
       map.remove();
       mapRef.current = null;
       fittedRunRef.current = "";
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const savedViewport = mapViewport;
+    if (
+      !map ||
+      fittedRunRef.current === mapExtentSignature ||
+      !savedViewport ||
+      savedViewport.extentSignature !== mapExtentSignature ||
+      !Number.isFinite(Number(savedViewport.latitude)) ||
+      !Number.isFinite(Number(savedViewport.longitude)) ||
+      !Number.isFinite(Number(savedViewport.zoom))
+    ) {
+      return;
+    }
+    map.setView(
+      [Number(savedViewport.latitude), Number(savedViewport.longitude)],
+      Number(savedViewport.zoom),
+      { animate: false }
+    );
+    fittedRunRef.current = mapExtentSignature;
+  }, [mapExtentSignature, mapViewport]);
 
   useEffect(() => {
     if (!mapHostRef.current || !mapRef.current || typeof ResizeObserver === "undefined") return;
@@ -4386,12 +5371,11 @@ function SpatialResultsMapPanel({
       if (!map) return;
       window.setTimeout(() => {
         map.invalidateSize();
-        if (layerRef.current) fitMapToAvailableData(layerRef.current, fittedRunRef.current || "resize", true);
       }, 0);
     });
     observer.observe(mapHostRef.current);
     return () => observer.disconnect();
-  }, [mapData, metricMeta.key, regionLookup]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -4500,58 +5484,34 @@ function SpatialResultsMapPanel({
     }).addTo(map);
 
     layerRef.current = layer;
-    const fitSignature = [
-      mapData && mapData.runId ? mapData.runId : "no-run",
-      metricMeta.key,
-      String(mapSummary.featureCount),
-      String(mapSummary.matchedByLocation),
-      String(mapSummary.matchedByRegion),
-    ].join("|");
-    window.setTimeout(() => fitMapToAvailableData(layer, fitSignature), 0);
-    window.setTimeout(() => fitMapToAvailableData(layer, fitSignature), 160);
+    window.setTimeout(() => fitMapToAvailableData(layer, mapExtentSignature), 0);
+    window.setTimeout(() => fitMapToAvailableData(layer, mapExtentSignature), 160);
   }, [
     mapData,
     mapSummary.featureCount,
-    mapSummary.matchedByLocation,
-    mapSummary.matchedByRegion,
     mapSummary.minValue,
     mapSummary.maxValue,
     metricMeta,
     regionLookup,
     spatialFilter,
+    mapExtentSignature,
   ]);
 
-  const unmatchedModelLocationIds =
-    (mapData && mapData.coverage && mapData.coverage.unmatchedModelLocationIds) || [];
-  const unmatchedGeoLocationIds =
-    (mapData && mapData.coverage && mapData.coverage.unmatchedGeoLocationIds) || [];
-  const syntheticSubregionLocationIds =
-    (mapData && mapData.coverage && mapData.coverage.syntheticSubregionLocationIds) || [];
-  const placeholderGeometryLocationIds =
-    (mapData && mapData.coverage && mapData.coverage.placeholderGeometryLocationIds) || [];
-
-  const locationCount = mapData && mapData.coverage ? toNumber(mapData.coverage.modelLocationCount) : 0;
-  const geoFeatureLocationCount = mapData && mapData.coverage ? toNumber(mapData.coverage.geoFeatureLocationCount) : 0;
-
   return (
-    <div className="card" style={{ minWidth: 0 }}>
+    <div className="card spatial-results-map-card result-widget result-widget-large" style={{ minWidth: 0 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div>
-          <h3 style={{ marginTop: 0, marginBottom: 2, fontSize: 15 }}>Spatial results map</h3>
-          <div className="muted" style={{ fontSize: 12 }}>
-            Location metrics are built from <code>investment_shocks.csv</code> and <code>operating_shocks.csv</code>.
-            {includeDevelopment ? "Regional development metrics are joined by region." : "Energy-only mode hides region-level MRIO/development metrics."}
-          </div>
-        </div>
-        <div>
-          <label>Map metric</label>
-          <select value={mapMetric} onChange={(e) => setMapMetric(e.target.value)} style={{ maxWidth: "100%" }}>
-            {availableMapMetrics.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+        <h3 style={{ marginTop: 0, marginBottom: 2, fontSize: 15 }}>Results map</h3>
+        <div className="map-toolbar-controls">
+          <label className="map-metric-control">
+            <span>Map metric</span>
+            <select value={mapMetric} onChange={(e) => setMapMetric(e.target.value)} style={{ maxWidth: "100%" }}>
+              {availableMapMetrics.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
@@ -4567,61 +5527,26 @@ function SpatialResultsMapPanel({
         </div>
       ) : null}
 
-      <div
-        ref={mapHostRef}
-        style={{
-          marginTop: 10,
-          width: "100%",
-          maxWidth: "100%",
-          minHeight: 320,
-          height: "min(52vh, 560px)",
-          borderRadius: 12,
-          border: "1px solid #273a5c",
-          overflow: "hidden",
-          background: "#0a1220",
-        }}
-      />
-
-      <div className="row muted" style={{ marginTop: 8, fontSize: 12, gap: 14 }}>
-        <span>Model locations: <code>{locationCount}</code></span>
-        <span>GeoJSON location IDs: <code>{geoFeatureLocationCount}</code></span>
-        <span>Matched by location: <code>{mapSummary.matchedByLocation}</code></span>
-        <span>Matched by region context: <code>{mapSummary.matchedByRegion}</code></span>
-        <span>Unmatched features: <code>{mapSummary.unmatched}</code></span>
-        <span>Synthetic subregions: <code>{syntheticSubregionLocationIds.length}</code></span>
-        <span>Placeholder geometries: <code>{placeholderGeometryLocationIds.length}</code></span>
-      </div>
-      {Number.isFinite(mapSummary.minValue) && Number.isFinite(mapSummary.maxValue) ? (
-        <div style={{ marginTop: 8 }}>
-          <div
-            style={{
-              height: 10,
-              borderRadius: 999,
-              border: "1px solid #2d4268",
-              background: mapLegendGradient(),
-            }}
-          />
-          <div className="row muted" style={{ marginTop: 4, fontSize: 11, justifyContent: "space-between" }}>
-            <span>{compact(mapSummary.minValue)}</span>
-            <span>{compact(mapSummary.maxValue)}</span>
-          </div>
-          {mapSummary.histogramBins.length ? (
-            <div style={{ marginTop: 8 }}>
-              <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>
-                Distribution across mapped features: <code>{mapSummary.metricValueCount}</code>
-              </div>
+      <div className="spatial-results-map-stage">
+        <div
+          ref={mapHostRef}
+          className="spatial-results-map-host"
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            minHeight: 320,
+            height: "min(52vh, 560px)",
+            background: "#0a1220",
+          }}
+        />
+        {Number.isFinite(mapSummary.minValue) && Number.isFinite(mapSummary.maxValue) ? (
+          <div className="map-distribution-overlay">
+            {mapSummary.histogramBins.length ? (
               <div
+                className="map-distribution-histogram"
                 aria-label={`Histogram distribution for ${metricMeta.label}`}
                 style={{
-                  height: 48,
-                  display: "grid",
                   gridTemplateColumns: `repeat(${mapSummary.histogramBins.length}, minmax(3px, 1fr))`,
-                  gap: 3,
-                  alignItems: "end",
-                  padding: "5px 6px",
-                  border: "1px solid #223657",
-                  borderRadius: 10,
-                  background: "#081324",
                 }}
               >
                 {mapSummary.histogramBins.map((bin, idx) => (
@@ -4630,154 +5555,26 @@ function SpatialResultsMapPanel({
                     title={`${compact(bin.min)} to ${compact(bin.max)}: ${bin.count} feature${bin.count === 1 ? "" : "s"}`}
                     style={{
                       height: `${Math.max(2, Math.round(bin.share * 38))}px`,
-                      borderRadius: "5px 5px 2px 2px",
                       background: colorForMapValue(bin.midpoint, mapSummary.minValue, mapSummary.maxValue),
                       opacity: bin.count > 0 ? 0.95 : 0.22,
                     }}
                   />
                 ))}
               </div>
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-          No mapped values were found for the selected metric.
-        </div>
-      )}
-      {selectedFeatureInfo ? (
-        <div
-          style={{
-            marginTop: 10,
-            border: "1px solid #2a3f62",
-            background: "#0d172a",
-            borderRadius: 10,
-            padding: "10px 12px",
-          }}
-        >
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <div style={{ fontWeight: 700, fontSize: 13 }}>
-              Selection: {selectedFeatureInfo.label}
-            </div>
-            <button
-              type="button"
-              style={{ background: "#22304c", fontSize: 12, padding: "5px 9px" }}
-              onClick={() => setSpatialFilter && setSpatialFilter(null)}
-            >
-              Clear filter
-            </button>
-          </div>
-          <div className="row muted" style={{ marginTop: 6, fontSize: 12, gap: 14 }}>
-            {selectedFeatureInfo.locationId ? (
-              <span>Location: <code>{selectedFeatureInfo.locationId}</code></span>
             ) : null}
-            {selectedFeatureInfo.countryIso3 ? (
-              <span>Country: <code>{selectedFeatureInfo.countryIso3}</code></span>
-            ) : null}
-            {selectedFeatureInfo.region ? (
-              <span>Region: <code>{selectedFeatureInfo.region}</code></span>
-            ) : null}
-            <span>{metricMeta.label}: <code>{Number.isFinite(selectedFeatureInfo.metricValue) ? compact(selectedFeatureInfo.metricValue) : "-"}</code></span>
-            {selectedFeatureInfo.syntheticSubregionArea ? (
-              <span>Synthetic geometry: <code>{selectedFeatureInfo.syntheticMethod || "yes"}</code></span>
-            ) : null}
-            {selectedFeatureInfo.placeholderGeometry ? (
-              <span>Placeholder geometry: <code>yes</code></span>
-            ) : null}
-          </div>
-          <div className="row muted" style={{ marginTop: 6, fontSize: 12, gap: 14 }}>
-            <span>Total shock: <code>{Number.isFinite(selectedFeatureInfo.totalShock) ? compact(selectedFeatureInfo.totalShock) : "-"}</code></span>
-            <span>CAPEX: <code>{Number.isFinite(selectedFeatureInfo.capexShock) ? compact(selectedFeatureInfo.capexShock) : "-"}</code></span>
-            <span>OPEX: <code>{Number.isFinite(selectedFeatureInfo.opexShock) ? compact(selectedFeatureInfo.opexShock) : "-"}</code></span>
-            <span>Jobs (region-level): <code>{Number.isFinite(toNumber(selectedFeatureInfo.regionRow && selectedFeatureInfo.regionRow.jobs_total, NaN)) ? compact(selectedFeatureInfo.regionRow && selectedFeatureInfo.regionRow.jobs_total) : "-"}</code></span>
-            <span>GVA (region-level): <code>{Number.isFinite(toNumber(selectedFeatureInfo.regionRow && selectedFeatureInfo.regionRow.gva_total_musd, NaN)) ? compact(selectedFeatureInfo.regionRow && selectedFeatureInfo.regionRow.gva_total_musd) : "-"}</code></span>
-            <span>Income (region-level): <code>{Number.isFinite(toNumber(selectedFeatureInfo.regionRow && selectedFeatureInfo.regionRow.household_income_proxy_musd, NaN)) ? compact(selectedFeatureInfo.regionRow && selectedFeatureInfo.regionRow.household_income_proxy_musd) : "-"}</code></span>
-          </div>
-          <details style={{ marginTop: 6 }}>
-            <summary className="muted" style={{ cursor: "pointer", fontSize: 12 }}>
-              Raw selection payload
-            </summary>
-            <pre
+            <div
+              className="map-distribution-gradient"
               style={{
-                marginTop: 6,
-                maxHeight: 180,
-                overflow: "auto",
-                background: "#0a1220",
-                border: "1px solid #243551",
-                borderRadius: 8,
-                padding: 8,
-                fontSize: 11,
+                background: mapLegendGradient(),
               }}
-            >
-              {JSON.stringify(
-                {
-                  location: selectedFeatureInfo.locationId,
-                  country_iso3: selectedFeatureInfo.countryIso3,
-                  region: selectedFeatureInfo.region,
-                  map_match_source: selectedFeatureInfo.resolved.source,
-                  synthetic_subregion_area: selectedFeatureInfo.syntheticSubregionArea,
-                  placeholder_geometry: selectedFeatureInfo.placeholderGeometry,
-                  map_row: selectedFeatureInfo.resolved.record || null,
-                  regional_development_row: selectedFeatureInfo.regionRow || null,
-                },
-                null,
-                2
-              )}
-            </pre>
-          </details>
-        </div>
-      ) : null}
-
-      {unmatchedModelLocationIds.length ? (
-        <details style={{ marginTop: 8 }}>
-          <summary className="muted" style={{ cursor: "pointer", fontSize: 12 }}>
-            Missing in GeoJSON: {unmatchedModelLocationIds.length} model locations
-          </summary>
-          <div style={{ marginTop: 6, fontSize: 12 }}>
-            <code>{unmatchedModelLocationIds.join(", ")}</code>
+            />
+            <div className="map-distribution-range">
+              <span>{compact(mapSummary.minValue)}</span>
+              <span>{metricMeta.label}</span>
+              <span>{compact(mapSummary.maxValue)}</span>
+            </div>
           </div>
-        </details>
-      ) : null}
-      {unmatchedGeoLocationIds.length ? (
-        <details style={{ marginTop: 8 }}>
-          <summary className="muted" style={{ cursor: "pointer", fontSize: 12 }}>
-            GeoJSON IDs without model data in this run: {unmatchedGeoLocationIds.length}
-          </summary>
-          <div style={{ marginTop: 6, fontSize: 12 }}>
-            <code>{unmatchedGeoLocationIds.join(", ")}</code>
-          </div>
-        </details>
-      ) : null}
-      {syntheticSubregionLocationIds.length ? (
-        <details style={{ marginTop: 8 }}>
-          <summary className="muted" style={{ cursor: "pointer", fontSize: 12 }}>
-            Synthetic subregion geometries: {syntheticSubregionLocationIds.length}
-          </summary>
-          <div style={{ marginTop: 6, fontSize: 12 }}>
-            <code>{syntheticSubregionLocationIds.join(", ")}</code>
-          </div>
-        </details>
-      ) : null}
-      {placeholderGeometryLocationIds.length ? (
-        <details style={{ marginTop: 8 }}>
-          <summary className="muted" style={{ cursor: "pointer", fontSize: 12 }}>
-            Placeholder geometries: {placeholderGeometryLocationIds.length}
-          </summary>
-          <div style={{ marginTop: 6, fontSize: 12 }}>
-            <code>{placeholderGeometryLocationIds.join(", ")}</code>
-          </div>
-        </details>
-      ) : null}
-      <div className="muted" style={{ marginTop: 8, fontSize: 11 }}>
-        GeoJSON source: <code>{LOCATION_MAP_GEOJSON_PATH}</code>. Override with{" "}
-        <code>window.EDIM_GEOJSON_PATH</code> before loading the app.
-      </div>
-      <div className="muted" style={{ marginTop: 4, fontSize: 11 }}>
-        Country boundary source: <code>{LOCATION_MAP_COUNTRIES_GEOJSON_PATH}</code>. Subregions are synthesized from
-        model centroid points inside parent-country boundaries.
-      </div>
-      <div className="muted" style={{ marginTop: 4, fontSize: 11 }}>
-        Click any country/subregion to filter other charts where spatial fields are available.
+        ) : null}
       </div>
     </div>
   );
@@ -4787,6 +5584,13 @@ function RunResultsPanel({
   result,
   architecture,
   selectedRunLabel,
+  selectedRunName,
+  onRenameModel,
+  onDuplicateModel,
+  duplicateModelLoading = false,
+  technicalExecutionPanel,
+  technicalDetailsPanel,
+  selectedModelDetailsPanel,
   runMetadata,
   integratedMetrics,
   developmentDrivers,
@@ -4823,8 +5627,10 @@ function RunResultsPanel({
   setSpatialFilter,
 }) {
   const [activeSection, setActiveSection] = useState("overview");
-  const [barFilter, setBarFilter] = useState("");
-  const [barLimit, setBarLimit] = useState("20");
+  const [mapViewportsByRun, setMapViewportsByRun] = useState({});
+  const [modelNameEditing, setModelNameEditing] = useState(false);
+  const [modelNameDraft, setModelNameDraft] = useState("");
+  const [modelNameSaving, setModelNameSaving] = useState(false);
   const includesDevelopment = architectureIncludesDevelopment(architecture);
   const visibleTabKeys = architectureResultTabs(architecture);
   const developmentMetricKeys = new Set([
@@ -4840,9 +5646,32 @@ function RunResultsPanel({
         : (integratedMetrics || []).filter((metric) => !developmentMetricKeys.has(String(metric && metric.key))),
     [includesDevelopment, integratedMetrics]
   );
+  const mapViewportKey = String(
+    (locationMapData && locationMapData.runId) ||
+    (runMetadata && (runMetadata.run_id || runMetadata.execution_id)) ||
+    selectedRunLabel ||
+    "current-run"
+  );
   useEffect(() => {
     if (!visibleTabKeys.includes(activeSection)) setActiveSection(visibleTabKeys[0] || "overview");
   }, [activeSection, visibleTabKeys.join("|")]);
+  useEffect(() => {
+    if (!modelNameEditing) setModelNameDraft(String(selectedRunName || ""));
+  }, [selectedRunName, modelNameEditing]);
+
+  async function saveModelName() {
+    const nextName = String(modelNameDraft || "").trim();
+    if (!nextName || typeof onRenameModel !== "function") return;
+    setModelNameSaving(true);
+    try {
+      await onRenameModel(nextName);
+      setModelNameEditing(false);
+    } catch (_error) {
+      // The workspace-level error surface reports persistence failures.
+    } finally {
+      setModelNameSaving(false);
+    }
+  }
 
   const uncertaintyBounds =
     developmentUncertainty &&
@@ -4850,7 +5679,6 @@ function RunResultsPanel({
     typeof developmentUncertainty.totals_bounds === "object"
       ? developmentUncertainty.totals_bounds
       : null;
-  const rankedLimit = Math.max(5, Math.round(toNumber(barLimit, 20)));
   const baseGenerationByTechRanked = aggregateByLabel(
     ((((result && result.summary) || {}).generation_by_tech || {}).records || []),
     "techs",
@@ -4865,30 +5693,6 @@ function RunResultsPanel({
   const countryLevelSelectionActive = Boolean(spatialFilter) && isCountryLikeSelection;
   const canFilterRegionRows = Boolean(spatialFilter) && !isCountryLikeSelection;
   const canFilterPoolRows = Boolean(spatialFilter) && !isCountryLikeSelection;
-  const selectedResultsTitle = useMemo(() => {
-    if (!spatialFilter) return "Regional / country / subcountry results";
-    if (selectionGranularity === "subregion") return "Selected subcountry results";
-    if (selectionGranularity === "country") return "Selected country results";
-    if (selectionGranularity === "region") return "Selected regional results";
-    if (selectionGranularity === "pool") return "Selected pool results";
-    return "Selected area results";
-  }, [spatialFilter, selectionGranularity]);
-  const selectedDriversTitle = useMemo(() => {
-    if (!spatialFilter) return "Regional / country / subcountry drivers";
-    if (selectionGranularity === "subregion") return "Selected subcountry drivers";
-    if (selectionGranularity === "country") return "Selected country drivers";
-    if (selectionGranularity === "region") return "Selected regional drivers";
-    if (selectionGranularity === "pool") return "Selected pool drivers";
-    return "Selected area drivers";
-  }, [spatialFilter, selectionGranularity]);
-  const selectedResultsScopeNote = useMemo(() => {
-    if (!spatialFilter) return "Choose a country, subcountry, or region on the map to populate this box.";
-    const label = spatialFilter.label || spatialFilter.locationId || spatialFilter.region || "selection";
-    if (countryLevelSelectionActive) {
-      return `Scope: ${label}. Metrics here use the finest compatible resolution; region-only series stay regional.`;
-    }
-    return `Scope: ${label}. Metrics here are filtered to the selected area.`;
-  }, [spatialFilter, countryLevelSelectionActive]);
   const locationRegionLookup = useMemo(() => buildLocationRegionLookup(locationMapData), [locationMapData]);
   const filteredGenerationByTech = useMemo(() => {
     if (!spatialFilter) return baseGenerationByTechRanked;
@@ -5148,9 +5952,49 @@ function RunResultsPanel({
   const qualityScore = toNumber(modelQuality && modelQuality.score, 0);
   const qualityIssues = Array.isArray(modelQuality && modelQuality.issues) ? modelQuality.issues : [];
   const qualityDiagnostics = (modelQuality && modelQuality.diagnostics) || {};
+  const resultEvidence = evidenceFromSummary((result && result.summary) || {});
   const resolutionRows = Array.isArray(metricResolution && metricResolution.records)
     ? metricResolution.records
     : [];
+  const countryResponsiveIntegratedMetricKeys = useMemo(() => {
+    const keys = new Set([
+      "monetary_cost",
+      "physical_emissions",
+      "unserved_energy_share",
+    ]);
+    resolutionRows.forEach((row) => {
+      const key = String((row && row.metric_key) || "").trim();
+      if (!key) return;
+      const filteredResolution = String((row && row.filtered_resolution) || "").toLowerCase();
+      if (
+        filteredResolution.includes("location") ||
+        filteredResolution.includes("country") ||
+        filteredResolution.includes("subregion")
+      ) {
+        keys.add(key);
+      } else {
+        keys.delete(key);
+      }
+    });
+    return keys;
+  }, [metricResolution]);
+  const countryResponsiveIntegratedMetrics = useMemo(
+    () =>
+      resolvedIntegratedMetrics.filter((metric) =>
+        countryResponsiveIntegratedMetricKeys.has(String((metric && metric.key) || ""))
+      ),
+    [resolvedIntegratedMetrics, countryResponsiveIntegratedMetricKeys]
+  );
+  const fixedIntegratedMetrics = useMemo(
+    () =>
+      displayIntegratedMetrics.filter(
+        (metric) => !countryResponsiveIntegratedMetricKeys.has(String((metric && metric.key) || ""))
+      ),
+    [displayIntegratedMetrics, countryResponsiveIntegratedMetricKeys]
+  );
+  const fixedMetricsIncludeImportLeakage = fixedIntegratedMetrics.some(
+    (metric) => String((metric && metric.key) || "") === "import_leakage_musd"
+  );
   const assumptionsCount = toNumber(confidence && confidence.scenario_assumptions_applied_count, 0);
   const indicatorAvailableCount = toNumber(confidence && confidence.development_indicators_available_count, 0);
   const indicatorUnavailableCount = toNumber(confidence && confidence.development_indicators_unavailable_count, 0);
@@ -5159,6 +6003,9 @@ function RunResultsPanel({
     : [];
   const developmentIndicatorRows = Array.isArray(developmentIndicators && developmentIndicators.records)
     ? developmentIndicators.records
+    : [];
+  const runWarnings = Array.isArray(result && result.summary && result.summary.warnings)
+    ? result.summary.warnings
     : [];
   const reportHref = resultArtifacts.getSummaryArtifactHref(result.artifacts.run_id, result.summary, "report_markdown");
   const exchangeBundleHref = resultArtifacts.getSummaryArtifactHref(result.artifacts.run_id, result.summary, "exchange_bundle_zip");
@@ -5174,84 +6021,221 @@ function RunResultsPanel({
   return (
     <div className="analysis-shell">
       <div className="card analysis-header-card">
-        <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "#8ea4c5" }}>
-              Run results workspace
+        <div className="analysis-title-row">
+          <div className="analysis-title-copy">
+            <div className="view-eyebrow">Model results</div>
+            {modelNameEditing ? (
+              <div className="analysis-model-title-editor">
+                <input
+                  type="text"
+                  aria-label="Model name"
+                  value={modelNameDraft}
+                  maxLength={200}
+                  autoFocus
+                  onChange={(event) => setModelNameDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") saveModelName();
+                    if (event.key === "Escape") setModelNameEditing(false);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="secondary-action-button"
+                  onClick={saveModelName}
+                  disabled={modelNameSaving || !String(modelNameDraft || "").trim()}
+                >
+                  {modelNameSaving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className="ghost-utility-button"
+                  onClick={() => setModelNameEditing(false)}
+                  disabled={modelNameSaving}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="analysis-model-title-row">
+                <h1 className="view-title">{selectedRunName || "Untitled model"}</h1>
+                {typeof onRenameModel === "function" ? (
+                  <button
+                    type="button"
+                    className="icon-button analysis-model-title-edit"
+                    aria-label="Edit model name"
+                    title="Edit model name"
+                    onClick={() => {
+                      setModelNameDraft(String(selectedRunName || ""));
+                      setModelNameEditing(true);
+                    }}
+                  >
+                    <img
+                      className="analysis-model-title-edit-icon"
+                      src="./assets/icons/pencil.svg?v=edit-2"
+                      alt=""
+                      aria-hidden="true"
+                    />
+                  </button>
+                ) : null}
+              </div>
+            )}
+            <div className="view-subtitle">
+              Explore this model's outputs by overview, energy-system, development, and method views.
             </div>
-            <div style={{ marginTop: 4, fontWeight: 700, fontSize: 18 }}>
-              {selectedRunLabel || "Selected model"}
-            </div>
-          </div>
-          <div className="row">
-            <a href={toApiUrl(result.artifacts.csv_url)} target="_blank" rel="noreferrer">Results CSV</a>
-            {reportHref ? (
-              <a href={reportHref} target="_blank" rel="noreferrer">Run report</a>
-            ) : null}
-            {exchangeBundleHref ? (
-              <a href={exchangeBundleHref} target="_blank" rel="noreferrer">Exchange bundle ZIP</a>
+            {technicalExecutionPanel ? (
+              <div className="analysis-inline-technical-execution" aria-label="Technical execution">
+                {technicalExecutionPanel}
+              </div>
             ) : null}
           </div>
-        </div>
-        <div className="row muted" style={{ fontSize: 12 }}>
-          <span>Solver: {runMetadata.solver || "-"}</span>
-          <span>Termination: {runMetadata.termination_condition || "-"}</span>
-          <span>Solve time: {runMetadata.solution_time_seconds != null ? `${toNumber(runMetadata.solution_time_seconds).toFixed(2)} s` : "-"}</span>
-          <span>Objective: {runMetadata.objective_function_value != null ? compact(runMetadata.objective_function_value) : "-"}</span>
-          <span>Spatial filter: <code>{spatialFilter ? spatialFilter.label || spatialFilter.locationId || spatialFilter.region || "-" : "none"}</code></span>
-        </div>
-        <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>
-          <div className="segmented-control">
-            {sectionTabs.map((tab) => (
+          <div className="analysis-title-actions analysis-title-actions-stacked">
+            {typeof onDuplicateModel === "function" ? (
               <button
-                key={tab.key}
                 type="button"
-                className={activeSection === tab.key ? "seg-button active" : "seg-button"}
-                onClick={() => setActiveSection(tab.key)}
+                className="primary-action-button analysis-duplicate-model-button"
+                onClick={onDuplicateModel}
+                disabled={duplicateModelLoading}
               >
-                {tab.label}
+                {duplicateModelLoading ? "Duplicating..." : "Duplicate model"}
               </button>
-            ))}
-          </div>
-          <div className="row" style={{ gap: 8 }}>
-            <div>
-              <label>Filter bars</label>
-              <input
-                type="text"
-                value={barFilter}
-                onChange={(e) => setBarFilter(e.target.value)}
-                placeholder="Type to filter labels"
-                style={{ width: 190 }}
-              />
-            </div>
-            <div>
-              <label>Top rows</label>
-              <select value={barLimit} onChange={(e) => setBarLimit(e.target.value)}>
-                <option value="10">Top 10</option>
-                <option value="15">Top 15</option>
-                <option value="20">Top 20</option>
-                <option value="30">Top 30</option>
-              </select>
+            ) : null}
+            {technicalDetailsPanel ? (
+              <DetailDialogButton
+                label="Technical details"
+                title="Technical details"
+                subtitle="Model run metadata"
+                className="secondary-action-button analysis-model-tool-button analysis-technical-details-button"
+                wide={true}
+              >
+                <div className="results-technical-details-stack">
+                  {technicalDetailsPanel}
+                  {selectedModelDetailsPanel ? (
+                    <section className="results-technical-detail-section" aria-labelledby="selected-model-record-title">
+                      <div className="results-kpi-group-label" id="selected-model-record-title">Selected model record</div>
+                      {selectedModelDetailsPanel}
+                    </section>
+                  ) : null}
+                  {runWarnings.length ? (
+                    <section className="results-technical-detail-section" aria-labelledby="execution-warning-title">
+                      <div className="results-kpi-group-label" id="execution-warning-title">Execution warnings</div>
+                      <ul className="results-technical-warning-list">
+                        {runWarnings.map((warning, index) => <li key={index}>{warning}</li>)}
+                      </ul>
+                    </section>
+                  ) : null}
+                </div>
+              </DetailDialogButton>
+            ) : null}
+            <div className="analysis-output-action-pair">
+              <details className="analysis-utility-menu analysis-download-menu">
+                <summary>
+                  <span>Downloads</span>
+                  <img
+                    className="analysis-download-chevron"
+                    src="./assets/icons/chevron-down.svg?v=stacked-actions-1"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                </summary>
+                <div className="analysis-export-links" aria-label="Result downloads">
+                  <a href={toApiUrl(result.artifacts.csv_url)} target="_blank" rel="noreferrer">Results CSV</a>
+                  {result.artifacts.summary_url ? (
+                    <a href={toApiUrl(result.artifacts.summary_url)} target="_blank" rel="noreferrer">Summary JSON</a>
+                  ) : null}
+                  {reportHref ? (
+                    <a href={reportHref} target="_blank" rel="noreferrer">Model report</a>
+                  ) : null}
+                  {exchangeBundleHref ? (
+                    <a href={exchangeBundleHref} target="_blank" rel="noreferrer">Exchange bundle ZIP</a>
+                  ) : null}
+                </div>
+              </details>
             </div>
           </div>
         </div>
-        {result.summary && result.summary.warnings && result.summary.warnings.length ? (
-          <details style={{ marginTop: 4 }}>
-            <summary style={{ cursor: "pointer", fontWeight: 700 }}>Run warnings ({result.summary.warnings.length})</summary>
-            <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-              {result.summary.warnings.map((w, i) => (
-                <li key={i} style={{ marginBottom: 4 }}>{w}</li>
-              ))}
-            </ul>
-          </details>
-        ) : null}
       </div>
 
-      <div className="analysis-section-body">
+      <nav className="analysis-filter-row results-section-tab-row" aria-label="Model result views">
+        <div className="segmented-control results-section-tabs" role="tablist" aria-label="Result sections">
+          {sectionTabs.map((tab, index) => (
+            <button
+              key={tab.key}
+              type="button"
+              id={`result-tab-${tab.key}`}
+              role="tab"
+              className={activeSection === tab.key ? "seg-button active" : "seg-button"}
+              aria-controls="result-tabpanel"
+              aria-selected={activeSection === tab.key}
+              tabIndex={activeSection === tab.key ? 0 : -1}
+              onClick={() => setActiveSection(tab.key)}
+              onKeyDown={(event) => handleTablistKeyDown(
+                event,
+                index,
+                sectionTabs.length,
+                (nextIndex) => setActiveSection(sectionTabs[nextIndex].key)
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      <div
+        className="analysis-section-body"
+        id="result-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`result-tab-${activeSection}`}
+        tabIndex={0}
+      >
         {activeSection === "overview" ? (
-          <div className="dashboard-stack">
+          <div className="dashboard-stack results-overview-widget-layout">
             <div className="workspace-map-grid">
-              <div className="dashboard-stack">
+              <div className="dashboard-stack results-map-widget-column">
+                <section className="card result-widget results-geographic-kpi-strip" aria-labelledby="geographic-results-title">
+                  <div className="results-geographic-kpi-heading">
+                    <h3 id="geographic-results-title">Key outcomes</h3>
+                  </div>
+                  <div className={includesDevelopment ? "results-geographic-kpi-groups" : "results-geographic-kpi-groups is-single"}>
+                    <div className="results-geographic-kpi-group">
+                      <div className="results-kpi-group-label">Final results</div>
+                      {countryResponsiveIntegratedMetrics.length ? (
+                        <div className="results-kpi-row">
+                          {countryResponsiveIntegratedMetrics.map((metric) => (
+                            <MetricCard
+                              key={`geographic-${String(metric.key)}`}
+                              label={`${String(metric.label)} (${String(metric.unit)})`}
+                              value={compact(toNumber(metric.value))}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="muted">Final results are not available for this model.</div>
+                      )}
+                    </div>
+                    {includesDevelopment ? (
+                      <div className="results-geographic-kpi-group">
+                        <div className="results-kpi-group-label">Development drivers</div>
+                        <div className="results-kpi-row">
+                          <MetricCard label="CAPEX effect (MUSD)" value={compact(displayedDevelopmentDrivers.capex_effect_musd)} />
+                          <MetricCard label="OPEX effect (MUSD)" value={compact(displayedDevelopmentDrivers.opex_effect_musd)} />
+                          <MetricCard label="Reliability penalty (MUSD)" value={compact(displayedDevelopmentDrivers.reliability_penalty_proxy)} />
+                          <MetricCard label="Total shock (MUSD)" value={compact(filteredLocationShockTotals.totalShockMusd)} />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                  {runSpatialTechLoading ? (
+                    <div className="muted results-geographic-kpi-status">
+                      Loading result detail...
+                    </div>
+                  ) : null}
+                  {runSpatialTechError ? (
+                    <div className="warn results-geographic-kpi-status">
+                      {runSpatialTechError}
+                    </div>
+                  ) : null}
+                </section>
                 <SpatialResultsMapPanel
                   mapData={locationMapData}
                   mapMetric={locationMapMetric}
@@ -5262,152 +6246,69 @@ function RunResultsPanel({
                   developmentByRegionRecords={developmentByRegion}
                   spatialFilter={spatialFilter}
                   setSpatialFilter={setSpatialFilter}
+                  mapViewport={mapViewportsByRun[mapViewportKey] || null}
+                  onMapViewportChange={(viewport) => {
+                    setMapViewportsByRun((previous) => {
+                      const current = previous[mapViewportKey];
+                      if (
+                        current &&
+                        current.extentSignature === viewport.extentSignature &&
+                        current.zoom === viewport.zoom &&
+                        Math.abs(current.latitude - viewport.latitude) < 0.000001 &&
+                        Math.abs(current.longitude - viewport.longitude) < 0.000001
+                      ) {
+                        return previous;
+                      }
+                      return { ...previous, [mapViewportKey]: viewport };
+                    });
+                  }}
                 />
-                {spatialFilter ? (
-                  <div className="card" style={{ marginTop: 0 }}>
-                    <div className="row" style={{ justifyContent: "space-between" }}>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        Spatial filter is active for mappable datasets: <code>{spatialFilter.label || spatialFilter.locationId || spatialFilter.region || "-"}</code>
-                      </div>
-                      <button
-                        type="button"
-                        style={{ background: "#22304c", fontSize: 12, padding: "6px 10px" }}
-                        onClick={() => setSpatialFilter && setSpatialFilter(null)}
-                      >
-                        Clear spatial filter
-                      </button>
-                    </div>
-                    {countryLevelSelectionActive ? (
-                      <div className="muted" style={{ marginTop: 8, fontSize: 11 }}>
-                        Country/subregion selection applies strict unit alignment. Region/pool-only series stay at their native resolution.
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
 
-              <div className="workspace-side-stack">
-                <div className="card">
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                    <h3 style={{ marginTop: 0, fontSize: 15, marginBottom: 0 }}>Global final results</h3>
-                    <span className="muted" style={{ fontSize: 11 }}>Run-wide</span>
+              <div className="workspace-side-stack results-overview-side">
+                <aside className="card result-widget results-run-wide-panel" aria-labelledby="run-wide-results-title">
+                  <div className="results-run-wide-heading">
+                    <h3 id="run-wide-results-title">Overall results</h3>
                   </div>
-                  {displayIntegratedMetrics.length ? (
-                    <div className="row" style={{ gap: 12 }}>
-                      {displayIntegratedMetrics.map((m) => (
-                        <MetricCard
-                          key={String(m.key)}
-                          label={`${String(m.label)} (${String(m.unit)})`}
-                          value={compact(toNumber(m.value))}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="muted">Integrated metrics not available for this run.</div>
-                  )}
-                  <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-                    These values are global outputs for the full model run and do not change with map selection.
-                  </div>
-                </div>
-
-                <div
-                  className="card"
-                  style={{
-                    border: "1px solid #38527e",
-                    background: "linear-gradient(180deg, rgba(19,33,54,0.96) 0%, rgba(11,22,37,0.96) 100%)",
-                  }}
-                >
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                    <h3 style={{ marginTop: 0, fontSize: 15, marginBottom: 0 }}>{selectedResultsTitle}</h3>
-                    <span className="muted" style={{ fontSize: 11 }}>
-                      {spatialFilter ? "Map-filtered" : "Awaiting selection"}
-                    </span>
-                  </div>
-                  {spatialFilter && resolvedIntegratedMetrics.length ? (
-                    <div className="row" style={{ gap: 12 }}>
-                      {resolvedIntegratedMetrics.map((m) => (
-                        <MetricCard
-                          key={`selected-${String(m.key)}`}
-                          label={`${String(m.label)} (${String(m.unit)})`}
-                          value={compact(toNumber(m.value))}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="muted">Select a country, subcountry, or region on the map to view scoped final results.</div>
-                  )}
-                  <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-                    {selectedResultsScopeNote}
-                  </div>
-                  {spatialFilter && runSpatialTechLoading ? (
-                    <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-                      Loading location-level cost details from <code>results.csv</code>...
-                    </div>
-                  ) : null}
-                  {spatialFilter && runSpatialTechError ? (
-                    <div className="warn" style={{ marginTop: 8, marginBottom: 0 }}>
-                      {runSpatialTechError}
-                    </div>
-                  ) : null}
-                </div>
-
-	                {includesDevelopment ? (
-	                <div className="card">
-	                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-	                    <h3 style={{ marginTop: 0, fontSize: 15, marginBottom: 0 }}>Global development drivers</h3>
-	                    <span className="muted" style={{ fontSize: 11 }}>Run-wide</span>
-	                  </div>
-	                  <div className="row" style={{ gap: 10 }}>
-	                    <MetricCard label="CAPEX effect (MUSD)" value={compact(globalDevelopmentDrivers.capex_effect_musd)} />
-	                    <MetricCard label="OPEX effect (MUSD)" value={compact(globalDevelopmentDrivers.opex_effect_musd)} />
-	                    <MetricCard label="Reliability penalty (MUSD)" value={compact(globalDevelopmentDrivers.reliability_penalty_proxy)} />
-	                  </div>
-	                  <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-	                    Global development drivers are derived from the full run summary. Import leakage is reported with final results.
-	                  </div>
-	                </div>
-	                ) : null}
-
-                {includesDevelopment ? (
-                <div
-                  className="card"
-                  style={{
-                    border: "1px solid #38527e",
-                    background: "linear-gradient(180deg, rgba(19,33,54,0.96) 0%, rgba(11,22,37,0.96) 100%)",
-                  }}
-                >
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                    <h3 style={{ marginTop: 0, fontSize: 15, marginBottom: 0 }}>{selectedDriversTitle}</h3>
-                    <span className="muted" style={{ fontSize: 11 }}>
-                      {spatialFilter ? "Map-filtered" : "Awaiting selection"}
-                    </span>
-                  </div>
-	                  {spatialFilter ? (
-	                    <>
-	                      <div className="row" style={{ gap: 10 }}>
-	                        <MetricCard label="CAPEX effect (MUSD)" value={compact(displayedDevelopmentDrivers.capex_effect_musd)} />
-	                        <MetricCard label="OPEX effect (MUSD)" value={compact(displayedDevelopmentDrivers.opex_effect_musd)} />
-	                        <MetricCard label="Reliability penalty (MUSD)" value={compact(displayedDevelopmentDrivers.reliability_penalty_proxy)} />
-	                        <MetricCard label="Total shock (MUSD)" value={compact(filteredLocationShockTotals.totalShockMusd)} />
-	                      </div>
-                      <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-                        Spatial filter is active; values use the finest compatible resolution available for each metric.
+                  <div className="results-run-wide-section">
+                    <div className="results-kpi-group-label">Final results</div>
+                    {fixedIntegratedMetrics.length ? (
+                      <div className="results-kpi-row">
+                        {fixedIntegratedMetrics.map((metric) => (
+                          <MetricCard
+                            key={`run-wide-${String(metric.key)}`}
+                            label={`${String(metric.label)} (${String(metric.unit)})`}
+                            value={compact(toNumber(metric.value))}
+                          />
+                        ))}
                       </div>
-                    </>
-                  ) : (
-                    <div className="muted">Select a country, subcountry, or region on the map to compare scoped drivers against the global run.</div>
-                  )}
-                </div>
-                ) : null}
+                    ) : (
+                      <div className="muted">No overall integrated metrics were recorded for this model.</div>
+                    )}
+                  </div>
+                  {includesDevelopment && !fixedMetricsIncludeImportLeakage ? (
+                    <div className="results-run-wide-section">
+                      <div className="results-kpi-group-label">Development drivers</div>
+                      <div className="results-kpi-row">
+                        <MetricCard label="Import leakage (MUSD)" value={compact(globalDevelopmentDrivers.import_leakage_musd)} />
+                      </div>
+                    </div>
+                  ) : null}
+                </aside>
               </div>
             </div>
 
-            <div className="workspace-grid-2">
-              <RunDiagnosticsCard confidence={confidence} />
-              <ModelQualityCard modelQuality={modelQuality} confidence={confidence} />
-            </div>
-
-            {includesDevelopment ? <DevelopmentUncertaintyCard developmentUncertainty={developmentUncertainty} /> : null}
+            <details className="results-section-disclosure results-evidence-disclosure">
+              <summary>
+                <span>Confidence and diagnostics</span>
+                <small>Quality, uncertainty, and execution checks</small>
+              </summary>
+              <div className="results-support-widget-grid">
+                <RunDiagnosticsCard confidence={confidence} />
+                <ModelQualityCard modelQuality={modelQuality} confidence={confidence} />
+                {includesDevelopment ? <DevelopmentUncertaintyCard developmentUncertainty={developmentUncertainty} /> : null}
+              </div>
+            </details>
           </div>
         ) : null}
 
@@ -5420,13 +6321,13 @@ function RunResultsPanel({
                   records={filteredGenerationByTech}
                   labelKey="techs"
                   valueKey="value"
-                  emptyMessage="No generation records for this run."
-                  limit={rankedLimit}
-                  filterText={barFilter}
+                  controlsLabel="generation by technology"
+                  emptyMessage="No generation records for this model."
+                  normalizedFilter={spatialFilter}
                 />
                 {spatialFilter && runSpatialTechLoading ? (
                   <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-                    Preparing location-filtered generation from <code>results.csv</code>...
+                    Preparing generation data...
                   </div>
                 ) : null}
                 {spatialFilter && runSpatialTechError ? (
@@ -5440,23 +6341,29 @@ function RunResultsPanel({
               </div>
 
               <div className="card">
-                <h3 style={{ marginTop: 0, fontSize: 15 }}>Capacity (energy_cap)</h3>
+                <h3 style={{ marginTop: 0, fontSize: 15 }}>Installed capacity</h3>
                 <RankedBars
                   records={filteredCapacityByTech}
                   labelKey="techs"
                   valueKey="value"
-                  emptyMessage="No capacity records for this run."
-                  limit={rankedLimit}
-                  filterText={barFilter}
+                  controlsLabel="installed capacity"
+                  emptyMessage="No capacity records for this model."
+                  normalizedFilter={spatialFilter}
                 />
                 {spatialFilter && runSpatialTechLoading ? (
                   <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-                    Preparing location-filtered capacity from <code>results.csv</code>...
+                    Preparing capacity data...
                   </div>
                 ) : null}
               </div>
             </div>
 
+            <section className="results-section-disclosure results-section-static">
+              <div className="results-section-static-header">
+                <span>System diagnostics</span>
+                <small>Reliability, trade, emissions, balances, and cost components</small>
+              </div>
+              <div className="results-disclosure-stack">
             <div className="workspace-grid-2">
               <div className="card">
                 <h3 style={{ marginTop: 0, fontSize: 15 }}>Reliability snapshot</h3>
@@ -5478,9 +6385,9 @@ function RunResultsPanel({
                   records={filteredTradeNetRecords}
                   labelKey="pool"
                   valueKey="value"
+                  controlsLabel="inter-pool trade balance"
                   emptyMessage="No inter-pool transmission balance data."
-                  limit={rankedLimit}
-                  filterText={barFilter}
+                  normalizedFilter={countryLevelSelectionActive}
                 />
                 {countryLevelSelectionActive ? (
                   <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
@@ -5497,9 +6404,9 @@ function RunResultsPanel({
                   records={resolvedEmissionsByPool}
                   labelKey="pool"
                   valueKey="value"
-                  emptyMessage="No physical emissions records for this run."
-                  limit={rankedLimit}
-                  filterText={barFilter}
+                  controlsLabel="physical emissions by pool"
+                  emptyMessage="No physical emissions records for this model."
+                  normalizedFilter={countryLevelSelectionActive}
                 />
                 {countryLevelSelectionActive ? (
                   <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
@@ -5568,13 +6475,14 @@ function RunResultsPanel({
                     records={costByComponent}
                     labelKey="component"
                     valueKey="value"
-                    emptyMessage="No cost decomposition records for this run."
-                    limit={rankedLimit}
-                    filterText={barFilter}
+                    controlsLabel="cost decomposition"
+                    emptyMessage="No cost decomposition records for this model."
                   />
                 </div>
               </div>
             </div>
+              </div>
+            </section>
           </div>
         ) : null}
 
@@ -5584,9 +6492,6 @@ function RunResultsPanel({
               <div className="card">
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                   <h3 style={{ marginTop: 0, fontSize: 15, marginBottom: 0 }}>Development drivers</h3>
-                  <span className="muted" style={{ fontSize: 11 }}>
-                    {spatialFilter ? "Map-filtered when possible" : "Run-wide"}
-                  </span>
 	                </div>
 	                <div className="row" style={{ gap: 10 }}>
 	                  <MetricCard label="CAPEX effect (MUSD)" value={compact(displayedDevelopmentDrivers.capex_effect_musd)} />
@@ -5619,9 +6524,9 @@ function RunResultsPanel({
                   records={filteredDevelopmentByRegion}
                   labelKey="region"
                   valueKey={developmentMetric}
-                  limit={rankedLimit}
-                  filterText={barFilter}
-                  emptyMessage="No development-by-region records for this run."
+                  controlsLabel="development impacts by region"
+                  emptyMessage="No development-by-region records for this model."
+                  normalizedFilter={countryLevelSelectionActive}
                 />
                 <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
                   Value shown: {developmentMetricLabel}
@@ -5639,9 +6544,9 @@ function RunResultsPanel({
                   records={filteredDevelopmentBySector}
                   labelKey="supplier_sector"
                   valueKey={developmentMetric}
-                  limit={rankedLimit}
-                  filterText={barFilter}
-                  emptyMessage="No development-by-sector records for this run."
+                  controlsLabel="development impacts by supplier sector"
+                  emptyMessage="No development-by-sector records for this model."
+                  normalizedFilter={countryLevelSelectionActive}
                 />
                 <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
                   Value shown: {developmentMetricLabel}
@@ -5654,10 +6559,22 @@ function RunResultsPanel({
               </div>
             </div>
 
-            <div className="workspace-grid-2">
-              <ScenarioAssumptionsCard scenarioAssumptions={scenarioAssumptions} confidence={confidence} />
-              <DevelopmentIndicatorsCard developmentIndicators={developmentIndicators} confidence={confidence} />
-            </div>
+            <section className="results-section-disclosure results-section-static">
+              <div className="results-section-static-header">
+                <span>Assumptions and indicator coverage</span>
+                <small>Scenario assumptions and development data availability</small>
+              </div>
+              <div className="workspace-grid-2">
+                <ScenarioAssumptionsCard scenarioAssumptions={scenarioAssumptions} confidence={confidence} />
+                <DevelopmentIndicatorsCard developmentIndicators={developmentIndicators} confidence={confidence} />
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {!includesDevelopment && activeSection === "development" ? (
+          <div className="card compact-placeholder-card">
+            No detailed development outputs are available for this energy-only run.
           </div>
         ) : null}
 
@@ -5703,98 +6620,6 @@ function RunResultsPanel({
   );
 }
 
-function RecentJobsPanel({ jobs, selectedJobId, onSelectJob, style = null, limit = 12 }) {
-  return (
-    <div className="card" style={{ marginTop: 14, ...(style || {}) }}>
-      <h3 style={{ marginTop: 0, fontSize: 16 }}>Recent runs</h3>
-      {!jobs.length ? (
-        <div className="muted">No runs yet.</div>
-      ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table className="panel-table">
-            <thead>
-              <tr>
-                <th>Model</th>
-                <th>Status</th>
-                <th>Progress</th>
-                <th>Energy scenario</th>
-                <th>Target year</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.slice(0, limit).map((j) => {
-                const id = runExecutionId(j);
-                return (
-                <tr
-                  key={id || j.run_id}
-                  className={selectedJobId && id === selectedJobId ? "row-selected" : ""}
-                  onClick={() => onSelectJob(j)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <td>{runLabel(j)}</td>
-                  <td><StatusBadge status={j.status} /></td>
-                  <td>{Math.round(toNumber(j.progress) * 100)}%</td>
-                  <td>{(j.request && j.request.energy_scenario_key) || "-"}</td>
-                  <td>{(j.request && j.request.target_year) || "-"}</td>
-                  <td>{new Date(j.created_at).toLocaleString()}</td>
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AnalysisCanvasInfoModal({ onClose }) {
-  return (
-    <Modal title="Analysis canvas" subtitle="Mission control guide" onClose={onClose} wide={true}>
-      <div className="dashboard-stack">
-        <div className="muted" style={{ fontSize: 13 }}>
-          The analysis canvas is the center results workspace. It stays separate from the scenario command area and the
-          model run management pane so users can configure, run, monitor, and interpret without scrolling through a
-          single long page.
-        </div>
-        <div className="workspace-grid-3">
-          <div className="dashboard-note">
-            <div style={{ fontWeight: 700, fontSize: 13 }}>1. Configure</div>
-            <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-              Use the scenario definition rail to select the energy pathway, MRIO report scenario, target year, and
-              levers, then review readiness diagnostics and placeholder inventory.
-            </div>
-          </div>
-          <div className="dashboard-note">
-            <div style={{ fontWeight: 700, fontSize: 13 }}>2. Queue and monitor</div>
-            <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-              Environment setup stays collapsed by default. Open details only when you need to diagnose readiness,
-              queue, solver, mapping, placeholder, or data issues.
-            </div>
-          </div>
-          <div className="dashboard-note">
-            <div style={{ fontWeight: 700, fontSize: 13 }}>3. Interrogate outputs</div>
-            <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-              After a run completes, the center workspace exposes overview, energy system, development, and method
-              tabs with map-based filtering where metric resolution allows it.
-            </div>
-          </div>
-        </div>
-        <div className="card" style={{ marginTop: 0 }}>
-          <h3 style={{ marginTop: 0, fontSize: 15 }}>What appears in the center workspace</h3>
-          <div style={{ display: "grid", gap: 6 }}>
-            <div className="dashboard-note">Overview: map-first results, global vs selected metrics, uncertainty, and model quality.</div>
-            <div className="dashboard-note">Energy system: generation, capacity, reliability, trade balance, emissions, and system structure.</div>
-            <div className="dashboard-note">Development: region/sector impacts, uncertainty, scenario assumptions, and indicator outputs.</div>
-            <div className="dashboard-note">Method: metric resolution, coupling diagnostics, source-channel comparison, and quality context.</div>
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 function BackendTargetSwitch({
   apiTarget,
   compatibility,
@@ -5827,26 +6652,26 @@ function BackendTargetSwitch({
               checked={backendMode}
               onChange={(event) => onApiTargetModeChange(event.target.checked ? "backend" : "local")}
               disabled={disabled || (!backendConfigured && !backendMode)}
-              aria-label="Switch between local and hosted backend runtime"
+              aria-label="Switch between local and remote runtime"
             />
             <span className="runtime-toggle-track" aria-hidden="true">
               <span className="runtime-toggle-thumb" />
             </span>
           </span>
-          <span className={`runtime-switch-label ${backendMode ? "is-active" : ""}`}>Backend</span>
+          <span className={`runtime-switch-label ${backendMode ? "is-active" : ""}`}>Remote</span>
         </label>
         <span className="runtime-info-slot">
           <button
             type="button"
             className={`runtime-info-button ${contractStatus || (backendConfigured ? "idle" : "warning")}`}
-            aria-label="Runtime backend details"
+            aria-label="Runtime connection details"
           >
             i
           </button>
           <span className="runtime-info-panel">
-            <span><b>Active:</b> {backendMode ? "Backend" : "Local"}</span>
-            <span><b>API:</b> {backendMode && backendConfigured ? (backendBase || "configured backend") : (apiBase || "current origin")}</span>
-            <span><b>Backend env:</b> {backendConfigured ? "Set" : "Not set"}</span>
+            <span><b>Active:</b> {backendMode ? "Remote" : "Local"}</span>
+            <span><b>API:</b> {backendMode && backendConfigured ? (backendBase || "configured remote") : (apiBase || "current origin")}</span>
+            <span><b>Remote API:</b> {backendConfigured ? "Configured" : "Not configured"}</span>
             <span><b>Contract:</b> {contractLabel}</span>
           </span>
         </span>
@@ -5886,45 +6711,28 @@ function ProductBrand({ onClick = null }) {
 }
 
 function UnifiedHeader({
-  runViewMode,
   currentUserId,
   availableUsers,
   onUserChange,
-  projects,
-  activeProjectId,
-  onReturnToProjects,
   apiTarget,
   systemCompatibility,
   onApiTargetModeChange,
   apiTargetLoading,
   onReturnToLanding,
 }) {
-  const activeProject = (projects || []).find((project) => project.project_id === activeProjectId) || null;
-  const inProjectWorkspace = runViewMode !== "projects" && activeProject;
-  const projectTitle = runViewMode
-    ? (inProjectWorkspace ? activeProject.title || "Untitled project" : "Projects overview")
-    : "";
+  const activeUser = (availableUsers || []).find((user) => user.user_id === currentUserId) || null;
+  const activeUserLabel = (activeUser && (activeUser.display_name || activeUser.user_id)) || currentUserId || "User";
+  const handleUserSelect = (event) => {
+    const userId = event.target.value;
+    const menu = event.currentTarget.closest("details");
+    if (menu) menu.removeAttribute("open");
+    onUserChange(userId);
+  };
   return (
     <header className="edim-topbar">
       <ProductBrand onClick={onReturnToLanding} />
 
-      {projectTitle ? (
-        <div className={`header-project-area ${inProjectWorkspace ? "in-project" : ""}`}>
-          {inProjectWorkspace ? (
-            <>
-              <div className="header-project-title">{projectTitle}</div>
-              <button type="button" className="header-back-button" onClick={onReturnToProjects}>
-                <span aria-hidden="true">↩</span>
-                <span>Back to projects</span>
-              </button>
-            </>
-          ) : (
-            <div className="header-project-title">{projectTitle}</div>
-          )}
-        </div>
-      ) : (
-        <div className="header-project-area" aria-hidden="true" />
-      )}
+      <div className="header-project-area" aria-hidden="true" />
 
       <div className="header-right-controls">
         <BackendTargetSwitch
@@ -5933,16 +6741,27 @@ function UnifiedHeader({
           onApiTargetModeChange={onApiTargetModeChange}
           disabled={apiTargetLoading}
         />
-        <label className="header-user-select">
-          <span>User</span>
-          <select value={currentUserId || ""} onChange={(e) => onUserChange(e.target.value)} disabled={apiTargetLoading}>
-            {(availableUsers || []).map((user) => (
-              <option key={user.user_id} value={user.user_id}>
-                {user.display_name || user.user_id}
-              </option>
-            ))}
-          </select>
-        </label>
+        <details className="header-user-menu">
+          <summary role="button" aria-label={`User menu for ${activeUserLabel}`} title={activeUserLabel}>
+            <img src="./assets/icons/user-round.svg" alt="" aria-hidden="true" />
+          </summary>
+          <div className="header-user-menu-body">
+            <div className="header-user-heading">
+              <b>{activeUserLabel}</b>
+              <span>{(activeUser && (activeUser.organization || activeUser.email)) || "Active user"}</span>
+            </div>
+            <label className="header-user-select">
+              <span>Switch user</span>
+              <select value={currentUserId || ""} onChange={handleUserSelect} disabled={apiTargetLoading}>
+                {(availableUsers || []).map((user) => (
+                  <option key={user.user_id} value={user.user_id}>
+                    {user.display_name || user.user_id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </details>
       </div>
     </header>
   );
@@ -6129,8 +6948,8 @@ function LandingPage({
               <div className="landing-video-placeholder">
                 <div className="landing-video-play" aria-hidden="true">▶</div>
                 <div>
-                  <div className="landing-video-title">Platform overview video</div>
-                  <div className="landing-video-copy">Set <code>EDIM_LANDING_VIDEO_SRC</code> to replace this preview with a hosted or local video asset.</div>
+                  <div className="landing-video-title">Integrated modeling workflow</div>
+                  <div className="landing-video-copy">Configure scenarios, connect model stages, and turn results into traceable evidence for policy and investment decisions.</div>
                 </div>
               </div>
             )}
@@ -6167,97 +6986,6 @@ function LandingPage({
         <div>Energy Development Modeling</div>
         <div>Decision support for sustainable energy transitions.</div>
       </footer>
-    </div>
-  );
-}
-
-function EmptyAnalysisWorkspace({
-  selectedScenario,
-  scenarioKey,
-  environmentSetup,
-  activeJob,
-  hasResult,
-}) {
-  return (
-    <div className="dashboard-empty">
-      <div className="dashboard-empty-hero">
-        <div className="card">
-          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "#8ea4c5" }}>
-            Run results workspace
-          </div>
-          <h2 style={{ marginTop: 8, marginBottom: 8, fontSize: 22 }}>
-            {hasResult ? "Select a run to inspect results." : "Run a scenario to populate the dashboard."}
-          </h2>
-          <div className="muted" style={{ fontSize: 13, maxWidth: 720 }}>
-            This workspace is designed around one loop: choose a scenario, validate readiness, queue a run, then inspect
-            global and spatial outputs in the center canvas while keeping run management visible.
-          </div>
-          <div className="workspace-grid-3" style={{ marginTop: 12 }}>
-            <div className="dashboard-note">
-              <div style={{ fontWeight: 700, fontSize: 13 }}>1. Configure</div>
-              <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                Use the command rail to select the scenario family, tune the levers, and choose the run profile.
-              </div>
-            </div>
-            <div className="dashboard-note">
-              <div style={{ fontWeight: 700, fontSize: 13 }}>2. Validate and run</div>
-              <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                Environment checks tell you whether the data and coupling path are clean enough for the requested run.
-              </div>
-            </div>
-            <div className="dashboard-note">
-              <div style={{ fontWeight: 700, fontSize: 13 }}>3. Interrogate outputs</div>
-              <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                Once a run completes, the canvas switches to a tabbed dashboard for overview, system, development, and method analysis.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="dashboard-stack">
-          <div className="card">
-            <h3 style={{ marginTop: 0, fontSize: 15 }}>Current session</h3>
-            <div className="row" style={{ gap: 10 }}>
-              <MetricCard
-                label="Scenario"
-                value={selectedScenario && selectedScenario.title ? selectedScenario.title : scenarioKey || "None"}
-              />
-              <MetricCard
-                label="Environment"
-                value={environmentSetup ? (environmentSetup.ok ? "Ready" : "Needs action") : "Checking"}
-              />
-              <MetricCard
-                label="Active run"
-                value={activeJob ? displayStatus(activeJob.status).label : "Idle"}
-              />
-            </div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-              The app stays in a dashboard shell even before the first run, so you can assess readiness without scrolling through setup and results panels.
-            </div>
-          </div>
-          <div className="card">
-            <h3 style={{ marginTop: 0, fontSize: 15 }}>What will appear here</h3>
-            <div className="muted" style={{ fontSize: 12 }}>
-              After a successful run, this center panel becomes a fixed analysis workspace with:
-            </div>
-            <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
-              <div className="dashboard-note">Overview: map-first results, global vs selected metrics, uncertainty, and model quality.</div>
-              <div className="dashboard-note">Energy system: generation, capacity, reliability, trade balance, emissions, and system structure.</div>
-              <div className="dashboard-note">Development: region/sector impacts, uncertainty, scenario assumptions, and indicator outputs.</div>
-              <div className="dashboard-note">Method: metric resolution, coupling diagnostics, source channels, and quality context.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <h3 style={{ marginTop: 0, fontSize: 15 }}>Architecture and model flow</h3>
-	        <div className="muted" style={{ fontSize: 12 }}>
-	          The model structure and data-flow reference now lives in the Architecture tab with the interactive system
-	          diagram, including separate user/scenario input streams, the unified adapter layer, Energy Model static inputs,
-	          MRIO input datasets, and direct Energy-Model-to-results flow.
-	        </div>
-      </div>
     </div>
   );
 }
@@ -6375,8 +7103,138 @@ function flowEdgePath(from, to, sourceSide, targetSide, sourceOffset = 0, target
   return `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}`;
 }
 
-function FlowEdgeLayer({ positions, edges, canvas }) {
+function groupDataWireRows(rows) {
+  const grouped = new Map();
+  (rows || []).forEach((row) => {
+    const groupKey = String(row.dataGroup || "").trim() || `single:${row.id}`;
+    if (!grouped.has(groupKey)) {
+      grouped.set(groupKey, {
+        ...row,
+        id: groupKey.startsWith("single:") ? row.id : groupKey,
+        label: row.dataGroupLabel || row.label,
+        variantLabels: [],
+        variantIds: [],
+      });
+    }
+    const target = grouped.get(groupKey);
+    const variantLabel = row.variantLabel || row.label || row.id;
+    if (variantLabel && !target.variantLabels.includes(variantLabel)) target.variantLabels.push(variantLabel);
+    if (row.id && !target.variantIds.includes(row.id)) target.variantIds.push(row.id);
+  });
+  return Array.from(grouped.values()).map((row) => ({
+    ...row,
+    variantCount: row.variantLabels.length,
+    variantSummary: row.variantLabels.join(", "),
+  }));
+}
+
+function buildVisualWireRows(edges, mode, context = {}) {
+  const sourceEdges = Array.isArray(edges) && edges.length ? edges : DEFAULT_FLOW_EDGES;
+  const expandRows = (rows, dataOnly) => rows.flatMap((row) => {
+    const layers = Array.isArray(row.layers) && row.layers.length
+      ? row.layers
+      : [{ id: row.id, label: row.label, type: row.type, activeWhen: row.activeWhen, informationLayer: row.informationLayer, purpose: row.purpose, granularity: row.granularity, parentId: row.id, parentLabel: row.label }];
+    return layers
+      .filter((layer) => {
+        const typeMatches = !dataOnly || DATA_IO_WIRE_TYPES.has(normalizeIoWireType(layer.type || row.type));
+        const activeMatches = !dataOnly || activeWhenMatches(layer.activeWhen || row.activeWhen, context);
+        return typeMatches && activeMatches;
+      })
+      .map((layer) => ({
+        ...layer,
+        id: `${row.id}:${layer.id || layer.label}`,
+        label: layer.label || row.label,
+        type: normalizeIoWireType(layer.type || row.type),
+        activeWhen: layer.activeWhen || row.activeWhen,
+        informationLayer: layer.informationLayer || row.informationLayer || "",
+        purpose: layer.purpose || row.purpose || "",
+        granularity: layer.granularity || row.granularity || "",
+        dataGroup: layer.dataGroup || row.dataGroup || "",
+        dataGroupLabel: layer.dataGroupLabel || row.dataGroupLabel || "",
+        variantLabel: layer.variantLabel || row.variantLabel || "",
+        parentId: layer.parentId || row.id,
+        parentLabel: layer.parentLabel || row.label,
+      }));
+  });
+  return sourceEdges.flatMap((edge, edgeIndex) => {
+    const rawIoRows = Array.isArray(edge.io) && edge.io.length ? edge.io : [];
+    const dataRows = rawIoRows.filter((row) => DATA_IO_WIRE_TYPES.has(normalizeIoWireType(row && row.type)));
+    const ioRows = mode === "layers"
+      ? groupDataWireRows(expandRows(dataRows, true))
+      : mode === "data" && rawIoRows.length
+        ? rawIoRows
+        : [{ id: "aggregate", label: edge.label || "aggregate flow", type: "aggregate" }];
+    return ioRows.map((wire, wireIndex) => {
+      const sourceType = normalizeIoWireType(wire.type);
+      const informationLayer = ioInformationLayer(sourceType, wire.informationLayer);
+      return {
+        from: edge.from,
+        to: edge.to,
+        edgeLabel: edge.label || "",
+        edgeKey: `${edge.from}-${edge.to}-${edgeIndex}`,
+        wireKey: `${edge.from}-${edge.to}-${edgeIndex}-${wire.id || wireIndex}`,
+        wireLabel: wire.label || wire.id || edge.label || "I/O",
+        wireId: wire.id || `io-${wireIndex + 1}`,
+        wireType: mode === "layers" ? ioWireDataGroup(sourceType) : mode === "data" ? informationLayer : "aggregate",
+        sourceWireType: sourceType,
+        informationLayer,
+        purpose: wire.purpose || "",
+        granularity: wire.granularity || "",
+        activeWhenLabel: activeWhenLabel(wire.activeWhen),
+        parentId: wire.parentId || "",
+        parentLabel: wire.parentLabel || "",
+        variantCount: Number(wire.variantCount || 0),
+        variantSummary: wire.variantSummary || "",
+        wireIndex,
+        wireCount: ioRows.length,
+      };
+    });
+  });
+}
+
+function IoWireLegend({ edges, mode, context }) {
+  const rows = buildVisualWireRows(edges, mode, context);
+    const counts = rows.reduce((acc, row) => {
+    const type = row.wireType || "aggregate";
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
+  const types = Object.keys(counts).sort((a, b) => {
+    const order = mode === "layers" ? DATA_WIRE_GROUP_ORDER : INFORMATION_LAYER_ORDER;
+    const ai = order.indexOf(a);
+    const bi = order.indexOf(b);
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return ioWireStyle(a).label.localeCompare(ioWireStyle(b).label);
+  });
+  if (!types.length) return null;
+  return (
+    <div className="flow-io-legend" aria-label="I/O wire color legend">
+      {types.map((type) => {
+        const style = ioWireStyle(type);
+        return (
+          <span key={type} className="flow-io-legend-item">
+            <span className="flow-io-legend-swatch" style={{ backgroundColor: style.color }} />
+            <span>{style.label}</span>
+            {mode !== "single" ? <span className="flow-io-legend-count">{counts[type]}</span> : null}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function FlowEdgeLayer({ positions, edges, canvas, mode = "single", context, onWireHover, onWireLeave }) {
   const canvasSize = canvas || DEFAULT_FLOW_CANVAS_SIZE;
+  const edgeRows = Array.isArray(edges) && edges.length ? edges : DEFAULT_FLOW_EDGES;
+  const visualRows = buildVisualWireRows(edgeRows, mode, context).filter((row) => positions[row.from] && positions[row.to]);
+  const markerTypes = Array.from(new Set(visualRows.map((row) => row.wireType || "aggregate")));
+  const renderedBundleLabels = new Set();
+  const detailedMode = mode !== "single";
+  const expandedWireMode = mode === "layers";
+  const informationMode = mode === "data";
+  const wireSpacing = expandedWireMode ? 5 : informationMode ? 10 : 28;
   return (
     <svg
       className="flow-edge-layer"
@@ -6389,34 +7247,93 @@ function FlowEdgeLayer({ positions, edges, canvas }) {
         <marker id="flow-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
           <path d="M 0 0 L 12 6 L 0 12 z" fill="#67e8f9" opacity="0.82" />
         </marker>
+        {markerTypes.map((type) => {
+          const style = ioWireStyle(type);
+          return (
+            <marker key={type} id={`flow-arrow-${type}`} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+              <path d="M 0 0 L 8 4 L 0 8 z" fill={style.color} opacity={detailedMode ? "0.74" : "0.9"} />
+            </marker>
+          );
+        })}
       </defs>
-      {(edges || DEFAULT_FLOW_EDGES).map((edge) => {
-        const edgeRows = edges || DEFAULT_FLOW_EDGES;
-        const from = positions[edge.from];
-        const to = positions[edge.to];
+      {visualRows.map((row) => {
+        const from = positions[row.from];
+        const to = positions[row.to];
         if (!from || !to) return null;
         const sourceSide = flowSideFor(from, to);
         const targetSide = flowSideFor(to, from);
-        const outgoing = edgeRows.filter((row) => {
-          const rowFrom = positions[row.from];
-          const rowTo = positions[row.to];
-          return row.from === edge.from && rowFrom && rowTo && flowSideFor(rowFrom, rowTo) === sourceSide;
+        const outgoing = visualRows.filter((candidate) => {
+          const rowFrom = positions[candidate.from];
+          const rowTo = positions[candidate.to];
+          return candidate.from === row.from && rowFrom && rowTo && flowSideFor(rowFrom, rowTo) === sourceSide;
         });
-        const incoming = edgeRows.filter((row) => {
-          const rowFrom = positions[row.from];
-          const rowTo = positions[row.to];
-          return row.to === edge.to && rowFrom && rowTo && flowSideFor(rowTo, rowFrom) === targetSide;
+        const incoming = visualRows.filter((candidate) => {
+          const rowFrom = positions[candidate.from];
+          const rowTo = positions[candidate.to];
+          return candidate.to === row.to && rowFrom && rowTo && flowSideFor(rowTo, rowFrom) === targetSide;
         });
-        const sourceOffset = flowSlotOffset(outgoing.indexOf(edge), outgoing.length);
-        const targetOffset = flowSlotOffset(incoming.indexOf(edge), incoming.length);
+        const sourceOffset = flowSlotOffset(outgoing.indexOf(row), outgoing.length, wireSpacing);
+        const targetOffset = flowSlotOffset(incoming.indexOf(row), incoming.length, wireSpacing);
         const start = flowAnchor(from, sourceSide, sourceOffset);
         const end = flowAnchor(to, targetSide, targetOffset);
         const labelX = (start.x + end.x) / 2;
         const labelY = (start.y + end.y) / 2 - 8;
+        const style = ioWireStyle(row.wireType);
+        const sourceStyle = ioWireSourceStyle(row.sourceWireType);
+        const showSingleLabel = mode === "single";
+        const showBundleLabel = mode !== "single" && !renderedBundleLabels.has(row.edgeKey);
+        if (showBundleLabel) renderedBundleLabels.add(row.edgeKey);
+        const tooltip = {
+          id: row.wireId,
+          label: row.wireLabel,
+          type: row.wireType,
+          typeLabel: style.label,
+          sourceTypeLabel: sourceStyle.label,
+          edgeLabel: row.edgeLabel,
+          purpose: row.purpose,
+          granularity: row.granularity,
+          activeWhenLabel: row.activeWhenLabel,
+          parentLabel: row.parentLabel,
+          variantCount: row.variantCount,
+          variantSummary: row.variantSummary,
+          from: row.from,
+          to: row.to,
+          mode,
+        };
         return (
-          <g key={`${edge.from}-${edge.to}`}>
-            <path className="flow-edge" d={flowEdgePath(from, to, sourceSide, targetSide, sourceOffset, targetOffset)} markerEnd="url(#flow-arrow)" />
-            <text className="flow-edge-label" x={labelX} y={labelY}>{edge.label}</text>
+          <g key={row.wireKey} className={`flow-wire flow-wire-${row.wireType}`}>
+            <path
+              className="flow-edge-hover-target"
+              d={flowEdgePath(from, to, sourceSide, targetSide, sourceOffset, targetOffset)}
+              style={{ strokeWidth: expandedWireMode ? 4 : 7 }}
+              onPointerMove={(event) => {
+                if (typeof onWireHover === "function") {
+                  onWireHover(tooltip, event);
+                }
+              }}
+              onPointerLeave={() => {
+                if (typeof onWireLeave === "function") onWireLeave();
+              }}
+            />
+            <path
+              className={`flow-edge ${detailedMode ? "flow-edge-io" : "flow-edge-single"}`}
+              d={flowEdgePath(from, to, sourceSide, targetSide, sourceOffset, targetOffset)}
+              markerEnd={`url(#flow-arrow-${row.wireType})`}
+              style={{
+                stroke: style.color,
+                strokeWidth: expandedWireMode ? 0.9 : informationMode ? 1.7 : 2.4,
+                opacity: expandedWireMode ? 0.64 : informationMode ? 0.76 : 0.78,
+                strokeLinecap: "round",
+              }}
+            />
+            {showSingleLabel ? (
+              <text className="flow-edge-label" x={labelX} y={labelY}>{row.edgeLabel}</text>
+            ) : null}
+            {showBundleLabel ? (
+              <text className="flow-edge-label flow-edge-bundle-label" x={(from.x + from.w / 2 + to.x + to.w / 2) / 2} y={(from.y + from.h / 2 + to.y + to.h / 2) / 2 - 12}>
+                {row.edgeLabel} · {row.wireCount} {mode === "data" ? "info" : mode === "layers" ? "layers" : "I/O"}
+              </text>
+            ) : null}
           </g>
         );
       })}
@@ -6523,7 +7440,9 @@ function FlowNode({
   children,
 }) {
   const nodeRef = useRef(null);
-  const nodeStyle = { left: rect.x, top: rect.y, width: rect.w };
+  const baseWidth = Number(rect.w) || 320;
+  const expandedWidth = baseWidth + Math.min(120, Math.max(48, Math.round(baseWidth * 0.16)));
+  const nodeStyle = { left: rect.x, top: rect.y, width: expanded ? expandedWidth : baseWidth };
   if (!fixed) nodeStyle.minHeight = expanded ? rect.h : 0;
 
   useEffect(() => {
@@ -6547,7 +7466,7 @@ function FlowNode({
   const collapsedSummary = (
     <div className="flow-node-summary">
       <div>{box.subtitle}</div>
-      <div className="flow-node-hint">{fixed ? "Fixed run-definition band." : "Expand for controls and data."}</div>
+      <div className="flow-node-hint">{fixed ? "Fixed model-definition band." : "Expand for controls and data."}</div>
     </div>
   );
   return (
@@ -6574,6 +7493,14 @@ function FlowNode({
         </div>
       </div>
       <div className="flow-node-body">{expanded ? children : collapsedSummary}</div>
+      {!fixed ? (
+        <div
+          className="flow-node-drag-footer"
+          onPointerDown={onPointerDown}
+          title={`Drag to move ${box.title}`}
+          aria-hidden="true"
+        />
+      ) : null}
       {status.state === "pending" ? <div className="flow-node-overlay">Pending</div> : null}
     </section>
   );
@@ -6592,15 +7519,28 @@ function FlowModelCanvas({
   lockReason = "",
   onUploadDataset,
   onDatasetVersionChange,
-  statusMessage,
+  scenarioKey = "",
+  scenarioSelections = {},
 }) {
-  const initialFlow = normalizeFlowDefinition(architecture && architecture.graph);
+  const initialFlow = centerExpandedFlowNode(
+    normalizeFlowDefinition(architecture && architecture.graph),
+    "scenario"
+  );
   const [flowDefinition, setFlowDefinition] = useState(() => initialFlow);
   const [positions, setPositions] = useState(() => initialFlow.nodes);
   const [measuredNodes, setMeasuredNodes] = useState({});
   const [expandedNodes, setExpandedNodes] = useState({ scenario: true });
   const [draggingId, setDraggingId] = useState("");
+  const [canvasPanning, setCanvasPanning] = useState(false);
+  const [ioWireMode, setIoWireMode] = useState("single");
+  const [wireTooltip, setWireTooltip] = useState(null);
   const dragRef = useRef(null);
+  const panRef = useRef(null);
+  const viewportRef = useRef(null);
+  const wireContext = useMemo(
+    () => buildScenarioWireContext(scenarioKey, scenarioSelections),
+    [scenarioKey, scenarioSelections]
+  );
   const includesDevelopment = architectureIncludesDevelopment(architecture);
   const outputArtifacts = architectureOutputArtifacts(architecture);
   const fixedNodeSet = useMemo(() => new Set(flowDefinition.fixedNodes || []), [flowDefinition.fixedNodes]);
@@ -6620,7 +7560,6 @@ function FlowModelCanvas({
   }, [orderedNodeIds, positions, measuredNodes]);
   const dynamicCanvas = useMemo(() => {
     const baseCanvas = flowDefinition.canvas || DEFAULT_FLOW_CANVAS_SIZE;
-    const padding = 96;
     let width = Number(baseCanvas.width) || DEFAULT_FLOW_CANVAS_SIZE.width;
     let height = Number(baseCanvas.height) || DEFAULT_FLOW_CANVAS_SIZE.height;
     orderedNodeIds.forEach((id) => {
@@ -6629,8 +7568,8 @@ function FlowModelCanvas({
       const measured = measuredNodes[id] || {};
       const nodeWidth = Number(measured.w || rect.w || 0);
       const nodeHeight = Number(measured.h || rect.h || 0);
-      if (Number.isFinite(nodeWidth)) width = Math.max(width, rect.x + nodeWidth + padding);
-      if (Number.isFinite(nodeHeight)) height = Math.max(height, rect.y + nodeHeight + padding);
+      if (Number.isFinite(nodeWidth)) width = Math.max(width, rect.x + nodeWidth + FLOW_CANVAS_NODE_PADDING);
+      if (Number.isFinite(nodeHeight)) height = Math.max(height, rect.y + nodeHeight + FLOW_CANVAS_NODE_PADDING);
     });
     return {
       width: Math.ceil(width),
@@ -6639,11 +7578,23 @@ function FlowModelCanvas({
   }, [flowDefinition.canvas, measuredNodes, orderedNodeIds, positions]);
 
   useEffect(() => {
-    const nextDefinition = normalizeFlowDefinition(architecture && architecture.graph);
+    const nextDefinition = centerExpandedFlowNode(
+      normalizeFlowDefinition(architecture && architecture.graph),
+      "scenario"
+    );
     setFlowDefinition(nextDefinition);
     setPositions(nextDefinition.nodes);
     setMeasuredNodes({});
     setExpandedNodes({ scenario: true });
+  }, [architecture && architecture.id]);
+
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      viewport.scrollLeft = Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2);
+    });
+    return () => window.cancelAnimationFrame(frameId);
   }, [architecture && architecture.id]);
 
   function toggleNode(id) {
@@ -6696,6 +7647,68 @@ function FlowModelCanvas({
     }
     dragRef.current = null;
     setDraggingId("");
+  }
+
+  function startCanvasPan(event) {
+    if (event.button !== 0) return;
+    if (
+      event.target &&
+      event.target.closest &&
+      event.target.closest(".flow-node, button, input, select, textarea, a, label, .flow-edge-hover-target")
+    ) {
+      return;
+    }
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    viewport.setPointerCapture(event.pointerId);
+    panRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: viewport.scrollLeft,
+      scrollTop: viewport.scrollTop,
+    };
+    setCanvasPanning(true);
+    event.preventDefault();
+  }
+
+  function moveCanvasPan(event) {
+    const pan = panRef.current;
+    const viewport = viewportRef.current;
+    if (!pan || !viewport || pan.pointerId !== event.pointerId) return;
+    viewport.scrollLeft = pan.scrollLeft - (event.clientX - pan.startX);
+    viewport.scrollTop = pan.scrollTop - (event.clientY - pan.startY);
+  }
+
+  function endCanvasPan(event) {
+    const pan = panRef.current;
+    const viewport = viewportRef.current;
+    if (
+      pan &&
+      viewport &&
+      viewport.hasPointerCapture &&
+      viewport.hasPointerCapture(pan.pointerId)
+    ) {
+      viewport.releasePointerCapture(pan.pointerId);
+    }
+    panRef.current = null;
+    setCanvasPanning(false);
+  }
+
+  function handleWireHover(payload, event) {
+    if (!payload || !event) return;
+    const bounds = event.currentTarget && event.currentTarget.ownerSVGElement
+      ? event.currentTarget.ownerSVGElement.getBoundingClientRect()
+      : null;
+    setWireTooltip({
+      ...payload,
+      x: bounds ? event.clientX - bounds.left + 14 : 0,
+      y: bounds ? event.clientY - bounds.top + 14 : 0,
+    });
+  }
+
+  function clearWireTooltip() {
+    setWireTooltip(null);
   }
 
   function renderNodeBody(id) {
@@ -6809,28 +7822,113 @@ function FlowModelCanvas({
     <div className="flow-model-shell">
       <div className="flow-model-toolbar">
         <div className="flow-model-heading">
-          <div className="flow-model-eyebrow">Draggable model graph</div>
+          <div className="flow-model-eyebrow">Model flow</div>
           <div className="flow-model-title">
-            Configure the run inside the {architecture ? architecture.shortLabel || architecture.label : "selected"} data-flow diagram
+            Configure the {architecture ? architecture.shortLabel || architecture.label : "selected"} run
           </div>
         </div>
         <div className="row flow-model-controls">
-          {statusMessage ? <div className="flow-inline-status ok">{statusMessage}</div> : null}
-          <button type="button" onClick={() => setPositions(flowDefinition.nodes)}>Reset layout</button>
-          <button
-            type="button"
-            onClick={() => setExpandedNodes((prev) => {
-              const allExpanded = orderedNodeIds.every((id) => prev[id]);
-              return Object.fromEntries(orderedNodeIds.map((id) => [id, !allExpanded]));
-            })}
-          >
-            {orderedNodeIds.every((id) => expandedNodes[id]) ? "Collapse all" : "Expand all"}
-          </button>
+          <div className="flow-display-controls-expanded" aria-label="Graph display">
+            <span className="flow-display-controls-label">Graph display</span>
+            <div className="flow-display-controls-body">
+              <div className="flow-io-mode-switch" role="group" aria-label="I/O wire display mode">
+                <button
+                  type="button"
+                  className={ioWireMode === "single" ? "active" : ""}
+                  onClick={() => setIoWireMode("single")}
+                  aria-pressed={ioWireMode === "single"}
+                >
+                  Single
+                </button>
+                <button
+                  type="button"
+                  className={ioWireMode === "data" ? "active" : ""}
+                  onClick={() => setIoWireMode("data")}
+                  aria-pressed={ioWireMode === "data"}
+                  title="Show packaged information flows by type"
+                >
+                  Data
+                </button>
+                <button
+                  type="button"
+                  className={ioWireMode === "layers" ? "active" : ""}
+                  onClick={() => setIoWireMode("layers")}
+                  aria-pressed={ioWireMode === "layers"}
+                  title="Show detailed logical data layers passing through the model"
+                >
+                  Layers
+                </button>
+              </div>
+              <button type="button" className="ghost-utility-button" onClick={() => setPositions(flowDefinition.nodes)}>Reset layout</button>
+              <button
+                type="button"
+                className="ghost-utility-button"
+                onClick={() => setExpandedNodes((prev) => {
+                  const allExpanded = orderedNodeIds.every((id) => prev[id]);
+                  return Object.fromEntries(orderedNodeIds.map((id) => [id, !allExpanded]));
+                })}
+              >
+                {orderedNodeIds.every((id) => expandedNodes[id]) ? "Collapse all" : "Expand all"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="flow-model-viewport">
+      <div
+        ref={viewportRef}
+        className={`flow-model-viewport ${canvasPanning ? "panning" : ""}`}
+        onPointerDown={startCanvasPan}
+        onPointerMove={moveCanvasPan}
+        onPointerUp={endCanvasPan}
+        onPointerCancel={endCanvasPan}
+      >
         <div className="flow-model-canvas" style={{ width: dynamicCanvas.width, height: dynamicCanvas.height }}>
-          <FlowEdgeLayer positions={edgePositions} edges={flowDefinition.edges} canvas={dynamicCanvas} />
+          <FlowEdgeLayer
+            positions={edgePositions}
+            edges={flowDefinition.edges}
+            canvas={dynamicCanvas}
+            mode={ioWireMode}
+            context={wireContext}
+            onWireHover={handleWireHover}
+            onWireLeave={clearWireTooltip}
+          />
+          {wireTooltip ? (
+            <div
+              className="flow-wire-tooltip"
+              style={{
+                left: Math.min(Math.max(12, wireTooltip.x), Math.max(12, dynamicCanvas.width - 280)),
+                top: Math.min(Math.max(12, wireTooltip.y), Math.max(12, dynamicCanvas.height - 126)),
+              }}
+            >
+              <div className="flow-wire-tooltip-kicker">{wireTooltip.from}{" -> "}{wireTooltip.to}</div>
+              <div className="flow-wire-tooltip-title">{wireTooltip.mode === "single" ? wireTooltip.edgeLabel : wireTooltip.label}</div>
+              <div className="flow-wire-tooltip-meta">
+                <span>{wireTooltip.mode === "single" ? "aggregate" : wireTooltip.id}</span>
+                <span>{wireTooltip.typeLabel}</span>
+                {wireTooltip.mode !== "single" && wireTooltip.sourceTypeLabel && wireTooltip.sourceTypeLabel !== wireTooltip.typeLabel ? (
+                  <span>{wireTooltip.sourceTypeLabel}</span>
+                ) : null}
+              </div>
+              {wireTooltip.mode !== "single" && wireTooltip.edgeLabel ? (
+                <div className="flow-wire-tooltip-flow">{wireTooltip.edgeLabel}</div>
+              ) : null}
+              {wireTooltip.purpose ? (
+                <div className="flow-wire-tooltip-flow">{wireTooltip.purpose}</div>
+              ) : null}
+              {wireTooltip.granularity ? (
+                <div className="flow-wire-tooltip-flow">Granularity: {wireTooltip.granularity}</div>
+              ) : null}
+              {wireTooltip.mode === "layers" && wireTooltip.activeWhenLabel ? (
+                <div className="flow-wire-tooltip-flow">Active when {wireTooltip.activeWhenLabel}</div>
+              ) : null}
+              {(wireTooltip.mode === "data" || wireTooltip.mode === "layers") && wireTooltip.parentLabel && wireTooltip.parentLabel !== wireTooltip.label ? (
+                <div className="flow-wire-tooltip-flow">Layer from: {wireTooltip.parentLabel}</div>
+              ) : null}
+              {wireTooltip.mode === "layers" && wireTooltip.variantCount > 1 ? (
+                <div className="flow-wire-tooltip-flow">Regional variants grouped: {wireTooltip.variantSummary}</div>
+              ) : null}
+            </div>
+          ) : null}
           {orderedNodeIds.map((id) => {
             const box = boxById.get(id);
             const rect = positions[id];
@@ -6857,6 +7955,7 @@ function FlowModelCanvas({
           })}
         </div>
       </div>
+      <IoWireLegend edges={flowDefinition.edges} mode={ioWireMode} context={wireContext} />
     </div>
   );
 }
@@ -6897,6 +7996,7 @@ function DiagramScenarioControls({
   inputsLocked = false,
   lockReason = "",
 }) {
+  const setupControlId = useId();
   const showStructuredSelector = Boolean(
     selectorModel && (selectorModel.hasTransmissionOnly || selectorModel.hasPathway2040)
   );
@@ -6923,7 +8023,6 @@ function DiagramScenarioControls({
       )
   );
   const selectedTargetScenario = (targetScenarios || []).find((s) => s.scenario_id === mrioScenarioId) || null;
-  const shockMapping = (mrioShockMappings || [])[0] || {};
   const normalizedEnergyModelOptions = (Array.isArray(energyModelOptions) && energyModelOptions.length ? energyModelOptions : ENERGY_MODEL_OPTIONS)
     .map((option) => ({
       value: String(option && option.value ? option.value : ""),
@@ -6937,6 +8036,12 @@ function DiagramScenarioControls({
     ? architectureCatalog.architectures
     : defaultArchitectureCatalog().architectures;
   const requiresMrio = architectureIncludesDevelopment(selectedArchitecture);
+  const adjustedLeverCount = [
+    ["renewables_capex_multiplier", 1],
+    ["fossil_fuel_price_multiplier", 1],
+    ["carbon_price_usd_per_tco2", 0],
+    ["demand_multiplier", 1],
+  ].filter(([key, neutral]) => Math.abs(toNumber(levers && levers[key], neutral) - neutral) > 0.000001).length;
   if (inputsLocked) {
     return (
       <LockedScenarioSummary
@@ -6953,7 +8058,6 @@ function DiagramScenarioControls({
         activePackage={activePackage}
         policyAvailable={policyAvailable}
         requiresMrio={requiresMrio}
-        shockMapping={shockMapping}
         levers={levers}
       />
     );
@@ -6961,26 +8065,27 @@ function DiagramScenarioControls({
 
   return (
     <div className="diagram-scenario-controls">
-      <div className="diagram-scenario-layout">
-        <div className="diagram-selector-stack">
-          <div className="diagram-section-label">Scenario selectors</div>
-          <div className="diagram-control-grid">
+      <div className="diagram-scenario-layout input-module-layout">
+        <section className="diagram-selector-stack input-module-column" aria-labelledby="run-setup-heading">
+          <div className="diagram-section-heading">
+            <div className="diagram-section-label" id="run-setup-heading">Model setup</div>
+            <small>{selectedEnergyModel.label} · {runProfile}</small>
+          </div>
+          <div className="diagram-control-grid cognitive-essential-grid">
+            <div className="run-setup-group-eyebrow">Model</div>
             <div>
-              <label>Model architecture</label>
-              <select value={selectedArchitectureId || DEFAULT_MODEL_ARCHITECTURE_ID} onChange={(e) => onArchitectureChange(e.target.value)}>
+              <label htmlFor={`${setupControlId}-architecture`}>Model architecture</label>
+              <select id={`${setupControlId}-architecture`} value={selectedArchitectureId || DEFAULT_MODEL_ARCHITECTURE_ID} onChange={(e) => onArchitectureChange(e.target.value)}>
                 {architectureOptions.map((option) => (
                   <option key={option.id} value={option.id}>
                     {option.shortLabel || option.label}
                   </option>
                 ))}
               </select>
-              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-                {selectedArchitecture && selectedArchitecture.description ? selectedArchitecture.description : "Select the visible model graph and result surface."}
-              </div>
             </div>
             <div>
-              <label>Energy model engine</label>
-              <select value={selectedEnergyModel.value} onChange={(e) => onEnergyModelEngineChange(e.target.value)}>
+              <label htmlFor={`${setupControlId}-engine`}>Energy model engine</label>
+              <select id={`${setupControlId}-engine`} value={selectedEnergyModel.value} onChange={(e) => onEnergyModelEngineChange(e.target.value)}>
                 {normalizedEnergyModelOptions.map((option) => (
                   <option key={option.value} value={option.value} disabled={option.disabled}>
                     {option.label} - {option.runtimeStatus}
@@ -6988,93 +8093,57 @@ function DiagramScenarioControls({
                 ))}
               </select>
             </div>
+            <div className="run-setup-group-eyebrow">Scenario</div>
             {showStructuredSelector ? (
-              <>
-                <div>
-                  <label>Main scenario type</label>
-                  <select
-                    value={scenarioSelections.family}
-                    onChange={(e) => onScenarioSelectionChange({ family: e.target.value })}
-                  >
-                    {selectorModel.hasPathway2040 ? (
-                      <option value="pathway_2040">2040 pathway scenarios</option>
-                    ) : null}
-                    {selectorModel.hasTransmissionOnly ? (
-                      <option value="transmission_only">Transmission-only scenario</option>
-                    ) : null}
-                  </select>
-                </div>
-                {requiresMrio ? (
-                  <div>
-                    <label>Target pathway</label>
-                    <select value={mrioScenarioId || ""} onChange={(e) => onMrioScenarioChange(e.target.value)}>
-                      {(targetScenarios || []).map((s) => (
-                        <option key={s.scenario_id} value={s.scenario_id}>
-                          {s.scenario_id} - {s.short_label || s.label || s.scenario_type || "Target pathway"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : null}
-                <div>
-                  <label>Target year</label>
-                  <select value={Number(targetYear || 2030)} onChange={(e) => onTargetYearChange(Number(e.target.value))}>
-                    {(targetYears || [2030, 2050]).map((year) => (
-                      <option key={year} value={Number(year)}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-                {scenarioSelections.family === "pathway_2040" ? (
-                  <>
-                    <div>
-                      <label>Demand pathway</label>
-                      <select value={scenarioSelections.pathway} onChange={(e) => onScenarioSelectionChange({ pathway: e.target.value })}>
-                        {selectorModel.pathways.map((path) => (
-                          <option key={path} value={path}>{pathwayLabel(path)}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label>Energy build package</label>
-                      <select
-                        value={activePackage}
-                        onChange={(e) => {
-                          const parts = String(e.target.value || "").split("_");
-                          onScenarioSelectionChange({ generation: parts[0] || "legacy", transmission: parts[1] || "legacy" });
-                        }}
-                      >
-                        {packageOptions.map((code) => (
-                          <option key={code} value={code}>{SCENARIO_PACKAGE_LABELS[code] || code}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label>Policy package</label>
-                      <select
-                        value={scenarioSelections.policy ? "on" : "off"}
-                        onChange={(e) => onScenarioSelectionChange({ policy: e.target.value === "on" })}
-                        disabled={!policyAvailable}
-                      >
-                        <option value="off">Standard</option>
-                        {policyAvailable ? <option value="on">Policy push</option> : null}
-                      </select>
-                    </div>
-                  </>
-                ) : null}
-              </>
+              <div>
+                <label htmlFor={`${setupControlId}-scenario-family`}>Main scenario type</label>
+                <select
+                  id={`${setupControlId}-scenario-family`}
+                  value={scenarioSelections.family}
+                  onChange={(e) => onScenarioSelectionChange({ family: e.target.value })}
+                >
+                  {selectorModel.hasPathway2040 ? (
+                    <option value="pathway_2040">2040 pathway scenarios</option>
+                  ) : null}
+                  {selectorModel.hasTransmissionOnly ? (
+                    <option value="transmission_only">Transmission-only scenario</option>
+                  ) : null}
+                </select>
+              </div>
             ) : (
               <div>
-                <label>Energy scenario</label>
-                <select value={scenarioKey} onChange={(e) => onScenarioChange(e.target.value)}>
+                <label htmlFor={`${setupControlId}-scenario`}>Energy scenario</label>
+                <select id={`${setupControlId}-scenario`} value={scenarioKey} onChange={(e) => onScenarioChange(e.target.value)}>
                   {(scenarios || []).map((s) => (
                     <option key={s.key} value={s.key}>{s.title}</option>
                   ))}
                 </select>
               </div>
             )}
+            {requiresMrio ? (
+              <div>
+                <label htmlFor={`${setupControlId}-target-pathway`}>Target pathway</label>
+                <select id={`${setupControlId}-target-pathway`} value={mrioScenarioId || ""} onChange={(e) => onMrioScenarioChange(e.target.value)}>
+                  {(targetScenarios || []).map((s) => (
+                    <option key={s.scenario_id} value={s.scenario_id}>
+                      {s.short_label || s.label || s.scenario_id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <div>
-              <label>Run profile</label>
-              <select value={runProfile} onChange={(e) => onSetRunProfile(e.target.value)}>
+              <label htmlFor={`${setupControlId}-target-year`}>Target year</label>
+              <select id={`${setupControlId}-target-year`} value={Number(targetYear || 2030)} onChange={(e) => onTargetYearChange(Number(e.target.value))}>
+                {(targetYears || [2030, 2050]).map((year) => (
+                  <option key={year} value={Number(year)}>{year}</option>
+                ))}
+              </select>
+            </div>
+            <div className="run-setup-group-eyebrow">Execution</div>
+            <div>
+              <label htmlFor={`${setupControlId}-execution-profile`}>Execution profile</label>
+              <select id={`${setupControlId}-execution-profile`} value={runProfile} onChange={(e) => onSetRunProfile(e.target.value)}>
                 <option value="dev">Dev profile</option>
                 <option value="analysis">Analysis profile</option>
                 <option value="full">Full profile</option>
@@ -7082,62 +8151,109 @@ function DiagramScenarioControls({
             </div>
           </div>
 
-          <div className="diagram-note">
-            <div><b>Resolved package:</b> <code>{selectedArchitecture ? selectedArchitecture.shortLabel || selectedArchitecture.label : "-"}</code> / <code>{selectedEnergyModel.label}</code> / <code>{scenarioKey || "-"}</code>{requiresMrio ? <> + target <code>{mrioScenarioId || "-"}</code></> : null} @ <code>{Number(targetYear || 2030)}</code></div>
-            {requiresMrio ? (
-              <div className="muted" style={{ marginTop: 4 }}>
-                MRIO shock mapping: <code>{shockMapping.mapping_id || "mrio_direct_heuristic"}</code>.{" "}
-                {selectedTargetScenario ? selectedTargetScenario.label || selectedTargetScenario.short_label || "" : ""}
+          {showStructuredSelector && scenarioSelections.family === "pathway_2040" ? (
+            <div className="input-module-subsection">
+              <div className="diagram-section-heading">
+                <div className="diagram-section-label">Pathway details</div>
+                <small>{pathwayLabel(scenarioSelections.pathway)} · {SCENARIO_PACKAGE_LABELS[activePackage] || activePackage}</small>
               </div>
-            ) : (
-              <div className="muted" style={{ marginTop: 4 }}>
-                Energy-only mode hides MRIO input boxes, bridge/MRIO graph nodes, development tabs, and MRIO output artifacts.
+              <div className="diagram-control-grid">
+                <div>
+                  <label htmlFor={`${setupControlId}-demand-pathway`}>Demand pathway</label>
+                  <select id={`${setupControlId}-demand-pathway`} value={scenarioSelections.pathway} onChange={(e) => onScenarioSelectionChange({ pathway: e.target.value })}>
+                    {selectorModel.pathways.map((path) => (
+                      <option key={path} value={path}>{pathwayLabel(path)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor={`${setupControlId}-build-package`}>Energy build package</label>
+                  <select
+                    id={`${setupControlId}-build-package`}
+                    value={activePackage}
+                    onChange={(e) => {
+                      const parts = String(e.target.value || "").split("_");
+                      onScenarioSelectionChange({ generation: parts[0] || "legacy", transmission: parts[1] || "legacy" });
+                    }}
+                  >
+                    {packageOptions.map((code) => (
+                      <option key={code} value={code}>{SCENARIO_PACKAGE_LABELS[code] || code}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor={`${setupControlId}-policy-package`}>Policy package</label>
+                  <select
+                    id={`${setupControlId}-policy-package`}
+                    value={scenarioSelections.policy ? "on" : "off"}
+                    onChange={(e) => onScenarioSelectionChange({ policy: e.target.value === "on" })}
+                    disabled={!policyAvailable}
+                  >
+                    <option value="off">Standard</option>
+                    {policyAvailable ? <option value="on">Policy push</option> : null}
+                  </select>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          ) : null}
+        </section>
 
-        <div className="diagram-slider-stack">
-          <div className="diagram-section-label">Policy levers</div>
-          <div className="diagram-lever-grid">
-            <LeverControl
-              label="Renewables CAPEX multiplier"
-              tooltip={POLICY_LEVER_TOOLTIPS.renewables_capex_multiplier}
-              value={levers.renewables_capex_multiplier}
-              min={0.7}
-              max={1.5}
-              step={0.05}
-              onChange={(v) => onSetLevers({ ...levers, renewables_capex_multiplier: v })}
-            />
-            <LeverControl
-              label="Fossil variable cost multiplier"
-              tooltip={POLICY_LEVER_TOOLTIPS.fossil_fuel_price_multiplier}
-              value={levers.fossil_fuel_price_multiplier}
-              min={0.7}
-              max={1.8}
-              step={0.05}
-              onChange={(v) => onSetLevers({ ...levers, fossil_fuel_price_multiplier: v })}
-            />
-            <LeverControl
-              label="Carbon price (USD/tCO2)"
-              tooltip={POLICY_LEVER_TOOLTIPS.carbon_price_usd_per_tco2}
-              value={levers.carbon_price_usd_per_tco2}
-              min={0}
-              max={300}
-              step={10}
-              onChange={(v) => onSetLevers({ ...levers, carbon_price_usd_per_tco2: v })}
-            />
-            <LeverControl
-              label="Demand multiplier"
-              tooltip={POLICY_LEVER_TOOLTIPS.demand_multiplier}
-              value={levers.demand_multiplier}
-              min={0.8}
-              max={1.4}
-              step={0.05}
-              onChange={(v) => onSetLevers({ ...levers, demand_multiplier: v })}
-            />
+        <section className="diagram-slider-stack input-module-column" aria-labelledby="policy-levers-heading">
+          <div className="diagram-section-heading">
+            <div className="diagram-section-label" id="policy-levers-heading">Policy levers</div>
+            <small>{adjustedLeverCount ? `${adjustedLeverCount} adjusted` : "Neutral defaults"}</small>
           </div>
-        </div>
+          <div className="input-module-levers">
+            <div className="diagram-lever-grid">
+              <LeverControl
+                label="Renewables CAPEX multiplier"
+                tooltip={POLICY_LEVER_TOOLTIPS.renewables_capex_multiplier}
+                value={levers.renewables_capex_multiplier}
+                min={0.7}
+                max={1.5}
+                step={0.05}
+                onChange={(v) => onSetLevers({ ...levers, renewables_capex_multiplier: v })}
+              />
+              <LeverControl
+                label="Fossil variable cost multiplier"
+                tooltip={POLICY_LEVER_TOOLTIPS.fossil_fuel_price_multiplier}
+                value={levers.fossil_fuel_price_multiplier}
+                min={0.7}
+                max={1.8}
+                step={0.05}
+                onChange={(v) => onSetLevers({ ...levers, fossil_fuel_price_multiplier: v })}
+              />
+              <LeverControl
+                label="Carbon price (USD/tCO2)"
+                tooltip={POLICY_LEVER_TOOLTIPS.carbon_price_usd_per_tco2}
+                value={levers.carbon_price_usd_per_tco2}
+                min={0}
+                max={300}
+                step={10}
+                onChange={(v) => onSetLevers({ ...levers, carbon_price_usd_per_tco2: v })}
+              />
+              <LeverControl
+                label="Demand multiplier"
+                tooltip={POLICY_LEVER_TOOLTIPS.demand_multiplier}
+                value={levers.demand_multiplier}
+                min={0.8}
+                max={1.4}
+                step={0.05}
+                onChange={(v) => onSetLevers({ ...levers, demand_multiplier: v })}
+              />
+            </div>
+            <div className="cognitive-inline-actions">
+              {selectedScenario && selectedScenario.preset_levers ? (
+                <button type="button" className="ghost-utility-button" onClick={onApplyTemplateLevers}>
+                  Apply scenario defaults
+                </button>
+              ) : null}
+              <button type="button" className="ghost-utility-button" onClick={onResetLevers}>
+                Reset levers
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -7148,23 +8264,65 @@ function RunTabs({
   selectedJobId,
   activeJob,
   mode,
-  onSelectProjectView,
+  activeProject,
+  onReturnToProject,
   onSelectJob,
-  onNewModel,
-  newModelDisabled = false,
+  onRenameModel,
 }) {
+  const [renamingId, setRenamingId] = useState("");
+  const [renameDraft, setRenameDraft] = useState("");
+  const [renameSaving, setRenameSaving] = useState(false);
   const rows = jobs || [];
+  const selectedRow = rows.find((job) => runExecutionId(job) === selectedJobId) || null;
+  const visibleRows = rows.slice(0, 4);
+  if (selectedRow && !visibleRows.includes(selectedRow)) {
+    visibleRows.splice(Math.max(visibleRows.length - 1, 0), 1, selectedRow);
+  }
+  const visibleIds = new Set(visibleRows.map((job) => runExecutionId(job)));
+  const overflowRows = rows.filter((job) => !visibleIds.has(runExecutionId(job)));
+  const selectedOverflowId = overflowRows.some((job) => runExecutionId(job) === selectedJobId)
+    ? selectedJobId
+    : "";
+
+  function startRename(event, job, displayedName) {
+    if (typeof onRenameModel !== "function") return;
+    event.preventDefault();
+    event.stopPropagation();
+    setRenamingId(runExecutionId(job));
+    setRenameDraft(displayedName);
+  }
+
+  async function commitRename(job, previousName) {
+    if (renameSaving) return;
+    const nextName = String(renameDraft || "").trim();
+    if (!nextName || nextName === previousName) {
+      setRenamingId("");
+      return;
+    }
+    setRenameSaving(true);
+    try {
+      await onRenameModel(job, nextName);
+      setRenamingId("");
+    } catch (_error) {
+      // The workspace-level error surface reports persistence failures.
+    } finally {
+      setRenameSaving(false);
+    }
+  }
+
   return (
-    <div className="run-tab-strip" aria-label="Model run tabs">
-      <button
-        type="button"
-        className={`run-tab project-level-tab ${mode === "project" ? "active" : ""}`}
-        onClick={onSelectProjectView}
-        title="Project-level view"
-      >
-        <span className="run-tab-title">Project</span>
-      </button>
-      {rows.length ? rows.map((job) => {
+    <div className="run-tab-strip" aria-label="Project model navigation">
+      <div className="run-project-context">
+        <button type="button" className="workspace-back-button" onClick={onReturnToProject}>
+          <span aria-hidden="true">←</span>
+          <span>Return to project</span>
+        </button>
+        <div className="run-project-title" title={(activeProject && activeProject.title) || "Untitled project"}>
+          {(activeProject && activeProject.title) || "Untitled project"}
+        </div>
+      </div>
+      <div className="run-tab-list" role="tablist" aria-label="Models">
+      {visibleRows.length ? visibleRows.map((job, index) => {
         const effective = activeJob && runExecutionId(activeJob) === runExecutionId(job)
           ? { ...job, ...activeJob, project_run_number: job.project_run_number || activeJob.project_run_number }
           : job;
@@ -7175,33 +8333,95 @@ function RunTabs({
         const customName = runCustomName(effective);
         const id = runExecutionId(effective);
         const selected = mode !== "project" && selectedJobId === id;
+        const displayedName = customName || modelTitle;
+        if (renamingId === id) {
+          return (
+            <div
+              key={id || job.run_id}
+              className={`run-tab run-tab-renaming status-${statusKey} ${selected ? "active" : ""}`}
+            >
+              <span className="run-tab-text">
+                <input
+                  type="text"
+                  className="run-tab-rename-input"
+                  aria-label={`Rename ${displayedName}`}
+                  value={renameDraft}
+                  maxLength={200}
+                  autoFocus
+                  disabled={renameSaving}
+                  onChange={(event) => setRenameDraft(event.target.value)}
+                  onBlur={() => commitRename(effective, displayedName)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setRenamingId("");
+                    }
+                  }}
+                />
+                {customName ? <span className="run-tab-subtitle">{modelTitle}</span> : null}
+              </span>
+              <span className="run-tab-status-label">{renameSaving ? "Saving" : status.label}</span>
+            </div>
+          );
+        }
         return (
           <button
             key={id || job.run_id}
             type="button"
+            role="tab"
             className={`run-tab status-${statusKey} ${selected ? "active" : ""}`}
+            aria-controls="model-workspace-primary"
+            aria-selected={selected}
+            tabIndex={selected || (mode === "project" && index === 0) ? 0 : -1}
             onClick={() => onSelectJob(effective)}
+            onKeyDown={(event) => handleTablistKeyDown(
+              event,
+              index,
+              visibleRows.length,
+              (nextIndex) => onSelectJob(visibleRows[nextIndex])
+            )}
             title={`${runLabel(effective)} - ${status.label}`}
             aria-label={`${runLabel(effective)} - ${status.label}`}
           >
             <span className="run-tab-text">
-              <span className="run-tab-title">{modelTitle}</span>
-              {customName ? <span className="run-tab-subtitle">{customName}</span> : null}
+              <span
+                className="run-tab-title"
+                title="Double-click to rename model"
+                onDoubleClick={(event) => startRename(event, effective, displayedName)}
+              >
+                {displayedName}
+              </span>
+              {customName ? <span className="run-tab-subtitle">{modelTitle}</span> : null}
             </span>
             <span className="run-tab-status-label">{status.label}</span>
           </button>
         );
       }) : null}
-      <button
-        type="button"
-        className="run-tab run-tab-new-model"
-        onClick={onNewModel}
-        disabled={newModelDisabled}
-        title="New model"
-        aria-label="New model"
-      >
-        <span aria-hidden="true">+</span>
-      </button>
+      {overflowRows.length ? (
+        <label className="run-tab-overflow">
+          <span className="sr-only">More models</span>
+          <select
+            aria-label={`More models (${overflowRows.length})`}
+            value={selectedOverflowId}
+            onChange={(event) => {
+              const selected = overflowRows.find((job) => runExecutionId(job) === event.target.value);
+              if (selected) onSelectJob(selected);
+            }}
+          >
+            <option value="">More models ({overflowRows.length})</option>
+            {overflowRows.map((job) => (
+              <option key={runExecutionId(job) || job.run_id} value={runExecutionId(job)}>
+                {runLabel(job)} - {displayStatus(job.status).label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+      </div>
     </div>
   );
 }
@@ -7230,7 +8450,6 @@ function LockedScenarioSummary({
   activePackage,
   policyAvailable,
   requiresMrio,
-  shockMapping,
   levers,
 }) {
   const runProfileLabels = {
@@ -7265,228 +8484,118 @@ function LockedScenarioSummary({
         </div>
       </div>
 
-      <div className="scenario-readonly-section">
-        <div className="diagram-section-label">Selected configuration</div>
-        <div className="scenario-readonly-grid">
-          <ReadOnlyScenarioValue
-            label="Model architecture"
-            value={selectedArchitecture ? selectedArchitecture.shortLabel || selectedArchitecture.label : "-"}
-            note={selectedArchitecture && selectedArchitecture.description ? selectedArchitecture.description : ""}
-          />
-          <ReadOnlyScenarioValue
-            label="Energy model"
-            value={selectedEnergyModel ? selectedEnergyModel.label : "-"}
-            note={selectedEnergyModel ? selectedEnergyModel.runtimeStatus : ""}
-          />
-          <ReadOnlyScenarioValue
-            label="Energy scenario"
-            value={selectedScenario ? selectedScenario.title : scenarioKey}
-            note={scenarioKey ? `Resolved key: ${scenarioKey}` : ""}
-          />
-          <ReadOnlyScenarioValue
-            label="Target year"
-            value={String(Number(targetYear || 2030))}
-          />
-          {requiresMrio ? (
+      <div className="diagram-scenario-layout input-module-layout">
+        <section className="diagram-selector-stack input-module-column">
+          <div className="diagram-section-heading">
+            <div className="diagram-section-label">Model setup</div>
+            <small>{selectedEnergyModel ? selectedEnergyModel.label : "-"} · {runProfileLabels[runProfile] || runProfile || "-"}</small>
+          </div>
+          <div className="scenario-readonly-grid">
+            <div className="run-setup-group-eyebrow">Model</div>
             <ReadOnlyScenarioValue
-              label="Target pathway"
-              value={selectedTargetScenario ? selectedTargetScenario.short_label || selectedTargetScenario.label || selectedTargetScenario.scenario_id : mrioScenarioId}
-              note={mrioScenarioId ? `Resolved target: ${mrioScenarioId}` : ""}
+              label="Model architecture"
+              value={selectedArchitecture ? selectedArchitecture.shortLabel || selectedArchitecture.label : "-"}
             />
-          ) : null}
-          <ReadOnlyScenarioValue
-            label="Run profile"
-            value={runProfileLabels[runProfile] || runProfile || "-"}
-          />
-          <ReadOnlyScenarioValue
-            label="Main scenario type"
-            value={familyLabel}
-          />
-          {scenarioSelections && scenarioSelections.family === "pathway_2040" ? (
-            <>
-              <ReadOnlyScenarioValue
-                label="Demand pathway"
-                value={pathwayLabel(scenarioSelections.pathway)}
-              />
-              <ReadOnlyScenarioValue
-                label="Energy build package"
-                value={SCENARIO_PACKAGE_LABELS[activePackage] || activePackage}
-              />
-              <ReadOnlyScenarioValue
-                label="Policy package"
-                value={policyLabel}
-              />
-            </>
-          ) : null}
-          {requiresMrio ? (
             <ReadOnlyScenarioValue
-              label="MRIO shock mapping"
-              value={shockMapping && shockMapping.label ? shockMapping.label : "A/Z, E, and Y heuristic shock mapping"}
-              note={shockMapping && shockMapping.mapping_id ? `Method: ${shockMapping.mapping_id}` : ""}
+              label="Energy model"
+              value={selectedEnergyModel ? selectedEnergyModel.label : "-"}
+              note={selectedEnergyModel ? selectedEnergyModel.runtimeStatus : ""}
             />
-          ) : null}
-        </div>
-      </div>
+            <div className="run-setup-group-eyebrow">Scenario</div>
+            <ReadOnlyScenarioValue label="Main scenario type" value={familyLabel} />
+            <ReadOnlyScenarioValue
+              label="Energy scenario"
+              value={selectedScenario ? selectedScenario.title : scenarioKey}
+            />
+            <ReadOnlyScenarioValue
+              label="Target year"
+              value={String(Number(targetYear || 2030))}
+            />
+            {requiresMrio ? (
+              <ReadOnlyScenarioValue
+                label="Target pathway"
+                value={selectedTargetScenario ? selectedTargetScenario.short_label || selectedTargetScenario.label || selectedTargetScenario.scenario_id : mrioScenarioId}
+              />
+            ) : null}
+            {scenarioSelections && scenarioSelections.family === "pathway_2040" ? (
+              <>
+                <ReadOnlyScenarioValue
+                  label="Demand pathway"
+                  value={pathwayLabel(scenarioSelections.pathway)}
+                />
+                <ReadOnlyScenarioValue
+                  label="Energy build package"
+                  value={SCENARIO_PACKAGE_LABELS[activePackage] || activePackage}
+                />
+                <ReadOnlyScenarioValue
+                  label="Policy package"
+                  value={policyLabel}
+                />
+              </>
+            ) : null}
+            <div className="run-setup-group-eyebrow">Execution</div>
+            <ReadOnlyScenarioValue label="Execution profile" value={runProfileLabels[runProfile] || runProfile || "-"} />
+          </div>
+        </section>
 
-      <div className="scenario-readonly-section">
-        <div className="diagram-section-label">Selected policy levers</div>
-        <div className="scenario-readonly-grid lever-grid">
-          {leverRows.map(([label, rawValue, unit]) => (
-            <ReadOnlyScenarioValue
-              key={label}
-              label={label}
-              value={`${Number.isFinite(Number(rawValue)) ? compact(Number(rawValue)) : "-"}${unit ? ` ${unit}` : ""}`}
-            />
-          ))}
-        </div>
+        <section className="diagram-slider-stack input-module-column">
+          <div className="diagram-section-heading">
+            <div className="diagram-section-label">Policy levers</div>
+            <small>{leverRows.length} values</small>
+          </div>
+          <div className="scenario-readonly-grid lever-grid">
+            {leverRows.map(([label, rawValue, unit]) => (
+              <ReadOnlyScenarioValue
+                key={label}
+                label={label}
+                value={`${Number.isFinite(Number(rawValue)) ? compact(Number(rawValue)) : "-"}${unit ? ` ${unit}` : ""}`}
+              />
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );
 }
 
-function ProjectWorkspacePanel({
-  activeProject,
-  projectRuns,
-  projectReports,
-  projectExports,
-  compareRunIds,
-  onToggleCompareRun,
-  onCreateReport,
-  onCreateRunExport,
-  onNewModel,
+function UploadedDatasetsPanel({
+  inputDatasets,
+  projects,
+  activeProjectId,
+  onRefresh,
   actionLoading,
 }) {
-  // Project-level controls intentionally sit outside the model diagram. They
-  // operate on persisted platform records: runs, reports, exports, and compare
-  // selections. Model internals remain hidden behind run artifacts.
-  const successfulRuns = succeededProjectRuns(projectRuns);
-  const selectedSuccessful = successfulRuns.filter((run) => compareRunIds.includes(run.run_id));
-  const reportLabel = selectedSuccessful.length > 1 ? "Generate comparison report" : "Generate project report";
-  return (
-    <aside className="project-selection-rail" aria-label="Project model selection and reports">
-      <div className="project-workspace-header">
-        <div className="project-workspace-title">
-          <div className="run-management-eyebrow">Model selection</div>
-          <h2>Project runs</h2>
-          <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>
-            {(projectRuns || []).length} runs · {successfulRuns.length} completed · {selectedSuccessful.length} selected
-          </div>
-        </div>
-        <button
-          type="button"
-          className="project-new-model-button"
-          onClick={onNewModel}
-          disabled={actionLoading || !activeProject}
-        >
-          New Model
-        </button>
-      </div>
-
-      <div className="project-selection-section">
-          <div style={{ fontWeight: 900, marginBottom: 6 }}>Run library and comparison set</div>
-          <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-            Comparison checkboxes are available once a model run has succeeded.
-          </div>
-          {(projectRuns || []).length ? (
-            <div className="project-run-list">
-              {(projectRuns || []).slice(0, 14).map((run) => {
-                const complete = normalizeStatus(run.status) === "succeeded";
-                const checked = compareRunIds.includes(run.run_id);
-                return (
-                  <div key={run.run_id} className={`project-run-row ${checked ? "selected" : ""}`}>
-                    <div>
-                      <div><b>{runLabel(run)}</b> <StatusBadge status={run.status} /></div>
-                      <div className="muted" style={{ fontSize: 11 }}>
-                        {runMetadataLine(run)}
-                      </div>
-                    </div>
-                    <div className="diagram-dataset-actions project-run-actions">
-                      {complete ? (
-                        <label className="project-compare-toggle">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => onToggleCompareRun(run.run_id)}
-                          />
-                          Compare
-                        </label>
-                      ) : null}
-                      {complete ? (
-                        <button type="button" onClick={() => onCreateRunExport(run.run_id)} disabled={actionLoading}>Export</button>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="muted" style={{ fontSize: 12 }}>No runs have been saved in this project yet.</div>
-          )}
-          {selectedSuccessful.length ? (
-            <div className="project-selected-compare-note">
-              Selected for comparison: {selectedSuccessful.map((run) => runLabel(run)).join(", ")}
-            </div>
-          ) : null}
-      </div>
-
-      <div className="project-selection-section">
-        <div className="project-selection-section-header">
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>Reports</div>
-          <button type="button" onClick={onCreateReport} disabled={actionLoading || !successfulRuns.length}>{reportLabel}</button>
-        </div>
-            {(projectReports || []).length ? (
-              <div className="project-artifact-list">
-                {(projectReports || []).slice(0, 6).map((report) => (
-                  <div key={report.report_id} className="diagram-dataset-version-row">
-                    <div>
-                      <div><b>{report.report_type || "Project report"}</b> <StatusBadge status={report.status} /></div>
-                      <div className="muted" style={{ fontSize: 11 }}><code>{report.report_id}</code> · {(report.run_ids || []).length} runs</div>
-                    </div>
-                    <div className="diagram-dataset-actions">
-                      <a href={api.projectReportDownloadUrl(report.project_id, report.report_id)} download>Report</a>
-                      {report.source_data_url ? (
-                        <a href={api.projectReportDataUrl(report.project_id, report.report_id)} download>Data</a>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="muted" style={{ fontSize: 12 }}>No reports generated yet.</div>
-            )}
-      </div>
-
-      <div className="project-selection-section">
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>Exports</div>
-            {(projectExports || []).length ? (
-              <div className="project-artifact-list">
-                {(projectExports || []).slice(0, 6).map((row) => (
-                  <div key={row.export_id} className="diagram-dataset-version-row">
-                    <div>
-                      <div><b>{(row.run_ids || []).length === 1 ? "Run export" : "Project files export"}</b> <StatusBadge status={row.status} /></div>
-                      <div className="muted" style={{ fontSize: 11 }}><code>{row.export_id}</code> · {compact(row.size_bytes || 0)} bytes</div>
-                    </div>
-                    <a href={api.projectExportDownloadUrl(row.project_id, row.export_id)} download>Download</a>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="muted" style={{ fontSize: 12 }}>No export bundles generated yet.</div>
-            )}
-      </div>
-    </aside>
-  );
-}
-
-function UploadedDatasetsPanel({ inputDatasets, onRefresh, actionLoading }) {
   const [versionsByDataset, setVersionsByDataset] = useState({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [datasetSearch, setDatasetSearch] = useState("");
+  const [datasetFormat, setDatasetFormat] = useState("all");
+  const [localActionLoading, setLocalActionLoading] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const defaultDatasetDraft = { label: "", role: "User-provided dataset", layer: "user" };
+  const [createDraft, setCreateDraft] = useState(defaultDatasetDraft);
+  const [createFile, setCreateFile] = useState(null);
+  const [attachTarget, setAttachTarget] = useState(null);
+  const [attachProjectId, setAttachProjectId] = useState(activeProjectId || "");
+  const [renameTarget, setRenameTarget] = useState(null);
+  const [renameLabel, setRenameLabel] = useState("");
+  const [detailsTarget, setDetailsTarget] = useState(null);
 
-  const datasets = (Array.isArray(inputDatasets) ? inputDatasets : []).filter(
+  const allDatasets = Array.isArray(inputDatasets) ? inputDatasets : [];
+  const datasets = allDatasets.filter(
     (dataset) => dataset && dataset.user_upload_listable !== false
   );
+  const systemDatasets = allDatasets.filter(
+    (dataset) => dataset && dataset.user_upload_listable === false
+  );
+  const activeProjects = (Array.isArray(projects) ? projects : []).filter(
+    (project) => project && String(project.status || "active").toLowerCase() !== "archived"
+  );
+  const availableLayers = Array.from(new Set(
+    datasets.map((dataset) => String(dataset.layer || "").trim()).filter(Boolean)
+  )).sort();
   const datasetKey = datasets.map((row) => `${row.id}:${row.active_version_id || ""}`).join("|");
+  const busy = Boolean(actionLoading || loading || localActionLoading);
 
   async function refreshVersions() {
     if (!datasets.length || typeof api.fetchInputDatasetVersions !== "function") {
@@ -7518,54 +8627,502 @@ function UploadedDatasetsPanel({ inputDatasets, onRefresh, actionLoading }) {
       active: dataset.active_version_id && dataset.active_version_id === version.version_id,
     }))
   ));
+  function formatFromFilename(filename) {
+    const ext = String(filename || "").split(".").pop();
+    return ext && ext !== filename ? ext.toUpperCase() : "-";
+  }
+  const availableFormats = Array.from(new Set(
+    uploadedRows.map(({ version }) => formatFromFilename(version.filename || version.version_id))
+  )).sort();
+  const normalizedDatasetSearch = datasetSearch.trim().toLowerCase();
+  const filteredUploadedRows = uploadedRows.filter(({ dataset, version }) => {
+    const filename = version.filename || version.version_id;
+    const format = formatFromFilename(filename);
+    if (datasetFormat !== "all" && format !== datasetFormat) return false;
+    if (!normalizedDatasetSearch) return true;
+    return [
+      dataset.label,
+      dataset.id,
+      dataset.role,
+      dataset.layer,
+      filename,
+      version.version_id,
+    ].some((value) => String(value || "").toLowerCase().includes(normalizedDatasetSearch));
+  });
+  const filtersActive = Boolean(normalizedDatasetSearch || datasetFormat !== "all");
+
+  function projectAvailabilityLabel(dataset, version) {
+    const projectIds =
+      (Array.isArray(version && version.project_ids) && version.project_ids) ||
+      (Array.isArray(dataset && dataset.project_ids) && dataset.project_ids) ||
+      (Array.isArray(dataset && dataset.attached_project_ids) && dataset.attached_project_ids) ||
+      null;
+    if (!projectIds) return "Available";
+    return `${projectIds.length} project${projectIds.length === 1 ? "" : "s"}`;
+  }
+
+  async function refreshDatasetLibrary() {
+    if (typeof onRefresh === "function") await onRefresh();
+    await refreshVersions();
+  }
+
+  async function submitCreateDataset(event) {
+    event.preventDefault();
+    const label = String(createDraft.label || "").trim();
+    const role = String(createDraft.role || "").trim();
+    const layer = String(createDraft.layer || "").trim();
+    if (!label || !role || !layer || !createFile) {
+      setMessage("Dataset name, role, layer, and file are required.");
+      return;
+    }
+    setLocalActionLoading(true);
+    setMessage("");
+    try {
+      const created = await api.createInputDataset({
+        label,
+        role,
+        layer,
+        scope: "user",
+        upload_policy: "project_override",
+      });
+      const datasetId = String((created && (created.id || created.dataset_id)) || "").trim();
+      if (!datasetId) throw new Error("Dataset creation response did not include an id.");
+      await api.uploadInputDataset(datasetId, createFile);
+      await refreshDatasetLibrary();
+      setCreateModalOpen(false);
+      setCreateDraft(defaultDatasetDraft);
+      setCreateFile(null);
+      setMessage(`Created dataset "${label}" and uploaded ${createFile.name}.`);
+    } catch (err) {
+      setMessage(toErrorMessage(err, "Failed to create dataset"));
+    } finally {
+      setLocalActionLoading(false);
+    }
+  }
+
+  function openAttachModal(dataset, version) {
+    setAttachTarget({ dataset, version });
+    setAttachProjectId(
+      activeProjects.some((project) => project.project_id === activeProjectId)
+        ? activeProjectId
+        : ((activeProjects[0] && activeProjects[0].project_id) || "")
+    );
+    setMessage("");
+  }
+
+  async function submitAttachDataset(event) {
+    event.preventDefault();
+    if (!attachTarget || !attachProjectId) return;
+    setLocalActionLoading(true);
+    setMessage("");
+    try {
+      await api.attachInputDatasetToProject(attachProjectId, {
+        dataset_id: attachTarget.dataset.id,
+        version_id: attachTarget.version.version_id,
+      });
+      const project = activeProjects.find((row) => row.project_id === attachProjectId);
+      setAttachTarget(null);
+      await refreshDatasetLibrary();
+      setMessage(`Added "${attachTarget.dataset.label || attachTarget.dataset.id}" to ${project ? project.title : "the selected project"}.`);
+    } catch (err) {
+      setMessage(toErrorMessage(err, "Failed to add dataset to project"));
+    } finally {
+      setLocalActionLoading(false);
+    }
+  }
+
+  function openRenameModal(dataset) {
+    setRenameTarget(dataset);
+    setRenameLabel(dataset.label || dataset.id || "");
+    setMessage("");
+  }
+
+  async function submitRenameDataset(event) {
+    event.preventDefault();
+    const label = String(renameLabel || "").trim();
+    if (!renameTarget || !label) return;
+    setLocalActionLoading(true);
+    setMessage("");
+    try {
+      await api.updateInputDataset(renameTarget.id, { label });
+      setRenameTarget(null);
+      await refreshDatasetLibrary();
+      setMessage(`Renamed dataset to "${label}".`);
+    } catch (err) {
+      setMessage(toErrorMessage(err, "Failed to rename dataset"));
+    } finally {
+      setLocalActionLoading(false);
+    }
+  }
+
+  async function activateDatasetVersion(dataset, version) {
+    setLocalActionLoading(true);
+    setMessage("");
+    try {
+      await api.activateInputDatasetVersion(dataset.id, version.version_id);
+      await refreshDatasetLibrary();
+      setMessage(`Activated ${version.filename || version.version_id}.`);
+    } catch (err) {
+      setMessage(toErrorMessage(err, "Failed to activate dataset version"));
+    } finally {
+      setLocalActionLoading(false);
+    }
+  }
+
+  async function deleteDatasetVersion(dataset, version) {
+    const filename = version.filename || version.version_id;
+    const confirmed = window.confirm(`Delete dataset version "${filename}"? Submitted model runs that reference it will block deletion.`);
+    if (!confirmed) return;
+    setLocalActionLoading(true);
+    setMessage("");
+    try {
+      await api.deleteInputDatasetVersion(dataset.id, version.version_id);
+      await refreshDatasetLibrary();
+      setMessage(`Deleted dataset version "${filename}".`);
+    } catch (err) {
+      setMessage(toErrorMessage(err, "Failed to delete dataset version"));
+    } finally {
+      setLocalActionLoading(false);
+    }
+  }
 
   return (
-    <div className="dashboard-note" style={{ marginTop: 14 }}>
-      <div className="row" style={{ justifyContent: "space-between", gap: 10 }}>
+    <div className="dataset-management-view">
+      <div className="dataset-management-header">
         <div>
-          <div style={{ fontWeight: 900 }}>Uploaded datasets</div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>
-            User-scoped dataset overrides available to this user across project workspaces.
+          <h2 style={{ margin: "0 0 4px" }}>Project data overrides</h2>
+          <div className="muted" style={{ fontSize: 13 }}>{uploadedRows.length} uploaded versions</div>
+        </div>
+        <div className="dataset-management-actions">
+          <button
+            type="button"
+            className="primary-action-button"
+            onClick={() => {
+              setCreateDraft((prev) => ({
+                ...prev,
+                layer: prev.layer || "user",
+              }));
+              setCreateModalOpen(true);
+              setMessage("");
+            }}
+            disabled={busy}
+          >
+            Add override
+          </button>
+          <button
+            type="button"
+            className={`icon-button refresh-icon-button ${loading ? "is-loading" : ""}`}
+            onClick={async () => {
+              await refreshVersions();
+              if (typeof onRefresh === "function") await onRefresh();
+            }}
+            disabled={busy}
+            aria-label={loading ? "Refreshing datasets" : "Refresh datasets"}
+            title={loading ? "Refreshing datasets" : "Refresh datasets"}
+          >
+            <span aria-hidden="true">↻</span>
+          </button>
+        </div>
+      </div>
+      {message ? <div className="warn" role="status" aria-live="polite" style={{ marginTop: 10 }}>{message}</div> : null}
+      {createModalOpen ? (
+        <Modal title="Add dataset" subtitle="Upload a reusable source" onClose={() => setCreateModalOpen(false)}>
+          <form className="project-create-form dataset-action-form" onSubmit={submitCreateDataset}>
+            <label>
+              Dataset name
+              <input
+                type="text"
+                value={createDraft.label}
+                maxLength={200}
+                placeholder="Example: National technology costs"
+                onChange={(event) => setCreateDraft((prev) => ({ ...prev, label: event.target.value }))}
+                autoFocus
+                required
+              />
+            </label>
+            <label>
+              File
+              <input
+                type="file"
+                accept=".csv,.json,.xlsx,.xls,.zip,.geojson,.yaml,.yml"
+                onChange={(event) => setCreateFile((event.target.files && event.target.files[0]) || null)}
+                required
+              />
+            </label>
+            <details className="dataset-classification-disclosure">
+              <summary>Classification</summary>
+              <div className="dataset-classification-fields">
+                <label>
+                  Role
+                  <input
+                    type="text"
+                    value={createDraft.role}
+                    maxLength={120}
+                    onChange={(event) => setCreateDraft((prev) => ({ ...prev, role: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Model layer
+                  <input
+                    type="text"
+                    list="dataset-layer-options"
+                    value={createDraft.layer}
+                    maxLength={120}
+                    onChange={(event) => setCreateDraft((prev) => ({ ...prev, layer: event.target.value }))}
+                    required
+                  />
+                  <datalist id="dataset-layer-options">
+                    {availableLayers.map((layer) => <option key={layer} value={layer} />)}
+                  </datalist>
+                </label>
+              </div>
+            </details>
+            {message ? <div className="warn dataset-modal-message" role="alert">{message}</div> : null}
+            <div className="modal-action-row">
+              <button type="button" onClick={() => setCreateModalOpen(false)} disabled={localActionLoading}>Cancel</button>
+              <button type="submit" className="run-play-button" disabled={localActionLoading || !createFile}>
+                Create dataset
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+      {attachTarget ? (
+        <Modal title="Add to project" subtitle="Dataset assignment" onClose={() => setAttachTarget(null)}>
+          <form className="project-create-form dataset-action-form" onSubmit={submitAttachDataset}>
+            <div className="dataset-action-summary">
+              <b>{attachTarget.dataset.label || attachTarget.dataset.id}</b>
+              <span>{attachTarget.version.filename || attachTarget.version.version_id}</span>
+            </div>
+            <label>
+              Project
+              <select
+                value={attachProjectId}
+                onChange={(event) => setAttachProjectId(event.target.value)}
+                autoFocus
+                required
+              >
+                {!activeProjects.length ? <option value="">No active projects available</option> : null}
+                {activeProjects.map((project) => (
+                  <option key={project.project_id} value={project.project_id}>
+                    {project.title || project.project_id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {message ? <div className="warn dataset-modal-message" role="alert">{message}</div> : null}
+            <div className="modal-action-row">
+              <button type="button" onClick={() => setAttachTarget(null)} disabled={localActionLoading}>Cancel</button>
+              <button type="submit" className="run-play-button" disabled={localActionLoading || !attachProjectId}>
+                Add to project
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+      {renameTarget ? (
+        <Modal title="Rename dataset" subtitle="Dataset metadata" onClose={() => setRenameTarget(null)}>
+          <form className="project-create-form dataset-action-form" onSubmit={submitRenameDataset}>
+            <label>
+              Dataset name
+              <input
+                type="text"
+                value={renameLabel}
+                maxLength={200}
+                onChange={(event) => setRenameLabel(event.target.value)}
+                autoFocus
+                required
+              />
+            </label>
+            {message ? <div className="warn dataset-modal-message" role="alert">{message}</div> : null}
+            <div className="modal-action-row">
+              <button type="button" onClick={() => setRenameTarget(null)} disabled={localActionLoading}>Cancel</button>
+              <button type="submit" className="run-play-button" disabled={localActionLoading || !String(renameLabel || "").trim()}>
+                Save name
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+      {detailsTarget ? (
+        <Modal title={detailsTarget.dataset.label || detailsTarget.dataset.id} subtitle="Dataset details" onClose={() => setDetailsTarget(null)}>
+          <dl className="dataset-details-list">
+            <div><dt>Dataset id</dt><dd><code>{detailsTarget.dataset.id}</code></dd></div>
+            <div><dt>Version id</dt><dd><code>{detailsTarget.version.version_id}</code></dd></div>
+            <div><dt>Role</dt><dd>{detailsTarget.dataset.role || "-"}</dd></div>
+            <div><dt>Layer</dt><dd>{detailsTarget.dataset.layer || "-"}</dd></div>
+            <div><dt>Source</dt><dd>{detailsTarget.dataset.path || detailsTarget.dataset.filename || "-"}</dd></div>
+            <div><dt>File size</dt><dd>{compact(detailsTarget.version.size_bytes || 0)} bytes</dd></div>
+            <div><dt>Project access</dt><dd>{projectAvailabilityLabel(detailsTarget.dataset, detailsTarget.version)}</dd></div>
+            <div><dt>Updated</dt><dd>{formatTimestamp(detailsTarget.version.created_at)}</dd></div>
+          </dl>
+          <div className="modal-action-row">
+            <button type="button" onClick={() => setDetailsTarget(null)}>Close</button>
+          </div>
+        </Modal>
+      ) : null}
+      {uploadedRows.length ? (
+        <>
+          <details className="dataset-filter-disclosure">
+            <summary>
+              <span>Filter datasets</span>
+              <small>
+                {filtersActive
+                  ? `${filteredUploadedRows.length} of ${uploadedRows.length} versions`
+                  : `${uploadedRows.length} versions`}
+              </small>
+            </summary>
+            <div className="dataset-library-toolbar" role="search" aria-label="Filter dataset library">
+              <label className="dataset-search-field">
+                <span>Search datasets</span>
+                <input
+                  type="search"
+                  value={datasetSearch}
+                  onChange={(event) => setDatasetSearch(event.target.value)}
+                  placeholder="Name, file, role, or version"
+                />
+              </label>
+              <label className="dataset-format-field">
+                <span>Format</span>
+                <select value={datasetFormat} onChange={(event) => setDatasetFormat(event.target.value)}>
+                  <option value="all">All formats</option>
+                  {availableFormats.map((format) => (
+                    <option key={format} value={format}>{format}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="dataset-filter-summary" aria-live="polite">
+                {filteredUploadedRows.length} of {uploadedRows.length} versions
+              </div>
+              {filtersActive ? (
+                <button
+                  type="button"
+                  className="ghost-utility-button dataset-clear-filters"
+                  onClick={() => {
+                    setDatasetSearch("");
+                    setDatasetFormat("all");
+                  }}
+                >
+                  Clear filters
+                </button>
+              ) : null}
+            </div>
+          </details>
+          <div className="dataset-table-wrap">
+            <table className="panel-table dataset-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Format</th>
+                  <th>Last updated</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUploadedRows.length ? filteredUploadedRows.map(({ dataset, version, active }) => {
+                  const filename = version.filename || version.version_id;
+                  return (
+                    <tr key={`${dataset.id}-${version.version_id}`}>
+                      <td data-label="Dataset">
+                        <b>{dataset.label || dataset.id}</b> {active ? <span className="badge badge-succeeded">Active</span> : null}
+                        <div className="muted" style={{ fontSize: 11 }}>
+                          {filename}
+                        </div>
+                      </td>
+                      <td data-label="Format">{formatFromFilename(filename)}</td>
+                      <td data-label="Updated">{formatTimestamp(version.created_at)}</td>
+                      <td data-label="Actions">
+                        <div className="dataset-table-actions">
+                          <button
+                            type="button"
+                            className="dataset-primary-row-action"
+                            onClick={() => openAttachModal(dataset, version)}
+                            disabled={busy || !activeProjects.length}
+                            title={activeProjects.length ? "Add this dataset version to a project" : "Create an active project first"}
+                          >
+                            Add to project
+                          </button>
+                          <details className="dataset-overflow-menu">
+                            <summary aria-label={`Actions for ${dataset.label || dataset.id}`} title="More dataset actions">
+                              ...
+                            </summary>
+                            <div className="dataset-overflow-menu-body">
+                              <button type="button" onClick={() => setDetailsTarget({ dataset, version })}>View details</button>
+                              <button type="button" onClick={() => openRenameModal(dataset)} disabled={busy}>Rename</button>
+                              <button
+                                type="button"
+                                onClick={() => activateDatasetVersion(dataset, version)}
+                                disabled={busy || active}
+                              >
+                                {active ? "Active version" : "Make active"}
+                              </button>
+                              <a href={api.inputDatasetVersionDownloadUrl(dataset.id, version.version_id)} download>Download</a>
+                              <button
+                                type="button"
+                                className="danger-menu-button"
+                                onClick={() => deleteDatasetVersion(dataset, version)}
+                                disabled={busy}
+                              >
+                                Delete version
+                              </button>
+                            </div>
+                          </details>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }) : (
+                  <tr>
+                    <td colSpan="4" className="dataset-no-results">
+                      No dataset versions match the current filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <div className="dataset-empty-state">
+          <div style={{ fontWeight: 900 }}>No project overrides.</div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 5 }}>
+            This project currently uses the platform's system inputs without uploaded replacements.
           </div>
         </div>
-        <button
-          type="button"
-          className={`icon-button refresh-icon-button ${loading ? "is-loading" : ""}`}
-          onClick={async () => {
-            await refreshVersions();
-            if (typeof onRefresh === "function") await onRefresh();
-          }}
-          disabled={actionLoading || loading}
-          aria-label={loading ? "Refreshing datasets" : "Refresh datasets"}
-          title={loading ? "Refreshing datasets" : "Refresh datasets"}
-        >
-          <span aria-hidden="true">↻</span>
-        </button>
-      </div>
-      {message ? <div className="warn" style={{ marginTop: 10 }}>{message}</div> : null}
-      {uploadedRows.length ? (
-        <div className="diagram-dataset-version-list" style={{ marginTop: 10 }}>
-          {uploadedRows.map(({ dataset, version, active }) => (
-            <div key={`${dataset.id}-${version.version_id}`} className="diagram-dataset-version-row">
-              <div>
-                <div>
-                  <b>{dataset.label || dataset.id}</b> {active ? <span className="badge badge-succeeded">Active</span> : null}
-                </div>
-                <div className="muted" style={{ fontSize: 11 }}>
-                  {version.filename || version.version_id} · <code>{version.version_id}</code> · {compact(version.size_bytes || 0)} bytes · {formatTimestamp(version.created_at)}
-                </div>
-              </div>
-              <div className="diagram-dataset-actions">
-                <a href={api.inputDatasetVersionDownloadUrl(dataset.id, version.version_id)} download>Download</a>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>
-          No uploaded dataset versions are available for this user yet. Upload model inputs from the dataset boxes inside a project workspace.
-        </div>
       )}
+      <section className="dataset-system-inputs" aria-labelledby="system-inputs-title">
+        <div className="dataset-management-header">
+          <div>
+            <h3 id="system-inputs-title">System inputs</h3>
+            <div className="muted" style={{ fontSize: 12 }}>
+              Read-only reference data used unless a project override is attached.
+            </div>
+          </div>
+          <span className="result-scope-token result-scope-token--scenario_wide">Platform managed</span>
+        </div>
+        {systemDatasets.length ? (
+          <div className="dataset-system-input-list">
+            {systemDatasets.map((dataset) => (
+              <div className="dataset-system-input" key={dataset.id}>
+                <div>
+                  <strong>{dataset.label || dataset.id}</strong>
+                  <small className="muted">
+                    {[dataset.role, dataset.layer].filter(Boolean).join(" · ") || "Reference input"}
+                  </small>
+                </div>
+                <small title={dataset.path || dataset.filename || ""}>
+                  {dataset.active_version_id ? `Version ${dataset.active_version_id}` : "Bundled source"}
+                </small>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="muted" style={{ marginTop: 9, fontSize: 12 }}>
+            System-input provenance is not available from the current backend.
+          </div>
+        )}
+      </section>
     </div>
   );
 }
@@ -7586,11 +9143,10 @@ function ModelRunManagementPane({
       ? "Project"
       : "Ready";
   return (
-    <aside className="model-run-management-pane" aria-label="Model run management">
+    <aside className="model-run-management-pane" aria-label="Model execution management">
       <div className="run-management-header">
         <div>
-          <div className="run-management-eyebrow">Run management</div>
-          <h2>Model runs</h2>
+          <h2>Execution</h2>
         </div>
         <div className={`overall-run-status ${normalizedStatus || ""}`}>
           {overallStatusLabel}
@@ -7601,7 +9157,6 @@ function ModelRunManagementPane({
       {statusMessage ? <div className="ok" style={{ marginTop: errorMessage ? 8 : 0 }}>{statusMessage}</div> : null}
 
       <section className="run-management-section">
-        <div className="run-management-section-title">Validation and execution</div>
         {operationsPanel}
       </section>
     </aside>
@@ -7674,7 +9229,7 @@ function NewModelModal({
             />
             <span>
               <b>Customize an existing model input</b>
-              <small>Copy the selected run configuration into a new editable draft without changing the original.</small>
+              <small>Copy the selected model configuration into a new editable draft without changing the original.</small>
             </span>
           </label>
         </fieldset>
@@ -7719,7 +9274,6 @@ function ProjectsOverviewPanel({
   projectRuns,
   projectReports,
   projectExports,
-  inputDatasets,
   onOpenProject,
   onCreateProject,
   onRenameProject,
@@ -7727,11 +9281,11 @@ function ProjectsOverviewPanel({
   onRestoreProject,
   onDeleteProject,
   onDownloadProjectFiles,
-  onRefreshDatasets,
+  onReturnHome,
+  currentUser,
   actionLoading,
   isAdminView = false,
 }) {
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState("");
   const [titleDrafts, setTitleDrafts] = useState({});
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -7740,11 +9294,41 @@ function ProjectsOverviewPanel({
     geography: PROJECT_GEOGRAPHY_OPTIONS[0],
     model_architecture_id: "energy-development",
   });
-  const activeRunRows = activeProject ? projectRuns || [] : [];
-  const completedCount = succeededProjectRuns(activeRunRows).length;
   const activeProjects = (projects || []).filter((project) => String(project.status || "active").toLowerCase() !== "archived");
   const archivedProjects = (projects || []).filter((project) => String(project.status || "active").toLowerCase() === "archived");
-  const visibleProjects = archiveOpen ? archivedProjects : activeProjects;
+  const activeProjectSummaries = activeProjects.map(projectVisualData);
+  const workspaceModelCount = activeProjectSummaries.reduce((total, summary) => total + summary.modelCount, 0);
+  const workspaceCompletedCount = activeProjectSummaries.reduce((total, summary) => total + summary.completedCount, 0);
+  const workspaceGeographyCount = new Set(
+    activeProjects
+      .map((project) => projectGeographyLabel(project.geography))
+      .filter(Boolean)
+  ).size;
+  const userDisplayName =
+    (currentUser && (currentUser.display_name || currentUser.user_id)) ||
+    "Current user";
+  const userContext =
+    (currentUser && (currentUser.organization || currentUser.email)) ||
+    "Platform workspace";
+  const lastActivityMs = [
+    ...(projects || []),
+    ...(projectRuns || []),
+    ...(projectReports || []),
+    ...(projectExports || []),
+  ].reduce((latest, record) => {
+    const timestamp = toTimestampMs(
+      record && (
+        record.updated_at ||
+        record.finished_at ||
+        record.started_at ||
+        record.created_at
+      )
+    );
+    return timestamp && timestamp > latest ? timestamp : latest;
+  }, 0);
+  const lastActivityLabel = lastActivityMs
+    ? formatTimestamp(new Date(lastActivityMs).toISOString())
+    : "This session";
 
   function draftTitle(project) {
     const id = project.project_id;
@@ -7772,8 +9356,7 @@ function ProjectsOverviewPanel({
       geography: String(createDraft.geography || "").trim(),
       model_architecture_id: architectureId,
       project_type: projectTypeForArchitecture(architectureId),
-      scenario_label: architectureId === "energy-only" ? "Energy model workspace" : "Energy-development model workspace",
-      notes: "Created from the projects overview.",
+      scenario_label: architectureId === "energy-only" ? "Energy model workspace" : "Energy-Development model workspace",
     });
     if (!created) return;
     setCreateModalOpen(false);
@@ -7784,227 +9367,499 @@ function ProjectsOverviewPanel({
     });
   }
 
-  function maybeOpenProject(event, projectId) {
-    const interactive = event.target && event.target.closest
-      ? event.target.closest("button, a, input, select, textarea, summary, details, label")
-      : null;
-    if (interactive || actionLoading) return;
-    onOpenProject(projectId);
+  function renderProjectCard(project) {
+    const selected = project.project_id === activeProjectId;
+    const modifiedAt = project.updated_at || project.last_modified_at || project.created_at;
+    const editing = editingProjectId === project.project_id;
+    const visualData = projectVisualData(project);
+    return (
+      <div
+        key={project.project_id}
+        className={`dashboard-note project-card ${selected ? "row-selected" : ""}`}
+      >
+        <div className="project-card-visual-wrap">
+          <ProjectIdentityVisual project={project} />
+        </div>
+        <button
+          type="button"
+          className="entity-card-open-target"
+          aria-label={`Open project: ${project.title || "Untitled project"}`}
+          onClick={() => onOpenProject(project.project_id)}
+          disabled={actionLoading}
+        />
+        <div className="project-card-header">
+          <div className="project-card-title-wrap">
+            {editing ? (
+              <div className="project-title-edit-row">
+                <input
+                  type="text"
+                  value={draftTitle(project)}
+                  maxLength={200}
+                  onChange={(event) => setTitleDrafts((prev) => ({ ...prev, [project.project_id]: event.target.value }))}
+                  style={{ width: "100%", minWidth: 0, fontWeight: 800 }}
+                />
+                <button type="button" onClick={() => saveTitle(project)} disabled={actionLoading}>Save</button>
+                <button type="button" onClick={() => setEditingProjectId("")} disabled={actionLoading}>Cancel</button>
+              </div>
+            ) : (
+              <div className="project-title-row">
+                <div className="project-card-title">{project.title || "Untitled project"}</div>
+                <button
+                  type="button"
+                  className="project-edit-icon"
+                  aria-label={`Edit project name: ${project.title || "Untitled project"}`}
+                  title="Edit project name"
+                  onClick={() => {
+                    setTitleDrafts((prev) => ({ ...prev, [project.project_id]: project.title || "" }));
+                    setEditingProjectId(project.project_id);
+                  }}
+                  disabled={actionLoading}
+                >
+                  ✎
+                </button>
+              </div>
+            )}
+          </div>
+          <details className="project-overflow-menu">
+            <summary aria-label={`Project actions for ${project.title || "Untitled project"}`}>...</summary>
+            <div className="project-overflow-menu-body">
+              <button
+                type="button"
+                onClick={() => onDownloadProjectFiles(project.project_id)}
+                disabled={actionLoading}
+              >
+                Download files
+              </button>
+              {String(project.status || "active").toLowerCase() === "archived" ? (
+                <button type="button" onClick={() => onRestoreProject(project.project_id)} disabled={actionLoading}>Restore</button>
+              ) : (
+                <button type="button" onClick={() => onArchiveProject(project.project_id)} disabled={actionLoading}>Archive</button>
+              )}
+              <button
+                type="button"
+                onClick={() => onDeleteProject(project.project_id)}
+                disabled={actionLoading}
+                className="danger-menu-button"
+              >
+                Delete
+              </button>
+            </div>
+          </details>
+        </div>
+        <div className="project-card-context">
+          <span>{projectGeographyLabel(project.geography) || "No geography"}</span>
+          <span>{projectTypeLabel(project)}</span>
+        </div>
+        {isAdminView ? (
+          <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
+            Owner: <code>{project.owner_user_id || "-"}</code>
+          </div>
+        ) : null}
+        <div className="project-card-updated">
+          Updated {formatTimestamp(modifiedAt)}
+        </div>
+        <div className="project-card-evidence">
+          <EvidenceBadge status={visualData.evidenceStatus} compact />
+        </div>
+        <div className="project-card-footer">
+          <div>
+            <div>
+              {visualData.modelCount} {visualData.modelCount === 1 ? "model" : "models"}
+              {" · "}
+              {visualData.completedCount} complete
+            </div>
+          </div>
+          <button
+            type="button"
+            className="project-open-link"
+            onClick={() => onOpenProject(project.project_id)}
+            disabled={actionLoading}
+          >
+            Open project
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="card projects-overview-panel">
-      <div className="row" style={{ justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-        <div>
-          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "#8ea4c5" }}>
-            Projects overview
-          </div>
-          <h2 style={{ margin: "6px 0 6px" }}>Select a project workspace</h2>
-          <div className="muted" style={{ fontSize: 13 }}>
-            Each project owns its model runs, uploaded dataset versions, reports, exports, and comparison workflow for the active user.
-          </div>
+      <section className="modeling-workspace-intro" aria-labelledby="modeling-workspace-title">
+        <div className="modeling-workspace-copy">
+          <button
+            type="button"
+            className="workspace-return-home workspace-back-button"
+            onClick={onReturnHome}
+          >
+            <span aria-hidden="true">←</span>
+            <span>Return to home</span>
+          </button>
+          <div className="modeling-workspace-kicker">Analysis portfolio</div>
+          <h1 id="modeling-workspace-title">Modeling Workspace</h1>
+          <p>
+            Organize energy and development analyses, explore alternative pathways,
+            and bring model evidence together for planning and policy decisions.
+          </p>
         </div>
-        <button type="button" onClick={() => setCreateModalOpen(true)} disabled={actionLoading}>
-          New project
-        </button>
-      </div>
+        <div className="modeling-workspace-summary">
+          <section className="modeling-workspace-user" aria-label="Current user">
+            <span className="modeling-workspace-user-icon" aria-hidden="true" />
+            <div className="modeling-workspace-user-identity">
+              <small>Current user</small>
+              <strong>{userDisplayName}</strong>
+              <span>{userContext}</span>
+            </div>
+            <div className="modeling-workspace-user-activity">
+              <small>Last active</small>
+              <strong>{lastActivityLabel}</strong>
+            </div>
+          </section>
+          <ul className="modeling-workspace-metrics" aria-label="Workspace summary">
+            <li className="modeling-workspace-metric">
+              <span className="modeling-workspace-metric-icon projects" aria-hidden="true" />
+              <div>
+                <span className="modeling-workspace-metric-label">Active projects</span>
+                <strong className="modeling-workspace-metric-value">{activeProjects.length}</strong>
+              </div>
+            </li>
+            <li className="modeling-workspace-metric">
+              <span className="modeling-workspace-metric-icon models" aria-hidden="true" />
+              <div>
+                <span className="modeling-workspace-metric-label">Models</span>
+                <strong className="modeling-workspace-metric-value">{workspaceModelCount}</strong>
+              </div>
+            </li>
+            <li className="modeling-workspace-metric">
+              <span className="modeling-workspace-metric-icon completed" aria-hidden="true" />
+              <div>
+                <span className="modeling-workspace-metric-label">Completed executions</span>
+                <strong className="modeling-workspace-metric-value">{workspaceCompletedCount}</strong>
+              </div>
+            </li>
+            <li className="modeling-workspace-metric">
+              <span className="modeling-workspace-metric-icon geographies" aria-hidden="true" />
+              <div>
+                <span className="modeling-workspace-metric-label">Geographies</span>
+                <strong className="modeling-workspace-metric-value">{workspaceGeographyCount}</strong>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
 
-      {createModalOpen ? (
-        <Modal title="Create project" subtitle="Project setup" onClose={() => setCreateModalOpen(false)}>
-          <form className="project-create-form" onSubmit={submitCreateProject}>
-            <label>
-              Project name
-              <input
-                type="text"
-                value={createDraft.title}
-                maxLength={200}
-                placeholder="Example: South Africa energy transition"
-                onChange={(event) => setCreateDraft((prev) => ({ ...prev, title: event.target.value }))}
-                autoFocus
-              />
-            </label>
-            <label>
-              Geography
-              <select
-                value={createDraft.geography}
-                onChange={(event) => setCreateDraft((prev) => ({ ...prev, geography: event.target.value }))}
-              >
-                {PROJECT_GEOGRAPHY_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Type
-              <select
-                value={createDraft.model_architecture_id}
-                onChange={(event) => setCreateDraft((prev) => ({ ...prev, model_architecture_id: event.target.value }))}
-              >
-                {PROJECT_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-            <div className="modal-action-row">
-              <button type="button" onClick={() => setCreateModalOpen(false)} disabled={actionLoading}>
-                Cancel
-              </button>
-              <button type="submit" className="run-play-button" disabled={actionLoading}>
-                Create project
+      <section className="projects-collection" aria-labelledby="your-projects-title">
+          <div className="row projects-overview-header" style={{ justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+            <div>
+              <h2 id="your-projects-title" style={{ margin: "0 0 6px" }}>Your Projects</h2>
+              <div className="muted" style={{ fontSize: 13 }}>
+                {activeProjects.length} active · {archivedProjects.length} archived
+              </div>
+            </div>
+            <div className="project-overview-actions">
+              <button type="button" className="primary-action-button" onClick={() => setCreateModalOpen(true)} disabled={actionLoading}>
+                New project
               </button>
             </div>
-          </form>
-        </Modal>
-      ) : null}
+          </div>
 
-      <div className="row" style={{ gap: 8, marginTop: 14 }}>
-        <button
-          type="button"
-          className={!archiveOpen ? "seg-button active" : "seg-button"}
-          onClick={() => setArchiveOpen(false)}
-        >
-          Active projects ({activeProjects.length})
-        </button>
-        <button
-          type="button"
-          className={archiveOpen ? "seg-button active" : "seg-button"}
-          onClick={() => setArchiveOpen(true)}
-        >
-          Project archive ({archivedProjects.length})
-        </button>
-      </div>
-
-      <div className="workspace-grid-3" style={{ marginTop: 14 }}>
-        {visibleProjects.length ? (
-          visibleProjects.map((project) => {
-            const selected = project.project_id === activeProjectId;
-            const modifiedAt = project.updated_at || project.last_modified_at || project.created_at;
-            const editing = editingProjectId === project.project_id;
-            return (
-              <div
-                key={project.project_id}
-                className={`dashboard-note project-card ${selected ? "row-selected" : ""}`}
-                role="button"
-                tabIndex={0}
-                onClick={(event) => maybeOpenProject(event, project.project_id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    maybeOpenProject(event, project.project_id);
-                  }
-                }}
-              >
-                <div className="project-card-header">
-                  <div className="project-card-title-wrap">
-                    {editing ? (
-                      <div className="project-title-edit-row">
-                        <input
-                          type="text"
-                          value={draftTitle(project)}
-                          maxLength={200}
-                          onChange={(event) => setTitleDrafts((prev) => ({ ...prev, [project.project_id]: event.target.value }))}
-                          style={{ width: "100%", minWidth: 0, fontWeight: 800 }}
-                        />
-                        <button type="button" onClick={() => saveTitle(project)} disabled={actionLoading}>Save</button>
-                        <button type="button" onClick={() => setEditingProjectId("")} disabled={actionLoading}>Cancel</button>
-                      </div>
-                    ) : (
-                      <div className="project-title-row">
-                        <div className="project-card-title">{project.title || "Untitled project"}</div>
-                        <button
-                          type="button"
-                          className="project-edit-icon"
-                          aria-label={`Edit project name: ${project.title || "Untitled project"}`}
-                          title="Edit project name"
-                          onClick={() => {
-                            setTitleDrafts((prev) => ({ ...prev, [project.project_id]: project.title || "" }));
-                            setEditingProjectId(project.project_id);
-                          }}
-                          disabled={actionLoading}
-                        >
-                          ✎
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <details className="project-overflow-menu">
-                    <summary aria-label={`Project actions for ${project.title || "Untitled project"}`}>...</summary>
-                    <div className="project-overflow-menu-body">
-                      <button
-                        type="button"
-                        onClick={() => onDownloadProjectFiles(project.project_id)}
-                        disabled={actionLoading}
-                      >
-                        Download files
-                      </button>
-                      {String(project.status || "active").toLowerCase() === "archived" ? (
-                        <button type="button" onClick={() => onRestoreProject(project.project_id)} disabled={actionLoading}>Restore</button>
-                      ) : (
-                        <button type="button" onClick={() => onArchiveProject(project.project_id)} disabled={actionLoading}>Archive</button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => onDeleteProject(project.project_id)}
-                        disabled={actionLoading}
-                        className="danger-menu-button"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </details>
-                </div>
-                <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                  {projectGeographyLabel(project.geography) ? <>Geography: <b>{projectGeographyLabel(project.geography)}</b></> : "No geography label set."}
-                </div>
-                <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                  Type: <b>{projectTypeLabel(project)}</b>
-                </div>
-                {isAdminView ? (
-                  <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                    Owner: <code>{project.owner_user_id || "-"}</code>
-                  </div>
-                ) : null}
-                <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                  Last modified: <code>{formatTimestamp(modifiedAt)}</code>
-                </div>
-                <div className="project-card-footer">
-                  <div>
-                    {selected ? (
-                      <>
-                        <div><b>Loaded:</b> {activeRunRows.length} runs, {completedCount} completed</div>
-                        <div className="muted" style={{ fontSize: 11 }}>
-                          {projectReports.length} reports · {projectExports.length} exports
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
-                  <button
-                    type="button"
-                    className="project-open-link"
-                    onClick={() => onOpenProject(project.project_id)}
-                    disabled={actionLoading}
+          {createModalOpen ? (
+            <Modal title="Create project" subtitle="Project setup" onClose={() => setCreateModalOpen(false)}>
+              <form className="project-create-form" onSubmit={submitCreateProject}>
+                <label>
+                  Project name
+                  <input
+                    type="text"
+                    value={createDraft.title}
+                    maxLength={200}
+                    placeholder="Example: South Africa energy transition"
+                    onChange={(event) => setCreateDraft((prev) => ({ ...prev, title: event.target.value }))}
+                    autoFocus
+                  />
+                </label>
+                <label>
+                  Geography
+                  <select
+                    value={createDraft.geography}
+                    onChange={(event) => setCreateDraft((prev) => ({ ...prev, geography: event.target.value }))}
                   >
-                    Open →
+                    {PROJECT_GEOGRAPHY_OPTIONS.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Type
+                  <select
+                    value={createDraft.model_architecture_id}
+                    onChange={(event) => setCreateDraft((prev) => ({ ...prev, model_architecture_id: event.target.value }))}
+                  >
+                    {PROJECT_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="modal-action-row">
+                  <button type="button" onClick={() => setCreateModalOpen(false)} disabled={actionLoading}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="run-play-button" disabled={actionLoading}>
+                    Create project
                   </button>
                 </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="dashboard-note" style={{ gridColumn: "1 / -1" }}>
-            <div style={{ fontWeight: 800 }}>{archiveOpen ? "No archived projects." : "No active projects for this user yet."}</div>
-            <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-              {archiveOpen ? "Archived projects will appear here after they are removed from the active workspace list." : "Create a project to start configuring and running models."}
-            </div>
-          </div>
-        )}
-      </div>
+              </form>
+            </Modal>
+          ) : null}
 
-      <UploadedDatasetsPanel
-        inputDatasets={inputDatasets}
-        onRefresh={onRefreshDatasets}
-        actionLoading={actionLoading}
-      />
+          <div className="workspace-grid-3 active-project-grid">
+            {activeProjects.length ? (
+              activeProjects.map(renderProjectCard)
+            ) : (
+              <div className="dashboard-note" style={{ gridColumn: "1 / -1" }}>
+                <div style={{ fontWeight: 800 }}>No active projects for this user yet.</div>
+                <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>
+                  Create a project to start configuring and running models.
+                </div>
+              </div>
+            )}
+          </div>
+
+          <details className="archived-projects-section">
+            <summary>
+              <span className="archived-projects-icon" aria-hidden="true" />
+              <span className="archived-projects-copy">
+                <strong>Archived projects</strong>
+                <small>Projects retained outside the active workspace</small>
+              </span>
+              <span className="archived-projects-count">{archivedProjects.length}</span>
+            </summary>
+            <div className="archived-projects-body">
+              {archivedProjects.length ? (
+                <div className="workspace-grid-3 archived-project-grid">
+                  {archivedProjects.map(renderProjectCard)}
+                </div>
+              ) : (
+                <div className="archived-projects-empty">No archived projects.</div>
+              )}
+            </div>
+          </details>
+      </section>
+    </div>
+  );
+}
+
+function ComparisonValueCell({
+  row,
+  runId,
+  baselineRunId,
+  displayMode,
+}) {
+  const value = row.values[runId];
+  const numeric = comparisonNumeric(value);
+  const baseline = comparisonNumeric(row.values[baselineRunId]);
+  const numericValues = Object.values(row.values).map(comparisonNumeric).filter((item) => item != null);
+  const maxMagnitude = numericValues.length ? Math.max(...numericValues.map((item) => Math.abs(item)), 0) : 0;
+  const magnitude = numeric != null && maxMagnitude > 0 ? Math.min(100, Math.abs(numeric) / maxMagnitude * 100) : 0;
+  const delta = numeric != null && baseline != null ? numeric - baseline : null;
+  const deltaShare = delta != null && Math.abs(baseline) > 1e-12 ? delta / Math.abs(baseline) : null;
+  const isBaseline = runId === baselineRunId;
+  const showAbsolute = displayMode !== "change";
+  const showDelta = displayMode !== "absolute";
+
+  if (value == null || value === "") return <td className="comparison-value-cell unavailable">Not available</td>;
+  if (numeric == null) {
+    return (
+      <td className={`comparison-value-cell comparison-value-cell--text ${isBaseline ? "baseline" : ""}`}>
+        <span>{String(value)}</span>
+        {isBaseline ? <small>Reference</small> : null}
+      </td>
+    );
+  }
+
+  return (
+    <td className={`comparison-value-cell ${isBaseline ? "baseline" : ""}`}>
+      <div className="comparison-value-main">
+        {showAbsolute ? <strong>{comparisonFormatValue(numeric, row.unit)}</strong> : null}
+        {showDelta ? (
+          <span className={`comparison-value-delta ${delta == null || Math.abs(delta) < 1e-12 ? "neutral" : delta > 0 ? "positive" : "negative"}`}>
+            {isBaseline
+              ? "Reference"
+              : deltaShare == null
+                ? delta == null ? "No reference" : `${delta > 0 ? "+" : ""}${comparisonFormatValue(delta, row.unit)}`
+                : `${deltaShare > 0 ? "+" : ""}${(deltaShare * 100).toFixed(1)}%`}
+          </span>
+        ) : null}
+      </div>
+      <span className="comparison-value-track" aria-hidden="true">
+        <span style={{ width: `${magnitude}%` }} />
+      </span>
+    </td>
+  );
+}
+
+function ComparisonMatrix({
+  rows,
+  selectedRuns,
+  summaries,
+  baselineRunId,
+  displayMode,
+}) {
+  const grouped = useMemo(() => {
+    const groups = new Map();
+    (rows || []).forEach((row) => {
+      if (!groups.has(row.group)) groups.set(row.group, []);
+      groups.get(row.group).push(row);
+    });
+    return Array.from(groups.entries());
+  }, [rows]);
+
+  if (!rows.length) {
+    return <div className="comparison-empty">This output family is not available in the selected model summaries.</div>;
+  }
+
+  return (
+    <div className="comparison-group-list">
+      {grouped.map(([group, groupRows], groupIndex) => (
+        <details key={group} className="comparison-output-group" open={groupIndex === 0}>
+          <summary>
+            <span>{group}</span>
+            <small>{groupRows.length} outputs</small>
+          </summary>
+          <div className="comparison-table-scroll">
+            <table className="comparison-matrix">
+              <thead>
+                <tr>
+                  <th>Output</th>
+                  {selectedRuns.map((run) => (
+                    <th key={run.run_id}>
+                      <span>{modelDisplayName(run)}</span>
+                      <small>{modelNumberLabel(run)}</small>
+                      <EvidenceBadge
+                        status={evidenceFromModel(run, summaries && summaries[run.run_id]).status}
+                        compact
+                      />
+                      {run.run_id === baselineRunId ? <small>Reference model</small> : null}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {groupRows.map((row) => (
+                  <tr key={row.key}>
+                    <th scope="row">
+                      <span>{row.label}</span>
+                      <small>
+                        {[row.unit, row.resolution].filter(Boolean).join(" · ") || "Native model output"}
+                      </small>
+                    </th>
+                    {selectedRuns.map((run) => (
+                      <ComparisonValueCell
+                        key={`${row.key}-${run.run_id}`}
+                        row={row}
+                        runId={run.run_id}
+                        baselineRunId={baselineRunId}
+                        displayMode={displayMode}
+                      />
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function comparisonArtifactRows(selectedRuns, summaries, artifactCatalogs) {
+  const rows = new Map();
+  (selectedRuns || []).forEach((run) => {
+    const runId = String(run && run.run_id || "");
+    if (!runId) return;
+    const summaryCatalog = Array.isArray(summaries[runId] && summaries[runId].artifact_catalog)
+      ? summaries[runId].artifact_catalog
+      : [];
+    const fetchedCatalog = Array.isArray(artifactCatalogs[runId]) ? artifactCatalogs[runId] : [];
+    const catalog = fetchedCatalog.length ? fetchedCatalog : summaryCatalog;
+    catalog.forEach((artifact) => {
+      if (!artifact || typeof artifact !== "object") return;
+      const artifactId = String(artifact.artifact_id || artifact.key || "").trim();
+      if (!artifactId) return;
+      if (!rows.has(artifactId)) {
+        rows.set(artifactId, {
+          key: artifactId,
+          label: String(artifact.label || comparisonHumanize(artifactId)),
+          kind: String(artifact.kind || ""),
+          mediaType: String(artifact.media_type || ""),
+          runs: {},
+        });
+      }
+      const href = window.EDIM_WORKSPACE_CONTRACTS && typeof window.EDIM_WORKSPACE_CONTRACTS.artifactHref === "function"
+        ? window.EDIM_WORKSPACE_CONTRACTS.artifactHref(runId, artifact)
+        : "";
+      rows.get(artifactId).runs[runId] = {
+        ...artifact,
+        href,
+      };
+    });
+  });
+  return Array.from(rows.values()).sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function ComparisonArtifactMatrix({
+  selectedRuns,
+  summaries,
+  artifactCatalogs,
+}) {
+  const rows = useMemo(
+    () => comparisonArtifactRows(selectedRuns, summaries, artifactCatalogs),
+    [selectedRuns, summaries, artifactCatalogs]
+  );
+  if (!rows.length) {
+    return <div className="comparison-empty">No downloadable output catalog is available for the selected models.</div>;
+  }
+  return (
+    <div className="comparison-table-scroll">
+      <table className="comparison-matrix comparison-artifact-matrix">
+        <thead>
+          <tr>
+            <th>Output file</th>
+            {selectedRuns.map((run) => (
+              <th key={run.run_id}>
+                <span>{modelDisplayName(run)}</span>
+                <small>{modelNumberLabel(run)}</small>
+                <EvidenceBadge
+                  status={evidenceFromModel(run, summaries && summaries[run.run_id]).status}
+                  compact
+                />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.key}>
+              <th scope="row">
+                <span>{row.label}</span>
+                <small>{[row.kind, row.mediaType, row.key].filter(Boolean).join(" · ")}</small>
+              </th>
+              {selectedRuns.map((run) => {
+                const artifact = row.runs[run.run_id];
+                return (
+                  <td key={`${row.key}-${run.run_id}`} className={`comparison-artifact-cell ${artifact ? "" : "unavailable"}`}>
+                    {artifact ? (
+                      <>
+                        {artifact.href ? <a href={artifact.href} download>Download</a> : <strong>Available</strong>}
+                        <small>{artifact.size_bytes != null ? `${compact(artifact.size_bytes)} bytes` : "Persisted output"}</small>
+                      </>
+                    ) : "Not available"}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -8016,32 +9871,66 @@ function ProjectComparePanel({
   projectExports,
   compareRunIds,
   onToggleCompareRun,
+  onCreateReport,
+  onCreateRunExport,
+  onNewModel,
+  onOpenRun,
+  onReturnToProjects,
+  actionLoading = false,
   isAdminView = false,
 }) {
-  // The project-level view reads completed run summaries from persisted artifacts. It
-  // does not depend on the live execution queue, so comparisons survive backend
-  // restarts once cloud storage/database providers are in place.
+  // Project-level view reads completed run summaries from persisted artifacts.
+  // It does not depend on live execution internals and remains a parent page
+  // above individual immutable or editable model runs.
+  const [workspaceTab, setWorkspaceTab] = useState("selection");
   const runs = projectRuns || [];
   const successfulRuns = succeededProjectRuns(runs);
+  const activeRuns = runs.filter((run) => ["queued", "running"].includes(normalizeStatus(run && run.status)));
   const selectedIds = compareRunIds;
   const selectedRuns = successfulRuns.filter((run) => selectedIds.includes(run.run_id));
-  const sortedRuns = [...runs].sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")));
-  const latestRun = sortedRuns[0] || null;
-  const latestReport = (projectReports || [])[0] || null;
   const modifiedAt = activeProject && (activeProject.updated_at || activeProject.last_modified_at || activeProject.created_at);
+  const projectTitle = (activeProject && activeProject.title) || "Untitled project";
+  const projectNotes = String((activeProject && activeProject.notes) || "").trim();
+  const meaningfulProjectNotes = projectNotes === "Created from the projects overview." ? "" : projectNotes;
+  const projectDescription = String(
+    meaningfulProjectNotes ||
+    (activeProject && activeProject.scenario_label) ||
+    "A shared workspace for configuring, running, and comparing energy-development models."
+  ).trim();
+  const projectGeography = activeProject && projectGeographyLabel(activeProject.geography);
+  const projectFocus = String((activeProject && activeProject.scenario_label) || "").trim();
+  const reportLabel = selectedRuns.length > 1 ? "Generate comparison report" : "Generate project report";
   const [summaries, setSummaries] = useState({});
+  const [artifactCatalogs, setArtifactCatalogs] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [comparisonSection, setComparisonSection] = useState("overview");
+  const [baselineRunId, setBaselineRunId] = useState("");
+  const [comparisonDisplayMode, setComparisonDisplayMode] = useState("both");
 
   useEffect(() => {
-    const missing = selectedRuns.map((run) => run.run_id).filter((runId) => runId && !summaries[runId]);
+    const missing = selectedRuns
+      .map((run) => run.run_id)
+      .filter((runId) => (
+        runId &&
+        (
+          !summaries[runId] ||
+          !Object.prototype.hasOwnProperty.call(artifactCatalogs, runId)
+        )
+      ));
     if (!missing.length) return;
     let cancelled = false;
     async function loadSummaries() {
       setLoading(true);
       setError("");
       try {
-        const rows = await Promise.all(missing.map(async (runId) => [runId, await api.fetchSummary(runId)]));
+        const rows = await Promise.all(missing.map(async (runId) => {
+          const summary = summaries[runId] || await api.fetchSummary(runId);
+          const artifacts = Object.prototype.hasOwnProperty.call(artifactCatalogs, runId)
+            ? artifactCatalogs[runId]
+            : await api.fetchRunArtifacts(runId).catch(() => []);
+          return [runId, summary, artifacts];
+        }));
         if (cancelled) return;
         setSummaries((prev) => {
           const next = { ...prev };
@@ -8050,8 +9939,15 @@ function ProjectComparePanel({
           });
           return next;
         });
+        setArtifactCatalogs((prev) => {
+          const next = { ...prev };
+          rows.forEach(([runId, , artifacts]) => {
+            next[runId] = artifacts;
+          });
+          return next;
+        });
       } catch (err) {
-        if (!cancelled) setError(toErrorMessage(err, "Failed to load comparison summaries"));
+        if (!cancelled) setError(toErrorMessage(err, "Failed to load model outputs for comparison"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -8060,130 +9956,456 @@ function ProjectComparePanel({
     return () => {
       cancelled = true;
     };
-  }, [selectedRuns.map((run) => run.run_id).join("|")]);
+  }, [
+    selectedRuns.map((run) => run.run_id).join("|"),
+    Object.keys(summaries).sort().join("|"),
+    Object.keys(artifactCatalogs).sort().join("|"),
+  ]);
 
-  const metricRows = useMemo(() => {
-    const byMetric = new Map();
-    selectedRuns.forEach((run) => {
-      const metrics = extractComparableMetrics(summaries[run.run_id]);
-      Object.values(metrics).forEach((metric) => {
-        if (!byMetric.has(metric.key)) byMetric.set(metric.key, { key: metric.key, label: metric.label, unit: metric.unit, values: {} });
-        byMetric.get(metric.key).values[run.run_id] = metric.value;
-      });
-    });
-    return Array.from(byMetric.values());
-  }, [selectedRuns.map((run) => run.run_id).join("|"), JSON.stringify(Object.keys(summaries).sort())]);
+  useEffect(() => {
+    const selectedRunIds = selectedRuns.map((run) => run.run_id);
+    if (!selectedRunIds.includes(baselineRunId)) setBaselineRunId(selectedRunIds[0] || "");
+  }, [selectedRuns.map((run) => run.run_id).join("|"), baselineRunId]);
+
+  const comparisonDatasets = useMemo(
+    () => buildComparisonDatasets(selectedRuns, summaries),
+    [selectedRuns, summaries]
+  );
+  const artifactComparisonRows = useMemo(
+    () => comparisonArtifactRows(selectedRuns, summaries, artifactCatalogs),
+    [selectedRuns, summaries, artifactCatalogs]
+  );
+  const activeComparisonDefinition = COMPARISON_OUTPUT_SECTIONS.find((section) => section.key === comparisonSection)
+    || COMPARISON_OUTPUT_SECTIONS[0];
+  const activeComparisonRows = comparisonDatasets[activeComparisonDefinition.key] || [];
+
+  function runTimestamp(run) {
+    return formatTimestamp(run.updated_at || run.finished_at || run.started_at || run.created_at);
+  }
+
+  function openComparison() {
+    if (selectedRuns.length < 2) return;
+    setWorkspaceTab("comparison");
+  }
 
   return (
-    <div className="project-home-unified card">
-      <section className="project-home-hero-card" aria-label="Project homepage and comparison overview">
-        <div className="project-home-copy">
-          <div className="run-management-eyebrow">Project workspace</div>
-          <h2>{activeProject ? activeProject.title || "Untitled project" : "No project selected"}</h2>
-          <div className="muted project-home-meta">
-            {activeProject && projectGeographyLabel(activeProject.geography) ? `Geography: ${projectGeographyLabel(activeProject.geography)}` : "No geography"}
-            {activeProject ? ` · ${projectTypeLabel(activeProject)}` : ""}
-            {modifiedAt ? ` · Modified ${formatTimestamp(modifiedAt)}` : ""}
-            {isAdminView && activeProject && activeProject.owner_user_id ? ` · Owner ${activeProject.owner_user_id}` : ""}
-          </div>
-          <p>
-            Use this project page to understand the run inventory, choose completed models for comparison,
-            and read the headline metric differences before opening a specific model run.
-          </p>
-        </div>
-        <div className="project-home-stats" aria-label="Project status summary">
-          <MetricCard label="Runs" value={String(runs.length)} />
-          <MetricCard label="Completed" value={String(successfulRuns.length)} />
-          <MetricCard label="Reports" value={String((projectReports || []).length)} />
-          <MetricCard label="Exports" value={String((projectExports || []).length)} />
-        </div>
-      </section>
-
-      <section className="project-home-activity-strip" aria-label="Latest project activity">
-        <span><b>Latest run</b> {latestRun ? `${runLabel(latestRun)} · ${displayStatus(latestRun.status).label}` : "No runs yet"}</span>
-        <span><b>Latest report</b> {latestReport ? `${latestReport.report_type || "Project report"} · ${formatTimestamp(latestReport.created_at)}` : "No reports yet"}</span>
-      </section>
-
-      <section className="project-comparison-workbench" aria-label="Project run comparison">
-        <div className="project-comparison-header">
-          <div>
-            <div className="run-management-eyebrow">Comparison workbench</div>
-            <h3>Compare completed model runs</h3>
-            <div className="muted">
-              Select completed runs here or in the run library. Metrics are read from persisted summary artifacts.
+    <div className="project-workspace-page card">
+      {workspaceTab === "selection" ? (
+        <section className="project-information-bar" aria-label={`Project overview: ${projectTitle}`}>
+        <div className="project-information-main">
+          <div className="project-information-heading-row">
+            <button
+              type="button"
+              className="project-information-back workspace-back-button"
+              onClick={onReturnToProjects}
+            >
+              <span aria-hidden="true">←</span>
+              <span>Back to projects</span>
+            </button>
+            <div className="project-information-heading-copy">
+              <div className="project-information-eyebrow">Project workspace</div>
+              <h1>{projectTitle}</h1>
             </div>
           </div>
-          <div className="project-comparison-count">
-            <b>{selectedRuns.length}</b>
-            <span>selected</span>
+          <p>{projectDescription}</p>
+          <div className="project-information-metadata">
+            <div className="project-information-meta-item">
+              <span className="project-information-icon icon-map-pin" aria-hidden="true" />
+              <span>
+                <small>Geography</small>
+                <b>{projectGeography || "Not specified"}</b>
+              </span>
+            </div>
+            <div className="project-information-meta-item">
+              <span className="project-information-icon icon-layers" aria-hidden="true" />
+              <span>
+                <small>Modeling scope</small>
+                <b>{activeProject ? projectTypeLabel(activeProject) : "Energy-Development"}</b>
+              </span>
+            </div>
+            {projectFocus ? (
+              <div className="project-information-meta-item">
+                <span className="project-information-icon icon-target" aria-hidden="true" />
+                <span>
+                  <small>Project focus</small>
+                  <b>{projectFocus}</b>
+                </span>
+              </div>
+            ) : null}
+            <div className="project-information-meta-item">
+              <span className="project-information-icon icon-calendar" aria-hidden="true" />
+              <span>
+                <small>Last updated</small>
+                <b>{modifiedAt ? formatTimestamp(modifiedAt) : "Not available"}</b>
+              </span>
+            </div>
+            {isAdminView && activeProject && activeProject.owner_user_id ? (
+              <div className="project-information-meta-item">
+                <span className="project-information-icon icon-user" aria-hidden="true" />
+                <span>
+                  <small>Owner</small>
+                  <b>{activeProject.owner_user_id}</b>
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
-
-        <div className="project-compare-run-pills" aria-label="Completed runs available for comparison">
-          {successfulRuns.length ? successfulRuns.map((run) => {
-            const selected = selectedIds.includes(run.run_id);
-            return (
-              <button
-                key={run.run_id}
-                type="button"
-                className={`project-compare-run-pill ${selected ? "selected" : ""}`}
-                onClick={() => onToggleCompareRun(run.run_id)}
-                aria-pressed={selected}
-              >
-                <span>{runLabel(run)}</span>
-                <small>{runMetadataLine(run)}</small>
-              </button>
-            );
-          }) : (
-            <div className="muted" style={{ fontSize: 12 }}>No completed runs are available for comparison yet.</div>
-          )}
-        </div>
-
-        {selectedRuns.length ? (
-          <div className="project-selected-compare-note">
-            Selected comparison set: {selectedRuns.map((run) => runLabel(run)).join(", ")}
+        <div className="project-information-summary">
+          <div className="project-information-visual">
+            {activeProject ? <ProjectIdentityVisual project={activeProject} /> : null}
           </div>
-        ) : null}
-
-        {error ? <div className="warn">{error}</div> : null}
-        {loading ? <div className="diagram-note">Loading comparison summaries...</div> : null}
-
-        <div className="project-comparison-table-panel">
-          <div style={{ fontWeight: 900, marginBottom: 6 }}>Headline metric comparison</div>
-          {selectedRuns.length < 2 ? (
-            <div className="muted" style={{ fontSize: 12 }}>
-              {successfulRuns.length
-                ? "Select at least two completed runs to compare headline metrics."
-                : "Run and complete at least two models to activate comparison."}
+          <div className="project-information-stats" aria-label="Project totals">
+            <div>
+              <strong>{runs.length}</strong>
+              <span>Models</span>
             </div>
-          ) : metricRows.length ? (
-            <div style={{ overflowX: "auto" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Metric</th>
-                    {selectedRuns.map((run) => <th key={run.run_id}>{runLabel(run)}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {metricRows.map((metric) => (
-                    <tr key={metric.key}>
-                      <td>{metric.label} {metric.unit ? <span className="muted">({metric.unit})</span> : null}</td>
-                      {selectedRuns.map((run) => (
-                        <td key={`${metric.key}-${run.run_id}`}>
-                          {Number.isFinite(metric.values[run.run_id]) ? compact(metric.values[run.run_id]) : "-"}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div>
+              <strong>{successfulRuns.length}</strong>
+              <span>Complete</span>
             </div>
-          ) : (
-            <div className="muted" style={{ fontSize: 12 }}>Selected run summaries do not expose comparable headline metrics yet.</div>
-          )}
+            <div>
+              <strong>{activeRuns.length}</strong>
+              <span>In progress</span>
+            </div>
+            <div>
+              <strong>{(projectReports || []).length}</strong>
+              <span>Reports</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="primary-action-button project-information-new-model"
+            onClick={onNewModel}
+            disabled={actionLoading || !activeProject}
+          >
+            <span aria-hidden="true">+</span>
+            New model
+          </button>
         </div>
-      </section>
+        </section>
+      ) : null}
+
+      {workspaceTab === "selection" ? (
+        <section
+          className="project-selection-workbench"
+          aria-label="Project models"
+        >
+          <div className="project-selection-toolbar">
+            <div>
+              <h2>Models</h2>
+              <div className="muted">{runs.length} models · {successfulRuns.length} complete · {selectedRuns.length} selected</div>
+            </div>
+            <button
+              type="button"
+              className="secondary-action-button model-comparison-launch"
+              disabled={selectedRuns.length < 2}
+              onClick={openComparison}
+              title={selectedRuns.length < 2 ? "Select at least two completed models" : "Open model comparison"}
+            >
+              <span>Compare models</span>
+              <b aria-label={`${selectedRuns.length} selected`}>{selectedRuns.length}</b>
+            </button>
+          </div>
+
+          <div className="project-run-card-grid">
+            {runs.length ? runs.map((run) => {
+              const complete = normalizeStatus(run.status) === "succeeded";
+              const checked = compareRunIds.includes(run.run_id);
+              return (
+                <article
+                  key={run.run_id}
+                  className={`project-model-card ${checked ? "selected" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="entity-card-open-target"
+                    aria-label={`Open model: ${modelDisplayName(run)}`}
+                    onClick={() => onOpenRun(run)}
+                  />
+                  <div className="project-model-card-head">
+                    <div>
+                      <h3>{modelDisplayName(run)}</h3>
+                      <div className="muted">{modelNumberLabel(run)} · {runMetadataLine(run)}</div>
+                    </div>
+                    <StatusBadge status={run.status} />
+                  </div>
+                  <div className="project-model-card-visual">
+                    <ModelIdentityVisual run={run} />
+                  </div>
+                  <div className="project-model-card-actions">
+                    <div>
+                      <EvidenceBadge
+                        status={evidenceFromModel(run, summaries[run.run_id]).status}
+                        summary={evidenceFromModel(run, summaries[run.run_id]).summary}
+                        compact
+                      />
+                    </div>
+                    <div className="project-card-open-actions">
+                      {complete ? (
+                        <label className="project-compare-toggle">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => onToggleCompareRun(run.run_id)}
+                          />
+                          Compare
+                        </label>
+                      ) : null}
+                      {complete ? (
+                        <button type="button" className="ghost-utility-button" onClick={() => onCreateRunExport(run.run_id)} disabled={actionLoading}>Export</button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="secondary-action-button project-primary-open"
+                        onClick={() => onOpenRun(run)}
+                      >
+                        Open model
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            }) : (
+              <div className="dashboard-note" style={{ gridColumn: "1 / -1" }}>
+                <div style={{ fontWeight: 900 }}>No models yet.</div>
+                <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>Create a model to start configuring the project scenario.</div>
+              </div>
+            )}
+          </div>
+
+          <div className="project-secondary-panels">
+            <details className="project-secondary-panel project-secondary-disclosure">
+              <summary>
+                <span>Reports</span>
+                <small>{(projectReports || []).length}</small>
+              </summary>
+              <div className="project-secondary-disclosure-body">
+                <div className="project-selection-section-header">
+                  <div className="muted">Generated from completed model outputs.</div>
+                <button type="button" className="secondary-action-button" onClick={onCreateReport} disabled={actionLoading || !successfulRuns.length}>{reportLabel}</button>
+                </div>
+                {(projectReports || []).length ? (
+                  <div className="project-artifact-list">
+                    {(projectReports || []).slice(0, 6).map((report) => (
+                      <div key={report.report_id} className="diagram-dataset-version-row">
+                        <div>
+                          <div>
+                            <b>{report.report_type || "Project report"}</b>{" "}
+                            <StatusBadge status={report.status} />{" "}
+                            <EvidenceBadge status={report.evidence_status} compact />
+                          </div>
+                          <div className="project-artifact-meta" title={`Report id: ${report.report_id || "-"}`}>
+                            {(report.run_ids || []).length} models
+                            {report.created_at ? ` · ${formatTimestamp(report.created_at)}` : ""}
+                          </div>
+                        </div>
+                        <div className="diagram-dataset-actions">
+                          <a href={api.projectReportDownloadUrl(report.project_id, report.report_id)} download>Report</a>
+                          {report.source_data_url ? <a href={api.projectReportDataUrl(report.project_id, report.report_id)} download>Data</a> : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <div className="muted">No reports generated yet.</div>}
+              </div>
+            </details>
+
+            <details className="project-secondary-panel project-secondary-disclosure">
+              <summary>
+                <span>Exports</span>
+                <small>{(projectExports || []).length}</small>
+              </summary>
+              <div className="project-secondary-disclosure-body">
+                {(projectExports || []).length ? (
+                  <div className="project-artifact-list">
+                    {(projectExports || []).slice(0, 6).map((row) => (
+                      <div key={row.export_id} className="diagram-dataset-version-row">
+                        <div>
+                          <div>
+                            <b>{(row.run_ids || []).length === 1 ? "Model export" : "Project files export"}</b>{" "}
+                            <StatusBadge status={row.status} />{" "}
+                            <EvidenceBadge status={row.evidence_status} compact />
+                          </div>
+                          <div className="project-artifact-meta" title={`Export id: ${row.export_id || "-"}`}>
+                            {compact(row.size_bytes || 0)} bytes
+                            {row.created_at ? ` · ${formatTimestamp(row.created_at)}` : ""}
+                          </div>
+                        </div>
+                        <a href={api.projectExportDownloadUrl(row.project_id, row.export_id)} download>Download</a>
+                      </div>
+                    ))}
+                  </div>
+                ) : <div className="muted">No export bundles generated yet.</div>}
+              </div>
+            </details>
+          </div>
+        </section>
+      ) : (
+        <section
+          className="project-comparison-workbench"
+          aria-label="Model comparison"
+        >
+          <button
+            type="button"
+            className="project-information-back comparison-back-to-models workspace-back-button"
+            onClick={() => setWorkspaceTab("selection")}
+          >
+            <span aria-hidden="true">←</span>
+            <span>Back to models</span>
+          </button>
+          <div className="project-comparison-header">
+            <div>
+              <div className="run-management-eyebrow">Comparison workbench</div>
+              <h3>Compare completed models</h3>
+              <div className="muted">Compare outcomes, energy outputs, costs, reliability, development effects, regional detail, assumptions, quality, and files.</div>
+            </div>
+            <div className="project-comparison-actions">
+              <div className="project-comparison-count"><b>{selectedRuns.length}</b><span>selected</span></div>
+            </div>
+          </div>
+
+          <div className="project-compare-run-pills" aria-label="Completed models available for comparison">
+            {successfulRuns.length ? successfulRuns.map((run) => {
+              const selected = selectedIds.includes(run.run_id);
+              return (
+                <button
+                  key={run.run_id}
+                  type="button"
+                  className={`project-compare-run-pill ${selected ? "selected" : ""}`}
+                  onClick={() => onToggleCompareRun(run.run_id)}
+                  aria-pressed={selected}
+                >
+                  <span>{modelDisplayName(run)}</span>
+                  <small>{modelNumberLabel(run)} · {runMetadataLine(run)}</small>
+                  <EvidenceBadge
+                    status={evidenceFromModel(run, summaries[run.run_id]).status}
+                    compact
+                  />
+                </button>
+              );
+            }) : <div className="muted" style={{ fontSize: 12 }}>No completed runs are available for comparison yet.</div>}
+          </div>
+
+          {selectedRuns.length ? <div className="project-selected-compare-note">Selected comparison set: {selectedRuns.map((run) => modelDisplayName(run)).join(", ")}</div> : null}
+          {error ? <div className="warn">{error}</div> : null}
+          {loading ? <div className="diagram-note">Loading model outputs and file catalogs...</div> : null}
+
+          <div className="project-comparison-table-panel">
+            <div className="comparison-results-heading">
+              <div>
+                <div className="run-management-eyebrow">Model evidence</div>
+                <h4>Comparison results</h4>
+              </div>
+              {selectedRuns.length >= 2 ? (
+                <div className="comparison-results-total">
+                  <b>{COMPARISON_OUTPUT_SECTIONS.reduce((total, section) => (
+                    total + (section.key === "outputs" ? artifactComparisonRows.length : (comparisonDatasets[section.key] || []).length)
+                  ), 0)}</b>
+                  <span>comparable outputs</span>
+                </div>
+              ) : null}
+            </div>
+            {selectedRuns.length < 2 ? (
+              <div className="comparison-empty">
+                {successfulRuns.length ? "Select at least two completed models to compare their full output sets." : "Execute and complete at least two models to activate comparison."}
+              </div>
+            ) : (
+              <div className="comparison-workbench-body">
+                <div className="comparison-control-bar">
+                  <label>
+                    <span>Reference model</span>
+                    <select value={baselineRunId} onChange={(event) => setBaselineRunId(event.target.value)}>
+                      {selectedRuns.map((run) => <option key={run.run_id} value={run.run_id}>{modelDisplayName(run)}</option>)}
+                    </select>
+                  </label>
+                  <div className="comparison-display-control" role="group" aria-label="Comparison value display">
+                    {[
+                      ["absolute", "Values"],
+                      ["change", "Change"],
+                      ["both", "Both"],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={comparisonDisplayMode === value ? "active" : ""}
+                        aria-pressed={comparisonDisplayMode === value}
+                        onClick={() => setComparisonDisplayMode(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="comparison-output-tabs" role="tablist" aria-label="Comparison output families">
+                  {COMPARISON_OUTPUT_SECTIONS.map((section, index) => {
+                    const count = section.key === "outputs"
+                      ? artifactComparisonRows.length
+                      : (comparisonDatasets[section.key] || []).length;
+                    const active = comparisonSection === section.key;
+                    return (
+                      <button
+                        key={section.key}
+                        type="button"
+                        role="tab"
+                        id={`comparison-output-tab-${section.key}`}
+                        aria-selected={active}
+                        aria-controls="comparison-output-panel"
+                        tabIndex={active ? 0 : -1}
+                        className={active ? "active" : ""}
+                        onClick={() => setComparisonSection(section.key)}
+                        onKeyDown={(event) => handleTablistKeyDown(
+                          event,
+                          index,
+                          COMPARISON_OUTPUT_SECTIONS.length,
+                          (nextIndex) => setComparisonSection(COMPARISON_OUTPUT_SECTIONS[nextIndex].key)
+                        )}
+                      >
+                        <span>{section.shortLabel}</span>
+                        <small>{count}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <section
+                  className="comparison-output-panel"
+                  id="comparison-output-panel"
+                  role="tabpanel"
+                  aria-labelledby={`comparison-output-tab-${activeComparisonDefinition.key}`}
+                  tabIndex={0}
+                >
+                  <div className="comparison-output-panel-heading">
+                    <div>
+                      <h5>{activeComparisonDefinition.label}</h5>
+                      <p>
+                        {activeComparisonDefinition.key === "outputs"
+                          ? `${artifactComparisonRows.length} persisted file types across the selected models.`
+                          : `${activeComparisonRows.length} normalized outputs across the selected models. Missing values remain explicit.`}
+                      </p>
+                    </div>
+                  </div>
+                  {activeComparisonDefinition.key === "outputs" ? (
+                    <ComparisonArtifactMatrix
+                      selectedRuns={selectedRuns}
+                      summaries={summaries}
+                      artifactCatalogs={artifactCatalogs}
+                    />
+                  ) : (
+                    <ComparisonMatrix
+                      rows={activeComparisonRows}
+                      selectedRuns={selectedRuns}
+                      summaries={summaries}
+                      baselineRunId={baselineRunId}
+                      displayMode={comparisonDisplayMode}
+                    />
+                  )}
+                </section>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -8202,11 +10424,12 @@ function ArchitectureRunWorkspace({
   errorMessage,
   statusMessage,
   runManagementPanel,
-  projectInfoPanel,
   projectsOverviewPanel,
   comparePanel,
   scenarioControls,
   resultsPanel,
+  scenarioKey = "",
+  scenarioSelections = {},
 }) {
   const workspaceState = flowActiveJob ? "running" : result ? "complete" : "ready";
   const datasetGroups = useMemo(() => {
@@ -8249,38 +10472,37 @@ function ArchitectureRunWorkspace({
           ) : null}
         </>
       ) : (
-        <div className="model-workspace-with-management">
-          <main className="model-workspace-primary">
-            {runViewMode === "project" ? (
-              comparePanel
-            ) : runViewMode === "results" && result ? (
-              <div className="results-mode-grid">
-                <aside className="results-settings-panel">
-                  <ArchitectureBox box={((architecture && architecture.boxes) || ARCHITECTURE_BOXES)[0] || ARCHITECTURE_BOXES[0]} activeJob={flowActiveJob} result={result}>
-                    {scenarioControls}
-                  </ArchitectureBox>
-                </aside>
-                <main className="results-mode-main">{resultsPanel}</main>
-              </div>
-            ) : (
-              <FlowModelCanvas
-                activeJob={flowActiveJob}
-                result={result}
-                architecture={architecture}
-                scenarioControls={scenarioControls}
-                calliopeDatasets={calliopeDatasets}
-                mrioDatasets={mrioDatasets}
-                datasetsByNode={datasetsByNode}
-                selectedRunId={selectedRunId}
-                inputsLocked={inputsLocked}
-                lockReason={lockReason}
-                onUploadDataset={onUploadDataset}
-                onDatasetVersionChange={onDatasetVersionChange}
-              />
-            )}
-          </main>
-          {runViewMode === "project" ? projectInfoPanel : runManagementPanel}
-        </div>
+        <>
+          <div className={`model-workspace-with-management ${runViewMode === "project" || (runViewMode === "results" && result) ? "no-side-panel" : ""}`}>
+            <main className="model-workspace-primary" id="model-workspace-primary">
+              {runViewMode === "project" ? (
+                comparePanel
+              ) : runViewMode === "results" && result ? (
+                <div className="results-mode-stack">
+                  <main className="results-mode-main">{resultsPanel}</main>
+                </div>
+              ) : (
+                <FlowModelCanvas
+                  activeJob={flowActiveJob}
+                  result={result}
+                  architecture={architecture}
+                  scenarioControls={scenarioControls}
+                  calliopeDatasets={calliopeDatasets}
+                  mrioDatasets={mrioDatasets}
+                  datasetsByNode={datasetsByNode}
+                  selectedRunId={selectedRunId}
+                  inputsLocked={inputsLocked}
+                  lockReason={lockReason}
+                  onUploadDataset={onUploadDataset}
+                  onDatasetVersionChange={onDatasetVersionChange}
+                  scenarioKey={scenarioKey}
+                  scenarioSelections={scenarioSelections}
+                />
+              )}
+            </main>
+            {runViewMode === "project" || (runViewMode === "results" && result) ? null : runManagementPanel}
+          </div>
+        </>
       )}
     </div>
   );
@@ -8311,6 +10533,13 @@ function aggregateByLabel(records, labelKey, valueKey) {
     .sort((a, b) => Math.abs(toNumber(b && b[valueKey])) - Math.abs(toNumber(a && a[valueKey])));
 }
 
+function resetTopLevelScroll() {
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  document
+    .querySelectorAll(".landing-shell, .methodology-shell, .model-workspace-primary, .architecture-flow-panel")
+    .forEach((element) => element.scrollTo({ top: 0, left: 0, behavior: "auto" }));
+}
+
 function App() {
   const [session, setSession] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(api.getActiveUserId ? api.getActiveUserId() : "undp_analyst");
@@ -8327,6 +10556,7 @@ function App() {
   const [projectExports, setProjectExports] = useState([]);
   const [compareRunIds, setCompareRunIds] = useState([]);
   const [platformActionLoading, setPlatformActionLoading] = useState(false);
+  const [draftSaving, setDraftSaving] = useState(false);
   const [scenarioCatalog, setScenarioCatalog] = useState(null);
   const [architectureCatalog, setArchitectureCatalog] = useState(() => normalizeArchitectureCatalog(null));
   const [selectedArchitectureId, setSelectedArchitectureId] = useState(DEFAULT_MODEL_ARCHITECTURE_ID);
@@ -8372,6 +10602,13 @@ function App() {
   const availableUsers = (session && session.available_users) || [];
   const currentUser = (session && session.user) || {};
   const isAdminView = Boolean(currentUser && currentUser.is_admin);
+  const navigationPageKey = methodologyOpen
+    ? "methodology"
+    : landingOpen
+      ? "landing"
+      : runViewMode === "projects"
+        ? "projects"
+        : `${runViewMode}:${activeProjectId}:${selectedJobId}`;
 
   const selectedScenario = useMemo(
     () => (scenarios || []).find((s) => s.key === scenarioKey),
@@ -8388,6 +10625,20 @@ function App() {
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      resetTopLevelScroll();
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [navigationPageKey]);
+
+  useEffect(() => {
+    if (!statusMessage) return undefined;
+    const timer = window.setTimeout(() => setStatusMessage(""), 7000);
+    return () => window.clearTimeout(timer);
+  }, [statusMessage]);
+
   const defaultRunName = useMemo(() => {
     const baseName = selectedScenario && selectedScenario.title
       ? selectedScenario.title
@@ -8628,6 +10879,7 @@ function App() {
     const [runs] = await Promise.all([
       refreshProjectRuns(id),
       refreshProjectOutputs(id),
+      refreshProjects(),
     ]);
     return runs;
   }
@@ -8853,16 +11105,16 @@ function App() {
       await hydrateIntegratedForRun(job.artifacts.run_id, job.summary.integrated_results || null);
     } else if (status === "failed") {
       setSelectedJobId(runExecutionId(job));
-      setErrorMessage(job.error || job.message || "Run failed.");
+      setErrorMessage(job.error || job.message || "Execution failed.");
     } else if (status === "cancelled") {
       setSelectedJobId(runExecutionId(job));
-      setErrorMessage("Run was cancelled.");
+      setErrorMessage("Execution was cancelled.");
     } else if (status === "draft") {
       setSelectedJobId(job.run_id || "");
       setSelectedRunId("");
       setResult(null);
       setIntegratedPayload(null);
-      setStatusMessage("Run cancelled; draft restored.");
+      setStatusMessage("Execution cancelled; draft restored.");
       setErrorMessage("");
       setRunViewMode("setup");
     }
@@ -8983,7 +11235,7 @@ function App() {
         geography: "Africa",
         project_type: projectTypeForArchitecture(architectureId),
         model_architecture_id: architectureId,
-        scenario_label: architectureId === "energy-only" ? "Energy model workspace" : "Energy-development model workspace",
+        scenario_label: architectureId === "energy-only" ? "Energy model workspace" : "Energy-Development model workspace",
         notes: "Created from the modeling dashboard.",
         ...(projectPayload || {}),
       });
@@ -9317,7 +11569,7 @@ function App() {
           blockingErrors[0] ||
           (queueBlocked
             ? "Queue is currently at capacity. Wait for active jobs to finish."
-            : "Environment setup checks are not passing. Resolve highlighted issues and retry.");
+            : "Execution readiness checks need attention. Review the highlighted items and try again.");
         setErrorMessage(message);
         return;
       }
@@ -9341,6 +11593,74 @@ function App() {
     }
   }
 
+  async function onSaveSelectedDraft() {
+    if (!selectedEditableDraft || !selectedEditableDraft.run_id) {
+      setErrorMessage("Select an editable draft before saving.");
+      return;
+    }
+    const projectId =
+      activeProjectId ||
+      selectedEditableDraft.project_id ||
+      (selectedEditableDraft.request && selectedEditableDraft.request.project_id) ||
+      "";
+    if (!projectId) {
+      setErrorMessage("Select a project before saving this draft.");
+      return;
+    }
+
+    setDraftSaving(true);
+    setErrorMessage("");
+    setStatusMessage("");
+    try {
+      const resolvedRunName = (customRunName || "").trim() || defaultRunName;
+      const requestPayload = currentRunRequestPayload(projectId, resolvedRunName);
+      const savedDraft = await api.updateRunDraft(projectId, selectedEditableDraft.run_id, {
+        request: requestPayload,
+        run_name: resolvedRunName,
+      });
+      await refreshProjectWorkspace(projectId);
+      setSelectedJobId(runExecutionId(savedDraft));
+      setStatusMessage("Draft saved.");
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to save draft"));
+    } finally {
+      setDraftSaving(false);
+    }
+  }
+
+  async function onRenameModel(targetJob, nextName) {
+    const cleanName = String(nextName || "").trim();
+    if (!cleanName || !targetJob || !targetJob.run_id) return;
+    const projectId =
+      activeProjectId ||
+      targetJob.project_id ||
+      (targetJob.request && targetJob.request.project_id) ||
+      "";
+    if (!projectId) {
+      setErrorMessage("Select a project before renaming this model.");
+      throw new Error("Project is required to rename a model.");
+    }
+
+    setErrorMessage("");
+    try {
+      const updated = await api.updateRunDraft(projectId, targetJob.run_id, { run_name: cleanName });
+      if (runExecutionId(targetJob) === selectedJobId) setCustomRunName(cleanName);
+      setProjectRuns((rows) =>
+        rows.map((row) => row.run_id === updated.run_id ? { ...row, ...updated } : row)
+      );
+      setJobs((rows) =>
+        rows.map((row) => row.run_id === updated.run_id ? { ...row, ...updated } : row)
+      );
+      if (activeJob && activeJob.run_id === updated.run_id) {
+        setActiveJob((current) => ({ ...(current || {}), ...updated }));
+      }
+      await refreshProjectWorkspace(projectId);
+    } catch (err) {
+      setErrorMessage(toErrorMessage(err, "Failed to rename model"));
+      throw err;
+    }
+  }
+
   async function onCancelActiveJob() {
     if (!activeJob) return;
     try {
@@ -9352,7 +11672,7 @@ function App() {
         setSelectedRunId("");
         setResult(null);
         setIntegratedPayload(null);
-        setStatusMessage(updated.message || "Run cancelled; draft restored.");
+        setStatusMessage(updated.message || "Execution cancelled; draft restored.");
         setErrorMessage("");
       } else {
         setActiveJob(updated);
@@ -9368,7 +11688,7 @@ function App() {
   async function onUploadDataset(datasetId, file) {
     if (!datasetId || !file) return;
     if (selectedRunInputsLocked) {
-      setErrorMessage("Inputs are locked for the selected run. Duplicate the configuration before changing datasets.");
+      setErrorMessage("Inputs are locked for the selected model. Duplicate the model before changing datasets.");
       return;
     }
     setErrorMessage("");
@@ -9376,7 +11696,7 @@ function App() {
     try {
       await api.uploadInputDataset(datasetId, file);
       await onDatasetVersionChange();
-      setStatusMessage(`Updated input dataset ${datasetId}. Re-run validation before queuing a model run.`);
+      setStatusMessage(`Updated input dataset ${datasetId}. Re-run validation before starting an execution.`);
     } catch (err) {
       setErrorMessage(toErrorMessage(err, "Failed to upload input dataset"));
       setStatusMessage("");
@@ -9400,17 +11720,31 @@ function App() {
 
   async function onCreateProjectReport() {
     if (!activeProjectId) return;
+    const runIds = compareRunIds.length ? compareRunIds : succeededProjectRuns(projectRuns).map((run) => run.run_id);
+    const selectedModels = projectRuns.filter((run) => runIds.includes(run.run_id));
+    const containsExploratoryEvidence = selectedModels.some(
+      (run) => normalizeEvidenceStatus(run && run.evidence_status) === "exploratory_only"
+    );
+    if (containsExploratoryEvidence) {
+      const acknowledged = window.confirm(
+        "One or more selected models are marked Exploratory only. The report will carry this limitation and must not be treated as policy-grade evidence. Generate it anyway?"
+      );
+      if (!acknowledged) return;
+    }
     setPlatformActionLoading(true);
     setErrorMessage("");
     try {
-      const runIds = compareRunIds.length ? compareRunIds : succeededProjectRuns(projectRuns).map((run) => run.run_id);
-      const report = await api.createProjectReport(activeProjectId, {
+      await api.createProjectReport(activeProjectId, {
         run_ids: runIds,
         report_type: compareRunIds.length > 1 ? "comparison_summary" : "project_summary",
-        options: { source: "dashboard", selected_compare_run_ids: compareRunIds },
+        options: {
+          source: "dashboard",
+          selected_compare_run_ids: compareRunIds,
+          acknowledge_exploratory: containsExploratoryEvidence,
+        },
       });
       await refreshProjectOutputs(activeProjectId);
-      setStatusMessage(`Generated project report ${report.report_id}.`);
+      setStatusMessage("Generated project report.");
     } catch (err) {
       setErrorMessage(toErrorMessage(err, "Failed to generate project report"));
     } finally {
@@ -9439,7 +11773,7 @@ function App() {
         include_reports: true,
       });
       if (targetProjectId === activeProjectId) await refreshProjectOutputs(targetProjectId);
-      setStatusMessage(`Prepared project files export ${bundle.export_id}.`);
+      setStatusMessage("Prepared project files export.");
       downloadProjectExport(targetProjectId, bundle.export_id);
     } catch (err) {
       setErrorMessage(toErrorMessage(err, "Failed to download project files"));
@@ -9455,9 +11789,9 @@ function App() {
     try {
       const bundle = await api.createRunExport(runId);
       await refreshProjectOutputs(activeProjectId);
-      setStatusMessage(`Created run export ${bundle.export_id}.`);
+      setStatusMessage("Created model export.");
     } catch (err) {
-      setErrorMessage(toErrorMessage(err, "Failed to create run export"));
+      setErrorMessage(toErrorMessage(err, "Failed to create model export"));
     } finally {
       setPlatformActionLoading(false);
     }
@@ -9538,7 +11872,7 @@ function App() {
     const sourceRunId = source && source.run_id;
     const projectId = activeProjectId || (source && source.request && source.request.project_id) || "";
     if (!sourceRunId || !projectId) {
-      setErrorMessage("Select a project run before duplicating its configuration.");
+      setErrorMessage("Select a model before duplicating its configuration.");
       return;
     }
     setPlatformActionLoading(true);
@@ -9567,11 +11901,11 @@ function App() {
     const projectId = activeProjectId || (source && source.request && source.request.project_id) || "";
     const status = normalizeStatus(source && source.status);
     if (!sourceRunId || !projectId) {
-      setErrorMessage("Select a project run before deleting it.");
+      setErrorMessage("Select a model before deleting it.");
       return;
     }
     if (status === "queued" || status === "running") {
-      setErrorMessage("Cancel the active execution before deleting this run.");
+      setErrorMessage("Cancel the active execution before deleting this model.");
       return;
     }
     const confirmed = window.confirm(`Delete ${runLabel(source)}? This removes the run record and generated run files.`);
@@ -9663,15 +11997,6 @@ function App() {
     }
   }
 
-  function onSelectProjectView() {
-    setSelectedJobId("");
-    setSelectedRunId("");
-    setResult(null);
-    setIntegratedPayload(null);
-    setErrorMessage("");
-    setRunViewMode("project");
-  }
-
   async function onSelectJob(job) {
     if (!job) return;
     const id = runExecutionId(job);
@@ -9696,13 +12021,13 @@ function App() {
         setStatusMessage(`Inspecting ${runLabel(job)}.`);
         setRunViewMode("results");
       } catch (err) {
-        setErrorMessage(toErrorMessage(err, "Failed to load selected run results"));
+        setErrorMessage(toErrorMessage(err, "Failed to load selected model results"));
       }
     } else {
       setSelectedRunId("");
       setResult(null);
       setRunViewMode("setup");
-      setStatusMessage(`Selected execution ${id || runId} (${job.status}).`);
+      setStatusMessage("");
     }
   }
 
@@ -9790,8 +12115,8 @@ function App() {
   const selectedRunInputsLocked = Boolean(selectedJob && RUN_CONFIG_LOCK_STATUSES.has(selectedRunStatus));
   const selectedRunLockReason = selectedRunInputsLocked
     ? selectedRunStatus === "succeeded"
-      ? "Completed run inputs are locked to preserve result provenance."
-      : "Queued and running run inputs are locked because execution uses an immutable input snapshot."
+      ? "Completed model inputs are locked to preserve result provenance."
+      : "Queued and running model inputs are locked because execution uses an immutable input snapshot."
     : "";
   const selectedRunActiveJob = activeJob && selectedJob && runExecutionId(activeJob) === runExecutionId(selectedJob)
     ? activeJob
@@ -9815,6 +12140,30 @@ function App() {
           : "";
 
   const selectedRunLabel = selectedJob ? runLabel(selectedJob) : selectedRunId ? "Selected model" : "Latest model";
+  const selectedRunName = selectedJob ? runCustomName(selectedJob) || "Untitled model" : "Selected model";
+  const technicalEnergyModelOptions = energyModelCatalogOptions(scenarioCatalog);
+  const technicalEnergyModel = technicalEnergyModelOptions.find(
+    (option) => String(option && option.value) === String(energyModelEngine)
+  ) || technicalEnergyModelOptions[0] || ENERGY_MODEL_OPTIONS[0];
+  const technicalTargetScenario = (targetScenarios || []).find(
+    (scenario) => scenario.scenario_id === mrioScenarioId
+  ) || null;
+  const technicalShockMapping = (mrioShockMappings || [])[0] || {};
+  const technicalShockMappingId = technicalShockMapping.mapping_id || "mrio_direct_heuristic";
+  const technicalExecution = (
+    <TechnicalExecutionPanel
+      selectedArchitecture={selectedArchitecture}
+      selectedEnergyModel={technicalEnergyModel}
+      scenarioKey={scenarioKey}
+      requiresMrio={selectedArchitectureRequiresMrio}
+      mrioScenarioId={mrioScenarioId}
+      selectedTargetScenario={technicalTargetScenario}
+      targetYear={targetYear}
+      runProfile={runProfile}
+      shockMapping={technicalShockMapping}
+      showShockMapping={!result}
+    />
+  );
   const scenarioControls = (
     <DiagramScenarioControls
       architectureCatalog={architectureCatalog}
@@ -9861,6 +12210,8 @@ function App() {
           onDuplicateConfiguration={onDuplicateSelectedConfiguration}
           onDeleteRun={onDeleteSelectedRun}
           actionLoading={platformActionLoading}
+          technicalExecution={result ? null : technicalExecution}
+          showDuplicate={!result}
           style={{ marginTop: 0 }}
         />
       ) : (
@@ -9868,25 +12219,75 @@ function App() {
           environmentSetup={environmentSetup}
           loading={environmentSetupLoading}
           onRun={onRun}
-          runName={customRunName}
-          defaultRunName={defaultRunName}
-          onRunNameChange={setCustomRunName}
           runDisabled={runDisabled}
           runDisabledReason={runDisabledReason}
           queueSubmitting={queueSubmitting}
           running={running}
+          technicalExecution={technicalExecution}
           style={{ marginTop: 0 }}
         />
       )}
       <ActiveJobPanel activeJob={activeJob} onCancel={onCancelActiveJob} style={{ marginTop: 0 }} />
-      <SelectedJobDetailsPanel job={selectedJob} style={{ marginTop: 0 }} />
+      {selectedRunStatus === "draft" ? (
+        <DraftSavePanel
+          job={selectedJob}
+          onSave={onSaveSelectedDraft}
+          saving={draftSaving}
+        />
+      ) : null}
+      {!result && selectedJob && selectedRunStatus !== "draft" && !(activeJob && runExecutionId(activeJob) === runExecutionId(selectedJob)) ? (
+        <div className="selected-run-action-row">
+          <DetailDialogButton
+            label="Selected model details"
+            title="Selected model details"
+            subtitle="Model record"
+            wide={true}
+          >
+            <SelectedJobDetailsPanel job={selectedJob} style={{ marginTop: 0 }} />
+          </DetailDialogButton>
+        </div>
+      ) : null}
     </div>
+  );
+  const resultsTechnicalDetails = result ? (
+    <section className="results-technical-summary" aria-labelledby="results-technical-summary-title">
+      <div className="results-kpi-group-label" id="results-technical-summary-title">Execution environment</div>
+      <div className="analysis-technical-grid">
+        <span>Solver: {runMetadata.solver || "-"}</span>
+        <span>Termination: {runMetadata.termination_condition || "-"}</span>
+        <span>Solve time: {runMetadata.solution_time_seconds != null ? `${toNumber(runMetadata.solution_time_seconds).toFixed(2)} s` : "-"}</span>
+        <span>Objective: {runMetadata.objective_function_value != null ? compact(runMetadata.objective_function_value) : "-"}</span>
+        <span>Spatial filter: <code>{spatialFilter ? spatialFilter.label || spatialFilter.locationId || spatialFilter.region || "-" : "none"}</code></span>
+        {selectedArchitectureRequiresMrio ? (
+          <span>MRIO shock mapping: <code>{technicalShockMappingId}</code></span>
+        ) : null}
+      </div>
+    </section>
+  ) : null;
+  const runManagementPanel = (
+    <ModelRunManagementPane
+      activeJob={activeJob}
+      selectedJob={selectedJob}
+      operationsPanel={operationsPanel}
+      errorMessage={errorMessage}
+      statusMessage={statusMessage}
+      runViewMode={runViewMode}
+    />
   );
   const resultsPanel = result ? (
     <RunResultsPanel
       result={result}
       architecture={selectedArchitecture}
       selectedRunLabel={selectedRunLabel}
+      selectedRunName={selectedRunName}
+      onRenameModel={(nextName) => onRenameModel(selectedJob, nextName)}
+      onDuplicateModel={selectedRunInputsLocked ? onDuplicateSelectedConfiguration : null}
+      duplicateModelLoading={platformActionLoading}
+      technicalExecutionPanel={technicalExecution}
+      technicalDetailsPanel={resultsTechnicalDetails}
+      selectedModelDetailsPanel={selectedJob && selectedRunStatus !== "draft" ? (
+        <SelectedJobDetailsPanel job={selectedJob} style={{ marginTop: 0 }} showOutputLinks={false} />
+      ) : null}
       runMetadata={runMetadata}
       integratedMetrics={integratedMetrics}
       developmentDrivers={developmentDrivers}
@@ -9923,31 +12324,6 @@ function App() {
       setSpatialFilter={setSpatialFilter}
     />
   ) : null;
-  const projectPanel = (
-    <ProjectWorkspacePanel
-      activeProject={activeProject}
-      projectRuns={projectRuns}
-      projectReports={projectReports}
-      projectExports={projectExports}
-      compareRunIds={compareRunIds}
-      onToggleCompareRun={onToggleCompareRun}
-      onCreateReport={onCreateProjectReport}
-      onCreateRunExport={onCreateRunExport}
-      onNewModel={() => setNewModelModalOpen(true)}
-      actionLoading={platformActionLoading}
-    />
-  );
-  const runManagementPanel = (
-    <ModelRunManagementPane
-      activeJob={activeJob}
-      selectedJob={selectedJob}
-      operationsPanel={operationsPanel}
-      errorMessage={errorMessage}
-      statusMessage={statusMessage}
-      runViewMode={runViewMode}
-    />
-  );
-  const projectSelectionPanel = projectPanel;
   const projectsOverviewPanel = (
     <ProjectsOverviewPanel
       projects={projects}
@@ -9956,7 +12332,6 @@ function App() {
       projectRuns={projectRuns}
       projectReports={projectReports}
       projectExports={projectExports}
-      inputDatasets={inputDatasets}
       onOpenProject={(projectId) => handleProjectChange(projectId, "project")}
       onCreateProject={handleCreateProject}
       onRenameProject={handleRenameProject}
@@ -9964,7 +12339,8 @@ function App() {
       onRestoreProject={handleRestoreProject}
       onDeleteProject={handleDeleteProject}
       onDownloadProjectFiles={onDownloadProjectFiles}
-      onRefreshDatasets={refreshInputDatasets}
+      onReturnHome={openLandingPage}
+      currentUser={currentUser}
       actionLoading={platformActionLoading}
       isAdminView={isAdminView}
     />
@@ -9977,31 +12353,43 @@ function App() {
       projectExports={projectExports}
       compareRunIds={compareRunIds}
       onToggleCompareRun={onToggleCompareRun}
+      onCreateReport={onCreateProjectReport}
+      onCreateRunExport={onCreateRunExport}
+      onNewModel={() => setNewModelModalOpen(true)}
+      onOpenRun={onSelectJob}
+      onReturnToProjects={openProjectsPage}
+      actionLoading={platformActionLoading}
       isAdminView={isAdminView}
     />
   );
-  const showRunTabs = runViewMode !== "projects" && Boolean(activeProject);
+  const showRunTabs = runViewMode !== "projects" && runViewMode !== "project" && Boolean(activeProject);
   const clearMethodologyRoute = () => {
     if (window.location.hash === "#/methodology" && window.history && window.history.pushState) {
       window.history.pushState("", document.title, window.location.pathname + window.location.search);
     }
   };
   const openMethodologyPage = () => {
+    setStatusMessage("");
+    setErrorMessage("");
     setMethodologyOpen(true);
     setLandingOpen(false);
     if (window.location.hash !== "#/methodology") window.location.hash = "/methodology";
   };
-  const openLandingPage = () => {
+  function openLandingPage() {
+    setStatusMessage("");
+    setErrorMessage("");
     clearMethodologyRoute();
     setMethodologyOpen(false);
     setLandingOpen(true);
-  };
-  const openProjectsPage = () => {
+  }
+  function openProjectsPage() {
+    setStatusMessage("");
+    setErrorMessage("");
     clearMethodologyRoute();
     setMethodologyOpen(false);
     setLandingOpen(false);
     setRunViewMode("projects");
-  };
+  }
 
   if (methodologyOpen) {
     const MethodologyPage = window.EDIMMethodology && window.EDIMMethodology.MethodologyPage;
@@ -10058,13 +12446,9 @@ function App() {
   return (
     <div className="app-shell">
       <UnifiedHeader
-        runViewMode={runViewMode}
         currentUserId={currentUserId}
         availableUsers={availableUsers}
         onUserChange={handleUserChange}
-        projects={projects}
-        activeProjectId={activeProjectId}
-        onReturnToProjects={() => setRunViewMode("projects")}
         apiTarget={apiTarget}
         systemCompatibility={systemCompatibility}
         onApiTargetModeChange={handleApiTargetModeChange}
@@ -10090,15 +12474,15 @@ function App() {
             selectedJobId={selectedJobId}
             activeJob={activeJob}
             mode={runViewMode}
-            onSelectProjectView={onSelectProjectView}
+            activeProject={activeProject}
+            onReturnToProject={() => handleProjectChange(activeProjectId, "project")}
             onSelectJob={onSelectJob}
-            onNewModel={() => setNewModelModalOpen(true)}
-            newModelDisabled={!activeProjectId || platformActionLoading}
+            onRenameModel={onRenameModel}
           />
         ) : null}
       </div>
 
-      <div className="app-body app-body-single">
+      <div className={`app-body app-body-single workspace-mode-${runViewMode}`}>
         <ArchitectureRunWorkspace
           architecture={selectedArchitecture}
           runViewMode={runViewMode}
@@ -10113,15 +12497,24 @@ function App() {
           errorMessage={errorMessage}
           statusMessage={statusMessage}
           runManagementPanel={runManagementPanel}
-          projectInfoPanel={projectSelectionPanel}
           projectsOverviewPanel={projectsOverviewPanel}
           comparePanel={comparePanel}
           scenarioControls={scenarioControls}
           resultsPanel={resultsPanel}
+          scenarioKey={scenarioKey}
+          scenarioSelections={scenarioSelections}
         />
       </div>
     </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+try {
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  window.EDIM_APP_MOUNTED = true;
+} catch (error) {
+  if (window.EDIM_SHOW_STARTUP_ERROR) {
+    window.EDIM_SHOW_STARTUP_ERROR(error);
+  }
+  throw error;
+}

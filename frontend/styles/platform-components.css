@@ -1,0 +1,474 @@
+.evidence-status {
+  --evidence-color: #aeb9c7;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--evidence-color) 52%, #26313d);
+  border-radius: 4px;
+  color: var(--evidence-color);
+  background: color-mix(in srgb, var(--evidence-color) 12%, #111820);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.evidence-status.is-compact {
+  min-height: 24px;
+  padding: 3px 7px;
+  font-size: 11px;
+}
+
+.evidence-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.evidence-status--ready { --evidence-color: #69d69f; }
+.evidence-status--review { --evidence-color: #f0c66b; }
+.evidence-status--exploratory { --evidence-color: #f28b8b; }
+.evidence-status--pending { --evidence-color: #aeb9c7; }
+
+.evidence-notice {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 16px;
+  border: 1px solid #364557;
+  border-left-width: 4px;
+  color: #e7edf5;
+  background: #111820;
+}
+
+.evidence-notice--exploratory_only {
+  border-color: #e06565;
+  background: #21171a;
+}
+
+.evidence-notice--analyst_review {
+  border-color: #d5a94c;
+  background: #211d14;
+}
+
+.evidence-notice--production_ready {
+  border-color: #45b77d;
+  background: #14211c;
+}
+
+.evidence-notice-eyebrow {
+  color: #9da9b8;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.evidence-notice p {
+  max-width: 760px;
+  margin: 3px 0 0;
+  color: #c0cad6;
+  font-size: 12px;
+}
+
+.evidence-score {
+  align-self: center;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.result-scope-token {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid #3c4b5d;
+  border-radius: 4px;
+  color: #dce4ed;
+  background: #18212b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.result-scope-token--selected_geography {
+  border-color: #408cc7;
+  color: #80c9f0;
+  background: #102334;
+}
+
+.result-scope-token--regional_estimate {
+  border-color: #b78f35;
+  color: #f0c96d;
+  background: #292313;
+}
+
+.result-scope-token--scenario_wide {
+  border-color: #637386;
+  color: #c6d0dc;
+  background: #1a222c;
+}
+
+.project-card-evidence,
+.project-model-evidence {
+  position: relative;
+  z-index: 2;
+  margin-top: 8px;
+}
+
+.project-card-evidence:empty,
+.project-model-evidence:empty {
+  display: none;
+}
+
+.project-card,
+.project-model-card {
+  cursor: pointer;
+}
+
+.entity-card-open-target {
+  position: absolute !important;
+  inset: 0;
+  z-index: 2 !important;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.entity-card-open-target:hover,
+.entity-card-open-target:active {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.entity-card-open-target:focus-visible {
+  outline: 2px solid #56c8e8;
+  outline-offset: -2px;
+  opacity: 1;
+}
+
+.project-card > :not(.project-card-visual-wrap):not(.entity-card-open-target),
+.project-model-card > :not(.project-model-card-visual):not(.entity-card-open-target) {
+  pointer-events: none;
+}
+
+.project-card > .project-card-header,
+.project-card > .project-card-footer,
+.project-model-card > .project-model-card-actions {
+  z-index: 3;
+}
+
+.project-card :is(a, button, input, select, textarea, summary, label),
+.project-model-card :is(a, button, input, select, textarea, summary, label) {
+  pointer-events: auto;
+}
+
+.project-card-open-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.project-primary-open {
+  white-space: nowrap;
+}
+
+.project-overview-actions .primary-action-button,
+.dataset-management-actions .primary-action-button,
+.dataset-primary-row-action {
+  border-color: #0b658f;
+  background: #0b658f;
+  color: #ffffff;
+}
+
+.modeling-workspace-metrics {
+  padding: 0;
+  list-style: none;
+}
+
+.modeling-workspace-metric-label,
+.modeling-workspace-metric-value {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.modeling-workspace-metric-value {
+  order: 1;
+  color: #f7fafc;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.modeling-workspace-metric-label {
+  order: 2;
+  margin-top: 5px;
+  color: #aeb9c7;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.project-model-card h3 {
+  margin: 0;
+  color: #f3f6fa;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.project-model-card-actions {
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.comparison-matrix thead .evidence-status {
+  display: flex;
+  width: fit-content;
+  margin-top: 6px;
+}
+
+.project-compare-run-pill .evidence-status {
+  margin-top: 7px;
+}
+
+.dataset-system-inputs {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #d8e0e8;
+}
+
+.dataset-system-inputs h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.dataset-system-input-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.dataset-system-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e4e9ee;
+}
+
+.dataset-system-input strong,
+.dataset-system-input small {
+  display: block;
+}
+
+.projects-collection {
+  min-width: 0;
+  margin-top: 28px;
+}
+
+/* Shared page-level navigation keeps every back action visually consistent. */
+.workspace-back-button {
+  width: fit-content;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  justify-self: start;
+  margin: 0;
+  padding: 5px 9px;
+  border: 1px solid rgba(173, 186, 204, 0.2);
+  border-radius: 6px;
+  background: transparent;
+  color: #c8d2df;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Keep page-return controls at one stable viewport anchor across workspace levels. */
+.app-body.workspace-mode-projects,
+.app-body.workspace-mode-project {
+  padding-top: 0;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.projects-overview-panel {
+  padding-top: 0;
+}
+
+.modeling-workspace-intro {
+  align-items: start;
+  margin-top: -1px;
+  padding-top: 0;
+}
+
+.workspace-return-home.workspace-back-button {
+  margin-left: 1px;
+}
+
+.project-workspace-page .project-information-bar {
+  align-items: start;
+  padding-top: 11px;
+  padding-left: 17px;
+}
+
+.project-workspace-page .project-comparison-workbench {
+  padding-top: 11px;
+  padding-right: 17px;
+  padding-left: 17px;
+}
+
+.global-run-tab-bar .run-tab-strip {
+  padding-top: 9px;
+}
+
+.workspace-back-button:hover:enabled,
+.workspace-back-button:focus-visible {
+  border-color: rgba(84, 196, 207, 0.62);
+  background: rgba(84, 196, 207, 0.08);
+  color: #f7fafc;
+}
+
+.workspace-back-button > span:first-child {
+  color: inherit;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1;
+  transition: transform 140ms ease;
+}
+
+.workspace-back-button:hover:enabled > span:first-child {
+  transform: translateX(-2px);
+}
+
+.workspace-back-button:focus-visible {
+  outline: 2px solid rgba(84, 196, 207, 0.56);
+  outline-offset: 2px;
+}
+
+.workspace-return-home.workspace-back-button {
+  margin-bottom: 18px;
+}
+
+.project-information-heading-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.project-information-heading-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.project-information-heading-copy .project-information-eyebrow {
+  margin: 2px 0 7px;
+}
+
+.project-information-back.workspace-back-button,
+.comparison-back-to-models.workspace-back-button {
+  margin: 0;
+}
+
+.run-project-context {
+  width: min(440px, 38vw);
+  min-width: 300px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  align-content: normal;
+  gap: 12px;
+}
+
+.run-project-context > .workspace-back-button {
+  min-height: 34px;
+  margin-top: 3px;
+  padding: 5px 9px;
+  border: 1px solid rgba(173, 186, 204, 0.2);
+  border-radius: 6px;
+  background: transparent;
+  color: #c8d2df;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.run-project-context > .workspace-back-button:hover:enabled,
+.run-project-context > .workspace-back-button:focus-visible {
+  border-color: rgba(84, 196, 207, 0.62);
+  background: rgba(84, 196, 207, 0.08);
+  color: #f7fafc;
+}
+
+.run-project-title {
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .workspace-return-home.workspace-back-button {
+    margin-bottom: 15px;
+  }
+
+  .project-information-heading-row {
+    gap: 10px;
+  }
+
+  .modeling-workspace-intro,
+  .project-workspace-page .project-information-bar,
+  .project-workspace-page .project-comparison-workbench {
+    padding-top: 11px;
+  }
+
+  .modeling-workspace-intro {
+    padding-top: 0;
+  }
+
+  .global-run-tab-bar .run-tab-strip {
+    padding-top: 9px;
+  }
+
+  .project-workspace-page .project-information-bar,
+  .project-workspace-page .project-comparison-workbench {
+    padding-right: 17px;
+    padding-left: 17px;
+  }
+
+  .project-information-heading-copy .project-information-eyebrow {
+    margin-top: 1px;
+  }
+
+  .run-project-context {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .run-project-context > .workspace-back-button {
+    margin-top: 4px;
+  }
+
+  .run-project-title {
+    justify-self: auto;
+    font-size: 20px;
+  }
+}

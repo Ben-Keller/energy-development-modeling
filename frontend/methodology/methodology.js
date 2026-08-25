@@ -8,7 +8,7 @@
     },
     {
       title: "Select the architecture",
-      body: "Choose whether to run an energy-only analysis or the full energy-development architecture.",
+      body: "Choose whether to run an energy-only analysis or the full Energy-Development architecture.",
     },
     {
       title: "Choose scenario pathways",
@@ -167,7 +167,7 @@
     );
   }
 
-  function MethodologyPlaceholderVisual({ title, description, variant = "network", activeIndex = 0 }) {
+  function MethodologyConceptVisual({ title, description, variant = "network", activeIndex = 0 }) {
     const dots = useMemo(() => Array.from({ length: 18 }).map((_, index) => ({
       x: 18 + ((index * 37) % 70),
       y: 18 + ((index * 53) % 62),
@@ -298,7 +298,7 @@
     const ArchitectureDiagram = window.EDIMMethodologyArchitectureDiagram;
     const modeCopy = selectedArchitecture === "energy-only"
       ? "Energy-only mode focuses on energy pathways, infrastructure choices, costs, generation, transmission, emissions, and energy-system outputs without running the development linkage."
-      : "Energy-development mode runs the full integrated workflow, connecting energy model outputs through bridge and MRIO analysis to broader outcomes such as sectoral activity, jobs, value creation, and development priorities.";
+      : "Energy-Development mode runs the full integrated workflow, connecting energy model outputs through bridge and MRIO analysis to broader outcomes such as sectoral activity, jobs, value creation, and development priorities.";
     return (
       <section className="methodology-section methodology-architecture-section" id="methodology-architecture">
         <div className="methodology-section-copy">
@@ -321,7 +321,7 @@
               className={selectedArchitecture === "energy-development" ? "active" : ""}
               onClick={() => setSelectedArchitecture("energy-development")}
             >
-              Energy-development
+              Energy-Development
             </button>
           </div>
           <p className="methodology-mode-copy">{modeCopy}</p>
@@ -333,10 +333,10 @@
           {ArchitectureDiagram ? (
             <ArchitectureDiagram selectedArchitecture={selectedArchitecture} architectureCatalog={architectureCatalog} activeNodeIds={selectedArchitecture === "energy-only" ? ["scenario", "adapter", "calliope_data", "calliope", "outputs"] : []} />
           ) : (
-            <MethodologyPlaceholderVisual
+            <MethodologyConceptVisual
               variant="network"
-              title="Placeholder visual: Model architecture flow"
-              description="The live architecture diagram loads when the main EDIM frontend bridge is available."
+              title="Model architecture flow"
+              description="Scenario assumptions move through model stages and into comparable energy and development outputs."
             />
           )}
         </div>
@@ -347,7 +347,7 @@
   function ScenarioChannelCards() {
     const { activeStep, setStepRef } = useScrollSteps(SCENARIO_CHANNELS.length);
     return (
-      <section className="methodology-section methodology-scenario-section">
+      <section className="methodology-section methodology-scenario-section" id="methodology-scenarios">
         <div className="methodology-section-copy methodology-section-copy-wide">
           <div className="methodology-eyebrow">Scenario channels</div>
           <h2>Scenarios are assembled through channels</h2>
@@ -393,7 +393,7 @@
   function InterpretationPrinciples() {
     const [active, setActive] = useState(0);
     return (
-      <section className="methodology-section methodology-interpretation-section">
+      <section className="methodology-section methodology-interpretation-section" id="methodology-interpretation">
         <div className="methodology-section-copy">
           <div className="methodology-eyebrow">Interpretation</div>
           <h2>Results are decision evidence, not automatic decisions</h2>
@@ -429,7 +429,7 @@
             {[0, 1, 2, 3, 4].map((row) => <span key={row} style={{ height: `${24 + row * 12 + (active === row ? 16 : 0)}%` }} />)}
           </div>
           <div className="methodology-placeholder-caption compact">
-            <div>Placeholder visual: Report interpretation map</div>
+            <div>Report interpretation map</div>
             <p>Principles highlight assumptions, comparison views, uncertainty, and communication outputs.</p>
           </div>
         </div>
@@ -439,7 +439,7 @@
 
   function MethodologyPage({ onOpenProjects, onStartProject, onReturnDashboard, architectureCatalog, header }) {
     const openProjects = typeof onOpenProjects === "function" ? onOpenProjects : function () {};
-    const startProject = typeof onStartProject === "function" ? onStartProject : openProjects;
+    const returnDashboard = typeof onReturnDashboard === "function" ? onReturnDashboard : openProjects;
 
     return (
       <div className="methodology-shell">
@@ -459,6 +459,15 @@
             </div>
           </section>
 
+          <nav className="methodology-reading-nav" aria-label="Methodology sections">
+            <a href="#methodology-integrated">Purpose</a>
+            <a href="#methodology-journey">Workflow</a>
+            <a href="#methodology-architecture">Architecture</a>
+            <a href="#methodology-scenarios">Scenarios</a>
+            <a href="#methodology-datasets">Data</a>
+            <a href="#methodology-interpretation">Interpretation</a>
+          </nav>
+
           <section className="methodology-section methodology-intro-section" id="methodology-integrated">
             <div className="methodology-section-copy">
               <div className="methodology-eyebrow">Why integrated modeling?</div>
@@ -474,10 +483,10 @@
               </p>
               <InsightCards />
             </div>
-            <MethodologyPlaceholderVisual
+            <MethodologyConceptVisual
               variant="network"
-              title="Placeholder visual: Integrated decision map"
-              description="Two partial systems — energy system and development system — gradually align into one integrated decision map."
+              title="Integrated decision map"
+              description="Energy-system and development-system evidence align into one integrated decision map."
             />
           </section>
 
@@ -485,7 +494,7 @@
           <ArchitectureExplainer architectureCatalog={architectureCatalog} />
           <ScenarioChannelCards />
 
-          <section className="methodology-section methodology-datasets-section">
+          <section className="methodology-section methodology-datasets-section" id="methodology-datasets">
             <div className="methodology-section-copy">
               <div className="methodology-eyebrow">Datasets and assumptions</div>
               <h2>Every run preserves its assumptions</h2>
@@ -502,9 +511,9 @@
                 <li>Exports include the references needed to interpret results.</li>
               </ul>
             </div>
-            <MethodologyPlaceholderVisual
+            <MethodologyConceptVisual
               variant="layers"
-              title="Placeholder visual: Dataset layers and run snapshot"
+              title="Dataset layers and run snapshot"
               description="Default data, uploaded data, active versions, and run snapshots stack into a preserved assumption record."
             />
           </section>
@@ -521,24 +530,24 @@
               </p>
               <MetricChipGrid items={ENERGY_OUTPUTS} />
             </div>
-            <MethodologyPlaceholderVisual
+            <MethodologyConceptVisual
               variant="map"
-              title="Placeholder visual: Energy system pathway"
+              title="Energy system pathway"
               description="Generation nodes, transmission links, demand centers, and changing pathway lines."
             />
           </section>
 
           <section className="methodology-section methodology-output-section reverse">
-            <MethodologyPlaceholderVisual
+            <MethodologyConceptVisual
               variant="network"
-              title="Placeholder visual: Development sector network"
+              title="Development sector network"
               description="Energy outputs connect into agriculture, industry, services, transport, health, education, and households."
             />
             <div className="methodology-large-card">
               <div className="methodology-eyebrow">Development model</div>
               <h2>The development model traces wider effects</h2>
               <p>
-                In the full energy-development architecture, energy-system outputs are connected to development analysis. This
+                In the full Energy-Development architecture, energy-system outputs are connected to development analysis. This
                 helps users explore how changes in energy investment, costs, demand, or infrastructure may relate to wider
                 economic and social outcomes. The goal is not to predict a single future with certainty, but to make trade-offs
                 and co-benefits easier to compare.
@@ -564,17 +573,17 @@
                 ))}
               </ol>
             </div>
-            <MethodologyPlaceholderVisual
+            <MethodologyConceptVisual
               variant="timeline"
-              title="Placeholder visual: Country-office planning pathway"
+              title="Country-office planning pathway"
               description="Scenario cards move from question to comparison to report package."
             />
           </section>
 
           <section className="methodology-closing-section">
-            <MethodologyPlaceholderVisual
+            <MethodologyConceptVisual
               variant="scenario"
-              title="Placeholder visual: Integrated decision workflow"
+              title="Integrated decision workflow"
               description="Energy pathway, development outcomes, and report package connected into one decision workflow."
             />
             <div>
@@ -587,7 +596,6 @@
               </p>
               <div className="methodology-closing-actions">
                 <button type="button" onClick={openProjects}>Open projects</button>
-                <button type="button" onClick={startProject}>Start a new project</button>
                 <button type="button" onClick={returnDashboard}>Return to dashboard</button>
               </div>
             </div>
@@ -600,6 +608,6 @@
   window.EDIMMethodology = {
     MethodologyPage,
     useScrollSteps,
-    MethodologyPlaceholderVisual,
+    MethodologyConceptVisual,
   };
 })();

@@ -290,14 +290,22 @@ def _upload_artifacts(
     run_id: str,
     artifact_catalog: dict,
 ) -> list[dict]:
-    if artifact_root.joinpath("artifacts").is_dir():
-        source_dir = artifact_root / "artifacts"
-    else:
-        source_dir = artifact_root
+    # The model runtime writes artifacts relative to its run directory
+    # (e.g. <run_dir>/artifacts/final/results.csv).  Upload with the same
+    # relative layout so the API's artifact-id -> blob-path mapping matches.
+    source_dir = artifact_root
 
     container_name = f"{config.blob_container_prefix}run-artifacts"
     _ensure_container(blob_client, container_name)
     container = blob_client.get_container_client(container_name)
+
+    # The artifact policy manifest is keyed by artifact id (e.g. "results_csv")
+    # with a "path" value (e.g. "artifacts/final/results.csv").  Build a
+    # reverse map so uploaded storage refs carry the stable artifact id.
+    path_to_id: dict[str, str] = {}
+    for artifact_id, entry in (artifact_catalog or {}).items():
+        if isinstance(entry, dict) and entry.get("path"):
+            path_to_id[str(entry["path"])] = str(artifact_id)
 
     skip_dirs = {"inputs", "work", "logs"}
     uploaded: list[dict] = []
@@ -305,7 +313,8 @@ def _upload_artifacts(
         if not path.is_file():
             continue
         rel = path.relative_to(source_dir).as_posix()
-        catalog_entry = artifact_catalog.get(rel, {})
+        artifact_id = path_to_id.get(rel, "")
+        catalog_entry = artifact_catalog.get(artifact_id, {}) if artifact_id else {}
         if not catalog_entry.get("retain_on_success", True):
             logger.info("Skipping artifact %s (retain_on_success=false)", rel)
             continue
@@ -317,7 +326,7 @@ def _upload_artifacts(
             container.upload_blob(name=blob_name, data=fh, overwrite=True)
         uploaded.append(
             {
-                "artifact_id": rel,
+                "artifact_id": artifact_id or rel,
                 "provider": "azure_blob",
                 "container": container_name,
                 "object_key": blob_name,
@@ -664,6 +673,17 @@ def _execute_payload(
                 if isinstance(summary, dict) and summary.get("run_dir"):
                     candidate = Path(summary["run_dir"])
                     if candidate.is_dir():
+                        artifact_root = candidate
+                # The model runtime resolves its own runs_dir from the bundle
+                # (runtime_settings.runs_dir) and writes to
+                # <runs_dir>/<run_id>. The worker staging directory also has
+                # an empty artifacts/ directory, so checking only whether that
+                # directory exists is not sufficient. Prefer the conventional
+                # model output directory when it contains actual artifacts.
+                if artifact_root == workspace:
+                    candidate = config.runs_dir / run_id
+                    candidate_artifacts = candidate / "artifacts"
+                    if candidate.is_dir() and candidate_artifacts.is_dir() and any(candidate_artifacts.rglob("*")):
                         artifact_root = candidate
                 storage_refs = _upload_artifacts(config, blob_client, artifact_root, run_id, artifact_catalog)
                 if summary is None:

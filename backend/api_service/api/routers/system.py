@@ -236,6 +236,9 @@ def _system_manifest_payload(
             ],
             "datasets_and_runtime": [
                 "GET /api/input-datasets",
+                "POST /api/input-datasets",
+                "PATCH /api/input-datasets/{dataset_id}",
+                "POST /api/projects/{project_id}/datasets",
                 "GET /api/input-datasets/{dataset_id}/download",
                 "POST /api/input-datasets/{dataset_id}/upload",
                 "GET /api/input-datasets/{dataset_id}/versions",

@@ -2,9 +2,16 @@
 
 Minimal test-user workbench for integrated energy-development scenario runs.
 
-Full technical documentation is in:
+Start with the two primary documents:
 
+- [Platform documentation](docs/APP_DOCUMENTATION.md)
+- [Modeling methodology report](docs/model/EDIM_Modeling_Methodology.docx)
+
+Supporting technical documentation:
+
+- [Documentation index](docs/README.md)
 - [System documentation](docs/system/SYSTEM_DOCUMENTATION.md)
+- [Modeling methodology technical reference](docs/model/MODELING_METHODOLOGY.md)
 - [Backend handoff](docs/handoff/BACKEND_HANDOFF.md)
 - [Model I/O catalog](docs/model/EDIM_model_io_catalog.xlsx)
 
@@ -136,15 +143,22 @@ cd ..
 ### 4) Run the local app
 
 ```bash
-source backend/.venv/bin/activate
-python3 scripts/run_local.py
+energy-modeling
 ```
 
 The runner starts FastAPI with the same project-owned, black-box model handoff path used for backend deployment. It
 tries the requested port first (`8000` by default), then automatically picks the next available port if that port is
-already in use.
+already in use. It also opens the UI automatically in the default browser when the app is ready.
+
+For debugging, the underlying Python entry point remains available:
+
+```bash
+backend/.venv/bin/python scripts/run_local.py --no-open
+```
 
 ### 5) Open the app
+
+The app opens automatically. If needed, open:
 
 - `http://127.0.0.1:8000/ui/`
 

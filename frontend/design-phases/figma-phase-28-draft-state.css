@@ -1,0 +1,58 @@
+/*
+ * Phase 28: drafts show only their persistence state and save action.
+ * Execution diagnostics remain reserved for submitted runs.
+ */
+
+.draft-save-panel {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid rgba(173, 186, 204, 0.16);
+  border-radius: 6px;
+  background: #151b22;
+}
+
+.draft-save-meta {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.draft-save-meta > span {
+  color: #8f9baa;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.draft-save-meta > time {
+  overflow: hidden;
+  color: #dce4ed;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draft-save-panel > button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+@media (max-width: 760px) {
+  .draft-save-panel {
+    align-items: stretch;
+  }
+
+  .draft-save-panel > button {
+    min-width: 96px;
+  }
+}

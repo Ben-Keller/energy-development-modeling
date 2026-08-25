@@ -1,0 +1,345 @@
+/*
+ * Figma exploration, Phase 2.
+ *
+ * Results-page density and hierarchy only. Removing this stylesheet restores
+ * the previous results layout without changing result data or interactions.
+ */
+
+.global-run-tab-bar {
+  padding: 0 16px;
+  background: rgba(8, 12, 17, 0.92);
+}
+
+.global-run-tab-bar .run-tab-strip {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 5px 0;
+}
+
+.global-run-tab-bar .run-tab {
+  width: auto;
+  min-width: 132px;
+  max-width: 190px;
+  min-height: 34px;
+  margin: 0;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--run-tab-accent) 48%, transparent);
+  transform: none;
+}
+
+.global-run-tab-bar .run-tab:hover:not(:disabled) {
+  transform: none;
+}
+
+.global-run-tab-bar .run-tab.active {
+  margin: 0;
+  border-bottom-color: rgba(103, 232, 249, 0.76);
+  background: rgba(29, 57, 88, 0.92);
+  box-shadow:
+    inset 0 2px 0 var(--run-tab-accent),
+    0 0 0 1px rgba(103, 232, 249, 0.12);
+  transform: none;
+}
+
+.global-run-tab-bar .run-tab.active::after {
+  display: none;
+}
+
+.results-mode-stack {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.results-mode-stack .scenario-definition-strip {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  padding: 7px 16px;
+  background: rgba(13, 18, 24, 0.96);
+}
+
+.results-mode-stack .results-mode-action-row {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 6px 16px 6px 8px;
+  border-bottom: 1px solid rgba(130, 159, 204, 0.22);
+  background: rgba(13, 18, 24, 0.96);
+}
+
+.results-mode-stack .results-mode-action-row .secondary-action-button,
+.results-mode-stack .scenario-definition-strip .ghost-utility-button {
+  min-height: 30px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.results-mode-stack .scenario-definition-details {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.results-mode-stack .results-mode-main {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  padding: 0 16px 16px;
+}
+
+.results-mode-stack .analysis-shell {
+  gap: 8px;
+}
+
+.results-mode-stack .analysis-header-card {
+  gap: 6px;
+  min-width: 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border-color: rgba(173, 186, 204, 0.2);
+  background: #11161d;
+  box-shadow: none;
+}
+
+.results-mode-stack .analysis-header-card > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.results-mode-stack .analysis-title-row {
+  align-items: center;
+  gap: 12px;
+}
+
+.results-mode-stack .view-eyebrow {
+  letter-spacing: 0;
+}
+
+.results-mode-stack .view-title {
+  margin-top: 2px;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.results-mode-stack .view-subtitle {
+  display: none;
+}
+
+.results-mode-stack .analysis-export-links {
+  gap: 6px;
+}
+
+.results-mode-stack .analysis-export-links a {
+  min-height: 29px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 11px;
+}
+
+.results-mode-stack .analysis-technical-details {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.results-mode-stack .analysis-technical-details summary {
+  font-size: 11px;
+}
+
+.results-mode-stack .analysis-filter-row {
+  margin-top: 0;
+  gap: 8px;
+}
+
+.results-mode-stack .analysis-filter-controls {
+  gap: 6px;
+}
+
+.results-mode-stack .analysis-filter-controls label {
+  font-size: 10px;
+}
+
+.results-mode-stack .analysis-filter-controls input,
+.results-mode-stack .analysis-filter-controls select {
+  min-height: 30px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.results-mode-stack .analysis-header-card .segmented-control {
+  border-radius: 6px;
+}
+
+.results-mode-stack .analysis-header-card .seg-button {
+  min-height: 30px;
+  padding: 5px 9px;
+}
+
+.results-mode-stack .analysis-header-card .seg-button.active {
+  box-shadow: none;
+}
+
+.results-mode-stack .results-section-tab-row {
+  width: 100%;
+  justify-content: center;
+  padding: 4px 0 2px;
+}
+
+.results-mode-stack .analysis-header-card .results-section-tabs {
+  width: min(100%, 820px);
+  padding: 5px;
+  border-color: rgba(96, 165, 250, 0.5);
+  border-radius: 8px;
+  background: rgba(6, 12, 22, 0.86);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.results-mode-stack .analysis-header-card .results-section-tabs .seg-button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 42px;
+  padding: 9px 16px;
+  border-radius: 6px;
+  color: #c6d5e9;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.results-mode-stack .analysis-header-card .results-section-tabs .seg-button.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #2563eb 0%, #3679dc 100%);
+  border-color: rgba(147, 197, 253, 0.78);
+  box-shadow: 0 5px 14px rgba(37, 99, 235, 0.28);
+}
+
+.results-mode-stack .analysis-section-body {
+  padding-right: 0;
+}
+
+.results-mode-stack .analysis-section-body .card {
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.results-mode-stack .metric-card {
+  min-width: 112px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border-color: rgba(173, 186, 204, 0.18);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.results-mode-stack .spatial-results-map-host {
+  min-height: 280px !important;
+  height: min(44vh, 460px) !important;
+  border-radius: 6px !important;
+}
+
+@media (min-width: 1101px) {
+  .results-mode-stack .workspace-map-grid {
+    grid-template-columns: minmax(0, 1.18fr) minmax(420px, 0.82fr);
+    gap: 10px;
+  }
+
+  .results-mode-stack .workspace-side-stack {
+    gap: 10px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .results-mode-stack .workspace-map-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .results-mode-stack {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+  }
+
+  .results-mode-stack .scenario-definition-strip,
+  .results-mode-stack .results-mode-action-row,
+  .results-mode-stack .scenario-definition-details,
+  .results-mode-stack .results-mode-main {
+    grid-column: 1;
+  }
+
+  .results-mode-stack .scenario-definition-strip {
+    grid-row: 1;
+    padding: 7px 12px;
+  }
+
+  .results-mode-stack .results-mode-action-row {
+    grid-row: 2;
+    justify-content: flex-start;
+    padding: 6px 12px;
+  }
+
+  .results-mode-stack .scenario-definition-details {
+    grid-row: 3;
+  }
+
+  .results-mode-stack .results-mode-main {
+    grid-row: 4;
+    padding: 0 12px 12px;
+  }
+
+  .results-mode-stack .analysis-title-row,
+  .results-mode-stack .analysis-filter-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .results-mode-stack .analysis-export-links {
+    justify-content: flex-start;
+  }
+
+  .results-mode-stack .analysis-filter-controls {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .results-mode-stack .analysis-header-card .segmented-control {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .results-mode-stack .analysis-header-card .seg-button {
+    flex: 0 0 auto;
+  }
+
+  .results-mode-stack .results-section-tab-row {
+    align-items: center;
+    padding-top: 3px;
+  }
+
+  .results-mode-stack .analysis-header-card .results-section-tabs {
+    display: flex;
+    gap: 3px;
+    overflow: visible;
+  }
+
+  .results-mode-stack .analysis-header-card .results-section-tabs .seg-button {
+    width: 100%;
+    min-height: 38px;
+    padding: 7px 3px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .results-mode-stack .analysis-section-body .workspace-grid-2,
+  .results-mode-stack .analysis-section-body .workspace-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}

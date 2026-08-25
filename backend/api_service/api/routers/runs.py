@@ -9,6 +9,7 @@ from ...jobs import JobManager, JobQueueFullError
 from ...runtime import EventStore
 from ...schemas import (
     RunArtifacts,
+    ArtifactDescriptor,
     PublicRunCreateRequest,
     PublicRunConfiguration,
     PublicProjectRunResponse,
@@ -101,10 +102,14 @@ def _public_project_run_list_item(record: Dict[str, Any]) -> Dict[str, Any]:
     run_id = str(record.get("run_id") or "")
     return {
         "run_id": run_id,
+        "model_id": str(record.get("model_id") or run_id),
         "execution_id": str(record.get("execution_id") or ""),
+        "latest_execution_id": str(record.get("latest_execution_id") or record.get("execution_id") or ""),
         "project_id": str(record.get("project_id") or ""),
         "project_run_number": int(record.get("project_run_number") or 0),
+        "model_number": int(record.get("model_number") or record.get("project_run_number") or 0),
         "run_name": str(record.get("run_name") or ""),
+        "model_name": str(record.get("model_name") or record.get("run_name") or ""),
         "status": status,
         "stage": str(record.get("stage") or status),
         "progress": float(record.get("progress") or 0.0),
@@ -126,6 +131,9 @@ def _public_project_run_list_item(record: Dict[str, Any]) -> Dict[str, Any]:
             else None
         ),
         "summary_available": bool(record.get("summary_available")),
+        "evidence_status": str(record.get("evidence_status") or "not_evaluated"),
+        "evidence_score": int(record.get("evidence_score") or 0),
+        "evidence_summary": str(record.get("evidence_summary") or ""),
         "source_run_id": str(record.get("source_run_id") or ""),
         "configuration": _public_run_configuration(record).model_dump(mode="json"),
     }
@@ -277,6 +285,93 @@ def _integrated_payload(run_id: str, storage: ArtifactStorageService) -> dict:
     return storage.read_json_artifact(run_id, "integrated_results_json")
 
 
+def _artifact_descriptors(run_id: str, summary: Dict[str, Any]) -> list[Dict[str, Any]]:
+    """Combine model artifact metadata with provider-specific storage refs.
+
+    The worker publishes two related catalogs: the model runtime emits rich
+    descriptors under ``payload.summary.artifact_catalog``, while the worker
+    adds Blob Storage references at the envelope's top-level
+    ``artifact_catalog``.  The public API contract exposes the rich descriptor
+    shape and keeps provider details internal to the download service.
+    """
+    nested_summary = summary.get("payload", {}).get("summary", {})
+    if not isinstance(nested_summary, dict):
+        nested_summary = {}
+
+    rich_catalog = nested_summary.get("artifact_catalog")
+    if not isinstance(rich_catalog, list):
+        rich_catalog = summary.get("artifact_catalog")
+    if not isinstance(rich_catalog, list):
+        rich_catalog = []
+
+    storage_catalog = summary.get("artifact_catalog")
+    if not isinstance(storage_catalog, list):
+        storage_catalog = []
+
+    rich_by_id = {
+        str(row.get("artifact_id") or "").strip(): row
+        for row in rich_catalog
+        if isinstance(row, dict) and str(row.get("artifact_id") or "").strip()
+    }
+
+    # Prefer the worker's uploaded refs when present. This prevents the API
+    # from advertising a descriptor for a file that was not actually stored.
+    source_rows = storage_catalog or rich_catalog
+    descriptors: list[Dict[str, Any]] = []
+    for row in source_rows:
+        if not isinstance(row, dict):
+            continue
+        artifact_id = str(row.get("artifact_id") or row.get("key") or "").strip()
+        if not artifact_id:
+            continue
+        descriptor = dict(rich_by_id.get(artifact_id) or {})
+        object_key = str(row.get("object_key") or "").strip()
+        path = str(descriptor.get("path") or "").strip()
+        if not path and object_key:
+            prefix = f"{run_id}/"
+            path = object_key[len(prefix):] if object_key.startswith(prefix) else object_key
+        descriptor.update(
+            {
+                "artifact_id": artifact_id,
+                "label": str(descriptor.get("label") or artifact_id.replace("_", " ").title()),
+                "kind": str(descriptor.get("kind") or "artifact"),
+                "producer_stage": str(descriptor.get("producer_stage") or "runtime"),
+                "path": path or artifact_id,
+                "download_url": str(
+                    descriptor.get("download_url")
+                    or f"/api/runs/{run_id}/artifacts/{artifact_id}"
+                ),
+                "include_in_project_bundle": bool(descriptor.get("include_in_project_bundle", True)),
+                "expose_download": bool(descriptor.get("expose_download", True)),
+                "embed_in_summary": bool(descriptor.get("embed_in_summary", False)),
+                "embed_in_final_results": bool(descriptor.get("embed_in_final_results", False)),
+                "required_for_report": bool(descriptor.get("required_for_report", False)),
+            }
+        )
+        descriptors.append(
+            {
+                key: descriptor[key]
+                for key in (
+                    "artifact_id",
+                    "label",
+                    "kind",
+                    "producer_stage",
+                    "path",
+                    "download_url",
+                    "include_in_project_bundle",
+                    "expose_download",
+                    "embed_in_summary",
+                    "embed_in_final_results",
+                    "required_for_report",
+                    "size_bytes",
+                    "media_type",
+                )
+                if key in descriptor
+            }
+        )
+    return descriptors
+
+
 def _authorize_run_access(run_id: str, repository: PlatformRepository, user_id: str) -> None:
     repository.get_run_record(run_id, user_id=user_id)
 
@@ -318,9 +413,20 @@ def _execution_info_from_record(record: Dict[str, Any], *, storage: ArtifactStor
     if status not in RUN_STATUSES:
         status = "failed"
     summary_model = None
+    artifact_catalog = _artifact_descriptors(
+        run_id,
+        {"artifact_catalog": list(record.get("artifact_catalog") or [])},
+    )
     if storage is not None and run_id and bool(record.get("summary_available")):
         try:
-            summary_model = RunSummary(**storage.read_json_artifact(run_id, "summary_json"))
+            raw_summary = storage.read_json_artifact(run_id, "summary_json")
+            try:
+                summary_model = RunSummary(**raw_summary)
+            except Exception:
+                nested_summary = raw_summary.get("payload", {}).get("summary", {})
+                if isinstance(nested_summary, dict):
+                    summary_model = RunSummary(**nested_summary)
+            artifact_catalog = _artifact_descriptors(run_id, raw_summary) or artifact_catalog
         except Exception:
             summary_model = None
     artifacts = (
@@ -354,7 +460,7 @@ def _execution_info_from_record(record: Dict[str, Any], *, storage: ArtifactStor
         request=req,
         artifacts=artifacts,
         summary=summary_model,
-        run_artifacts=list(record.get("artifact_catalog") or []),
+        run_artifacts=artifact_catalog,
     )
 
 
@@ -380,7 +486,7 @@ def get_run_integrated(run_id: str, storage: ArtifactStorageService = Depends(ge
 def list_run_artifacts(run_id: str, storage: ArtifactStorageService = Depends(get_artifact_storage_service), repository: PlatformRepository = Depends(get_platform_repository), user: UserContext = Depends(get_current_user_context)):
     _authorize_run_access(run_id, repository, user.user_id)
     summary = _summary_payload(run_id, storage)
-    return {"run_id": run_id, "artifacts": summary.get("artifact_catalog") or []}
+    return {"run_id": run_id, "artifacts": _artifact_descriptors(run_id, summary)}
 
 
 @router.get("/api/runs/{run_id}/artifacts/{artifact_id}")
@@ -399,7 +505,6 @@ def list_project_runs(
 ):
     actual_project_id = _resolved_project_id(repository, user.user_id, project_id)
     rows = repository.list_run_records(project_id=actual_project_id, user_id=user.user_id, include_drafts=include_drafts, limit=limit)
-    rows = [row for row in rows if str(row.get("status") or "").strip().lower() != "cancelled"]
     return {
         "project_id": actual_project_id,
         "runs": [_public_project_run_list_item(row) for row in rows],
@@ -467,7 +572,7 @@ def patch_project_run(
     if current.get("project_id") != actual_project_id:
         raise HTTPException(status_code=404, detail="Run record not found in project.")
     updates: Dict[str, Any] = {}
-    if payload.request is not None or payload.run_name is not None:
+    if payload.request is not None:
         _require_draft_run(current, action="edit")
     if payload.request is not None:
         normalized = _normalize_request_for_project(payload.request, actual_project_id, settings=settings)
@@ -475,9 +580,14 @@ def patch_project_run(
         updates["run_name"] = normalized.run_name
     if payload.run_name is not None:
         updates["run_name"] = payload.run_name
-        request_payload = dict(updates.get("request") or current.get("request") or {})
-        request_payload["run_name"] = payload.run_name
-        updates["request"] = _normalize_request_for_project(request_payload, actual_project_id, settings=settings).model_dump(mode="json")
+        if str(current.get("status") or "").strip().lower() == "draft":
+            request_payload = dict(updates.get("request") or current.get("request") or {})
+            request_payload["run_name"] = payload.run_name
+            updates["request"] = _normalize_request_for_project(
+                request_payload,
+                actual_project_id,
+                settings=settings,
+            ).model_dump(mode="json")
     if not updates:
         return {"run": _public_project_run_list_item(current)}
     return {"run": _public_project_run_list_item(repository.update_run_record(run_id, updates, user_id=user.user_id))}

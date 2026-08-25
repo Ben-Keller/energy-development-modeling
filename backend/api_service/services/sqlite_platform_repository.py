@@ -28,6 +28,7 @@ from .platform_artifacts import (
     load_run_summary_for_report,
     platform_storage_ref_path,
 )
+from .reporting import aggregate_evidence, evidence_from_summary
 from .users import DEFAULT_USER_ID, is_admin_user
 
 LOCAL_USER_ID = DEFAULT_USER_ID
@@ -69,6 +70,26 @@ class SQLitePlatformRepository:
         rows = self._records("project")
         if not is_admin_user(user_id):
             rows = [row for row in rows if _owner(row) == user_id]
+        runs = self._records("run")
+        if not is_admin_user(user_id):
+            runs = [row for row in runs if _owner(row) == user_id]
+        runs_by_project: Dict[str, List[Dict[str, Any]]] = {}
+        for run in runs:
+            if str(run.get("status") or "").strip().lower() == "cancelled":
+                continue
+            runs_by_project.setdefault(str(run.get("project_id") or ""), []).append(run)
+        rows = [
+            {
+                **row,
+                "visual_summary": _project_visual_summary(
+                    [
+                        self._with_evidence(run)
+                        for run in runs_by_project.get(str(row.get("project_id") or ""), [])
+                    ]
+                ),
+            }
+            for row in rows
+        ]
         rows.sort(key=lambda row: str(row.get("updated_at") or row.get("created_at") or ""), reverse=True)
         return rows
 
@@ -237,7 +258,7 @@ class SQLitePlatformRepository:
         safe_run_id = normalize_scope_id(run_id, "")
         record = self._record("run", safe_run_id)
         if record and _can_access_owner(user_id, _owner(record)):
-            return self._numbered_run_record(record, user_id=user_id)
+            return self._with_evidence(self._numbered_run_record(record, user_id=user_id))
         raise HTTPException(status_code=404, detail="Run record not found.")
 
     def get_run_record_by_execution(self, execution_id: str, *, user_id: str) -> Dict[str, Any]:
@@ -255,7 +276,9 @@ class SQLitePlatformRepository:
             ).fetchone()
         record = _loads(row["payload_json"]) if row else None
         if record and _can_access_owner(user_id, _owner(record)):
-            return self._numbered_run_record(_normalize_owner(record), user_id=user_id)
+            return self._with_evidence(
+                self._numbered_run_record(_normalize_owner(record), user_id=user_id)
+            )
         raise HTTPException(status_code=404, detail="Run execution not found.")
 
     def _next_project_run_number(self, conn: sqlite3.Connection, project_id: str, *, exclude_run_id: str = "") -> int:
@@ -297,6 +320,7 @@ class SQLitePlatformRepository:
         if not include_drafts:
             records = [row for row in records if row.get("status") != "draft"]
         records = _with_project_run_numbers(records)
+        records = [self._with_evidence(record) for record in records]
         records.sort(key=lambda row: str(row.get("updated_at") or row.get("created_at") or ""), reverse=True)
         return records[: max(1, int(limit))]
 
@@ -381,6 +405,19 @@ class SQLitePlatformRepository:
                 ]
             run_records = [self.get_run_record(run_id, user_id=user_id) for run_id in selected_run_ids]
             summaries = {run_id: self._load_run_summary_for_report(run_id) for run_id in selected_run_ids}
+            report_evidence = aggregate_evidence(
+                evidence_from_summary(summary) for summary in summaries.values()
+            )
+            if report_evidence.get("requires_acknowledgement") and not bool(
+                (options or {}).get("acknowledge_exploratory")
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "This report includes exploratory model outputs. "
+                        "Set options.acknowledge_exploratory=true after analyst acknowledgement."
+                    ),
+                )
             selected_run_set = set(selected_run_ids)
             export_records = [
                 row
@@ -409,6 +446,10 @@ class SQLitePlatformRepository:
                 "report_type": str(report_type or "project_summary"),
                 "format": "markdown",
                 "source_schema_version": source_data.get("schema_version", ""),
+                "evidence_status": str((source_data.get("evidence") or {}).get("status") or "not_evaluated"),
+                "requires_evidence_acknowledgement": bool(
+                    (source_data.get("evidence") or {}).get("requires_acknowledgement")
+                ),
                 "status": "succeeded",
                 "queued_at": created_at,
                 "started_at": created_at,
@@ -497,6 +538,10 @@ class SQLitePlatformRepository:
                 "updated_at": _now(),
                 "storage_ref": export_artifact["storage_ref"],
                 "size_bytes": export_artifact["size_bytes"],
+                "evidence_status": str((export_artifact.get("evidence") or {}).get("status") or "not_evaluated"),
+                "contains_exploratory_outputs": bool(
+                    (export_artifact.get("evidence") or {}).get("requires_acknowledgement")
+                ),
                 "download_url": f"/api/projects/{safe_project_id}/exports/{export_id}/download",
             }
             with self._transaction() as conn:
@@ -551,6 +596,24 @@ class SQLitePlatformRepository:
 
     def _load_run_summary_for_report(self, run_id: str) -> Dict[str, Any]:
         return load_run_summary_for_report(self._settings, run_id)
+
+    def _with_evidence(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        run_id = str(record.get("run_id") or "")
+        evidence = (
+            evidence_from_summary(self._load_run_summary_for_report(run_id))
+            if run_id and bool(record.get("summary_available"))
+            else evidence_from_summary({})
+        )
+        return {
+            **record,
+            "model_id": run_id,
+            "model_number": _positive_int(record.get("project_run_number")),
+            "model_name": str(record.get("run_name") or ""),
+            "latest_execution_id": str(record.get("execution_id") or ""),
+            "evidence_status": evidence["status"],
+            "evidence_score": evidence["score"],
+            "evidence_summary": evidence["summary"],
+        }
 
     def _ensure_project(self, conn: sqlite3.Connection, project_id: str = "default", *, user_id: str = LOCAL_USER_ID) -> Dict[str, Any]:
         safe_project_id = _project_id_for_user(project_id, user_id)
@@ -759,6 +822,117 @@ def _positive_int(value: Any) -> int:
     except (TypeError, ValueError):
         return 0
     return parsed if parsed > 0 else 0
+
+
+def _run_visual_descriptor(record: Dict[str, Any]) -> Dict[str, Any]:
+    request = record.get("request") if isinstance(record.get("request"), dict) else {}
+    levers = request.get("levers") if isinstance(request.get("levers"), dict) else {}
+    default_levers = {
+        "demand_multiplier": 1.0,
+        "renewables_capex_multiplier": 1.0,
+        "fossil_fuel_price_multiplier": 1.0,
+        "carbon_price_usd_per_tco2": 0.0,
+    }
+    adjusted_lever_count = 0
+    for key, value in levers.items():
+        if key not in default_levers:
+            adjusted_lever_count += 1
+            continue
+        try:
+            if abs(float(value) - default_levers[key]) > 1e-9:
+                adjusted_lever_count += 1
+        except (TypeError, ValueError):
+            adjusted_lever_count += 1
+    artifacts = [row for row in (record.get("artifact_catalog") or []) if isinstance(row, dict)]
+    artifact_families = {
+        str(
+            row.get("category")
+            or row.get("family")
+            or row.get("kind")
+            or row.get("artifact_id")
+            or row.get("name")
+            or ""
+        ).strip()
+        for row in artifacts
+    }
+    artifact_families.discard("")
+    summary_available = bool(record.get("summary_available"))
+    architecture_id = str(request.get("model_architecture_id") or "energy-development")
+    baseline_scope = 8 if architecture_id == "energy-development" else 5
+    kpi_scope_count = max(len(artifact_families), baseline_scope if summary_available else 0)
+    target_year = request.get("target_year")
+    try:
+        target_year = int(target_year) if target_year is not None else None
+    except (TypeError, ValueError):
+        target_year = None
+    return {
+        "run_id": str(record.get("run_id") or ""),
+        "project_run_number": _positive_int(record.get("project_run_number")),
+        "status": str(record.get("status") or "draft").strip().lower(),
+        "architecture_id": architecture_id,
+        "scenario_key": str(request.get("energy_scenario_key") or ""),
+        "target_scenario_id": str(request.get("mrio_scenario_id") or ""),
+        "target_year": target_year,
+        "run_profile": str(request.get("run_profile") or "dev"),
+        "lever_count": adjusted_lever_count,
+        "artifact_count": len(artifacts),
+        "kpi_scope_count": kpi_scope_count,
+        "summary_available": summary_available,
+        "evidence_status": str(record.get("evidence_status") or "not_evaluated"),
+        "evidence_score": int(record.get("evidence_score") or 0),
+    }
+
+
+def _project_visual_summary(records: List[Dict[str, Any]]) -> Dict[str, Any]:
+    numbered = _with_project_run_numbers(records)
+    descriptors = [_run_visual_descriptor(row) for row in numbered]
+    descriptors.sort(
+        key=lambda row: (
+            int(row.get("project_run_number") or 0),
+            str(row.get("run_id") or ""),
+        )
+    )
+    statuses = [str(row.get("status") or "draft") for row in descriptors]
+    architectures = {str(row.get("architecture_id") or "") for row in descriptors}
+    scenarios = {
+        (
+            str(row.get("scenario_key") or ""),
+            str(row.get("target_scenario_id") or ""),
+            row.get("target_year"),
+        )
+        for row in descriptors
+    }
+    fingerprints = {
+        (
+            str(row.get("architecture_id") or ""),
+            str(row.get("scenario_key") or ""),
+            str(row.get("target_scenario_id") or ""),
+            row.get("target_year"),
+            str(row.get("run_profile") or ""),
+            int(row.get("lever_count") or 0),
+        )
+        for row in descriptors
+    }
+    model_count = len(descriptors)
+    variation_score = 0.0 if model_count <= 1 else round((len(fingerprints) - 1) / (model_count - 1), 3)
+    evidence = aggregate_evidence(
+        {"status": str(row.get("evidence_status") or "not_evaluated")}
+        for row in descriptors
+    )
+    return {
+        "model_count": model_count,
+        "completed_count": statuses.count("succeeded"),
+        "active_count": sum(status in {"queued", "running"} for status in statuses),
+        "failed_count": statuses.count("failed"),
+        "architecture_count": len(architectures),
+        "scenario_count": len(scenarios),
+        "kpi_scope_count": sum(int(row.get("kpi_scope_count") or 0) for row in descriptors),
+        "variation_score": variation_score,
+        "evidence_status": evidence["status"],
+        "exploratory_model_count": sum(row.get("evidence_status") == "exploratory_only" for row in descriptors),
+        "analyst_review_model_count": sum(row.get("evidence_status") == "analyst_review" for row in descriptors),
+        "models": descriptors[-24:],
+    }
 
 
 def _with_project_run_numbers(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

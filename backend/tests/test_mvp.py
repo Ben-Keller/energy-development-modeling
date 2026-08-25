@@ -748,6 +748,17 @@ class SummaryDiagnosticsTests(unittest.TestCase):
 
 
 class MainAndArtifactTests(unittest.TestCase):
+    def test_api_echoes_or_assigns_request_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            client = TestClient(create_app(settings=settings))
+            generated = client.get("/health")
+            self.assertEqual(generated.status_code, 200)
+            self.assertTrue(generated.headers.get("X-Request-Id"))
+
+            supplied = client.get("/health", headers={"X-Request-Id": "frontend-test-request"})
+            self.assertEqual(supplied.headers.get("X-Request-Id"), "frontend-test-request")
+
     def test_read_summary_json_invalid_payload_returns_503(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "summary.json"
@@ -1090,6 +1101,83 @@ class MainAndArtifactTests(unittest.TestCase):
             lever_row = next(row for row in catalog if row["id"] == "lever_mappings")
             self.assertTrue(lever_row["versioned_override"])
 
+    def test_input_dataset_library_supports_create_rename_and_project_assignment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _build_settings(Path(tmp))
+            app = create_app(settings=settings, job_manager=JobManager(settings, runtime=_successful_fake_runtime()))
+            client = TestClient(app)
+            analyst_headers = {"X-EDIM-User-Id": "undp_analyst"}
+
+            created = client.post(
+                "/api/input-datasets",
+                headers=analyst_headers,
+                json={
+                    "label": "National demand outlook",
+                    "layer": "demand",
+                    "role": "Scenario demand projection",
+                    "scope": "user",
+                    "upload_policy": "project_override",
+                },
+            )
+            self.assertEqual(created.status_code, 200)
+            dataset = created.json()["dataset"]
+            self.assertEqual(dataset["id"], "national_demand_outlook")
+            self.assertEqual(dataset["scope"], "user")
+            self.assertFalse(dataset["exists"])
+
+            upload = client.post(
+                f"/api/input-datasets/{dataset['id']}/upload",
+                headers=analyst_headers,
+                files={"file": ("demand.csv", b"year,value\n2030,12\n", "text/csv")},
+            )
+            self.assertEqual(upload.status_code, 200)
+            version_id = upload.json()["version_id"]
+
+            renamed = client.patch(
+                f"/api/input-datasets/{dataset['id']}",
+                headers=analyst_headers,
+                json={"label": "National electricity demand outlook"},
+            )
+            self.assertEqual(renamed.status_code, 200)
+            self.assertEqual(renamed.json()["dataset"]["label"], "National electricity demand outlook")
+
+            project = client.post(
+                "/api/projects",
+                headers=analyst_headers,
+                json={"title": "Demand planning"},
+            ).json()["project"]
+            attached = client.post(
+                f"/api/projects/{project['project_id']}/datasets",
+                headers=analyst_headers,
+                json={"dataset_id": dataset["id"], "version_id": version_id},
+            )
+            self.assertEqual(attached.status_code, 200)
+            self.assertEqual(attached.json()["project_ids"], [project["project_id"]])
+
+            versions = client.get(
+                f"/api/input-datasets/{dataset['id']}/versions",
+                headers=analyst_headers,
+            ).json()["versions"]
+            self.assertEqual(versions[0]["project_ids"], [project["project_id"]])
+            catalog_row = next(
+                row
+                for row in client.get("/api/input-datasets", headers=analyst_headers).json()["datasets"]
+                if row["id"] == dataset["id"]
+            )
+            self.assertEqual(catalog_row["project_ids"], [project["project_id"]])
+
+            country_catalog = client.get(
+                "/api/input-datasets",
+                headers={"X-EDIM-User-Id": "country_officer"},
+            ).json()["datasets"]
+            self.assertFalse(any(row["id"] == dataset["id"] for row in country_catalog))
+            hidden = client.post(
+                f"/api/projects/{project['project_id']}/datasets",
+                headers={"X-EDIM-User-Id": "country_officer"},
+                json={"dataset_id": dataset["id"], "version_id": version_id},
+            )
+            self.assertEqual(hidden.status_code, 404)
+
     def test_input_dataset_upload_rejects_missing_required_csv_headers(self):
         with tempfile.TemporaryDirectory() as tmp:
             settings = _build_settings(Path(tmp))
@@ -1330,6 +1418,9 @@ class MainAndArtifactTests(unittest.TestCase):
             self.assertEqual(contracts["runtime_event"], "runtime_event_v1")
             self.assertIn("platform_repository", payload["provider_boundaries"])
             self.assertIn("POST /api/projects/{project_id}/runs/{run_id}/submit", payload["public_endpoints"]["runs"])
+            self.assertIn("POST /api/input-datasets", payload["public_endpoints"]["datasets_and_runtime"])
+            self.assertIn("PATCH /api/input-datasets/{dataset_id}", payload["public_endpoints"]["datasets_and_runtime"])
+            self.assertIn("POST /api/projects/{project_id}/datasets", payload["public_endpoints"]["datasets_and_runtime"])
             self.assertEqual(payload["runtime"]["execution_retry_policy"]["schema_version"], "execution_retry_policy")
             self.assertIn("operational_notes", payload)
 
@@ -1451,6 +1542,8 @@ class MainAndArtifactTests(unittest.TestCase):
             schemas = openapi["components"]["schemas"]
             for schema_name in (
                 "InputDatasetListResponse",
+                "InputDatasetResponse",
+                "ProjectDatasetAssignmentResponse",
                 "DatasetUploadResponse",
                 "DatasetVersionsResponse",
                 "DatasetDeleteResponse",
@@ -1471,6 +1564,14 @@ class MainAndArtifactTests(unittest.TestCase):
             self.assertEqual(
                 paths["/api/input-datasets"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
                 "#/components/schemas/InputDatasetListResponse",
+            )
+            self.assertEqual(
+                paths["/api/input-datasets"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/InputDatasetResponse",
+            )
+            self.assertEqual(
+                paths["/api/projects/{project_id}/datasets"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                "#/components/schemas/ProjectDatasetAssignmentResponse",
             )
             self.assertEqual(
                 paths["/api/environment-setup"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
@@ -1622,6 +1723,15 @@ class MainAndArtifactTests(unittest.TestCase):
             self.assertEqual(row["configuration"]["scenario"]["target_scenario_id"], "S2")
             self.assertEqual(row["configuration"]["run_profile"], "analysis")
 
+            project_summary = client.get("/api/projects").json()["projects"][0]["visual_summary"]
+            self.assertEqual(project_summary["model_count"], 1)
+            self.assertEqual(project_summary["completed_count"], 0)
+            self.assertEqual(project_summary["scenario_count"], 1)
+            self.assertEqual(project_summary["models"][0]["run_id"], record["run_id"])
+            self.assertEqual(project_summary["models"][0]["architecture_id"], "energy-development")
+            self.assertEqual(project_summary["models"][0]["target_year"], 2030)
+            self.assertEqual(project_summary["models"][0]["lever_count"], 1)
+
             validation = client.post(f"/api/projects/{project_id}/runs/validate", json={"configuration": public_payload})
             self.assertEqual(validation.status_code, 200)
             self.assertIn("runtime_preflight", validation.json())
@@ -1694,8 +1804,36 @@ class MainAndArtifactTests(unittest.TestCase):
             self.assertEqual(duplicate.json()["run"]["status"], "draft")
             self.assertEqual(duplicate.json()["run"]["project_run_number"], 2)
 
-            report = client.post(f"/api/projects/{project_id}/reports", json={"run_ids": [run_id]}).json()["report"]
+            summary_path = settings.runs_dir / run_id / "artifacts" / "final" / "summary.json"
+            evidence_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            evidence_summary["integrated_results"] = {
+                "model_quality": {
+                    "status": "exploratory_only",
+                    "score": 42,
+                    "summary": "Placeholder evidence requires analyst review.",
+                    "issues": [{"code": "placeholder_inputs", "severity": "error"}],
+                }
+            }
+            summary_path.write_text(json.dumps(evidence_summary, indent=2), encoding="utf-8")
+            enriched_run = client.get(f"/api/projects/{project_id}/runs/{run_id}").json()["run"]
+            self.assertEqual(enriched_run["model_id"], run_id)
+            self.assertEqual(enriched_run["evidence_status"], "exploratory_only")
+            unacknowledged_report = client.post(
+                f"/api/projects/{project_id}/reports",
+                json={"run_ids": [run_id]},
+            )
+            self.assertEqual(unacknowledged_report.status_code, 409)
+
+            report = client.post(
+                f"/api/projects/{project_id}/reports",
+                json={
+                    "run_ids": [run_id],
+                    "options": {"acknowledge_exploratory": True},
+                },
+            ).json()["report"]
             self.assertEqual(report["status"], "succeeded")
+            self.assertEqual(report["evidence_status"], "exploratory_only")
+            self.assertTrue(report["requires_evidence_acknowledgement"])
             self.assertEqual(report["status_history"][-1]["status"], "succeeded")
             report_download = client.get(f"/api/projects/{project_id}/reports/{report['report_id']}/download")
             self.assertEqual(report_download.status_code, 200)
@@ -1708,6 +1846,8 @@ class MainAndArtifactTests(unittest.TestCase):
             self.assertEqual(report_source["project"]["project_id"], project_id)
             self.assertEqual(report_source["runs"][0]["run_id"], run_id)
             self.assertIn("artifact_catalog", report_source["runs"][0])
+            self.assertEqual(report_source["evidence"]["status"], "exploratory_only")
+            self.assertEqual(report_source["runs"][0]["evidence"]["status"], "exploratory_only")
 
             export = client.post(f"/api/projects/{project_id}/exports", json={"run_ids": [run_id]}).json()["export"]
             self.assertEqual(export["status"], "succeeded")
@@ -1722,7 +1862,11 @@ class MainAndArtifactTests(unittest.TestCase):
             with ZipFile(io.BytesIO(export_download.content)) as zf:
                 names = set(zf.namelist())
                 self.assertIn("manifest.json", names)
+                self.assertIn("EVIDENCE_STATUS.txt", names)
                 self.assertIn("datasets/uploaded_dataset_manifest.json", names)
+                manifest = json.loads(zf.read("manifest.json"))
+                self.assertEqual(manifest["evidence"]["status"], "exploratory_only")
+                self.assertIn("EXPLORATORY OUTPUT", zf.read("EVIDENCE_STATUS.txt").decode("utf-8"))
                 self.assertTrue(any(name.startswith("reports/") and name.endswith(".md") for name in names))
                 self.assertTrue(any(name.startswith("reports/") and name.endswith(".source.json") for name in names))
                 self.assertTrue(any(name.startswith("datasets/users/undp_analyst/lever_mappings/") and name.endswith(".csv") for name in names))
@@ -1735,7 +1879,7 @@ class MainAndArtifactTests(unittest.TestCase):
             self.assertEqual(client.get(f"/api/projects/{project_id}").status_code, 404)
             self.assertEqual(client.get(f"/api/projects/{project_id}/runs/{run_id}").status_code, 404)
 
-    def test_project_run_lifecycle_rejects_completed_mutation_and_resubmit(self):
+    def test_project_run_lifecycle_allows_completed_rename_but_rejects_configuration_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(__file__).resolve().parents[2]
             settings = replace(
@@ -1767,8 +1911,21 @@ class MainAndArtifactTests(unittest.TestCase):
                 time.sleep(0.05)
             self.assertEqual(client.get(f"/api/projects/{project_id}/runs/{run_id}").json()["run"]["status"], "succeeded")
 
-            edit_response = client.patch(f"/api/projects/{project_id}/runs/{run_id}", json={"run_name": "Should not mutate"})
-            self.assertEqual(edit_response.status_code, 409)
+            original_request = client.get(
+                f"/api/projects/{project_id}/runs/{run_id}/diagnostics"
+            ).json()["run"]["request"]
+            edit_response = client.patch(f"/api/projects/{project_id}/runs/{run_id}", json={"run_name": "Published model"})
+            self.assertEqual(edit_response.status_code, 200)
+            self.assertEqual(edit_response.json()["run"]["run_name"], "Published model")
+            renamed_request = client.get(
+                f"/api/projects/{project_id}/runs/{run_id}/diagnostics"
+            ).json()["run"]["request"]
+            self.assertEqual(renamed_request, original_request)
+            configuration_response = client.patch(
+                f"/api/projects/{project_id}/runs/{run_id}",
+                json={"request": _public_run_payload("Changed configuration")},
+            )
+            self.assertEqual(configuration_response.status_code, 409)
             status_response = client.patch(f"/api/projects/{project_id}/runs/{run_id}", json={"status": "draft"})
             self.assertEqual(status_response.status_code, 422)
             resubmit_response = client.post(f"/api/projects/{project_id}/runs/{run_id}/submit")

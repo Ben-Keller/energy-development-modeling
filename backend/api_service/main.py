@@ -4,9 +4,10 @@ import logging
 import os
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -238,6 +239,16 @@ def create_app(
         completion_bridge.start()
 
     app = FastAPI(title="EDIM Calliope-Africa API", version="0.1.0")
+
+    @app.middleware("http")
+    async def attach_request_id(request: Request, call_next):
+        incoming = (request.headers.get("X-Request-Id") or "").strip()
+        request_id = incoming[:200] if incoming else str(uuid.uuid4())
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-Id"] = request_id
+        return response
+
     app.state.settings = settings
     app.state.platform_repository = platform_repository
     app.state.artifact_storage = artifact_storage

@@ -83,19 +83,27 @@ def _artifact_container_name() -> str:
 def _blob_name(run_id: str, artifact_id: str) -> str:
     """Blob path matching the worker upload convention.
 
-    Worker uploads to ``<run_id>/<rel_path>`` (e.g. ``<run_id>/summary.json``).
-    The API uses artifact IDs like ``summary_json`` which are mapped here.
+    The worker uploads the model run directory relative to ``<run_id>/``
+    (e.g. ``<run_id>/artifacts/final/results.csv``).  The API uses artifact
+    IDs like ``results_csv`` which are mapped here to the model's layout.
     """
-    # Map common artifact IDs to the relative paths used by the worker.
+    # Map common artifact IDs to the relative paths used by the model runtime
+    # (see the model's artifact_index.json / artifact policy manifest).
     _id_to_file: dict[str, str] = {
         "summary_json": "summary.json",
-        "results_csv": "results.csv",
-        "operating_shocks_csv": "exchange/operating_shocks.csv",
-        "investment_shocks_csv": "exchange/investment_shocks.csv",
-        "integrated_results_json": "integrated_results.json",
-        "coupling_manifest_json": "coupling_manifest.json",
-        "development_impacts_json": "development_impacts.json",
-        "report_md": "report.md",
+        "results_csv": "artifacts/final/results.csv",
+        "operating_shocks_csv": "artifacts/intermediate/exchange/operating_shocks.csv",
+        "investment_shocks_csv": "artifacts/intermediate/exchange/investment_shocks.csv",
+        "integrated_results_json": "artifacts/final/integrated_results.json",
+        "coupling_manifest_json": "artifacts/final/coupling_manifest.json",
+        "development_impacts_json": "artifacts/final/development_impacts.json",
+        "report_md": "exports/report.md",
+        "report_markdown": "exports/report.md",
+        "artifact_index_json": "artifacts/artifact_index.json",
+        "exchange_bundle_zip": "exports/exchange_bundle.zip",
+        "calliope_component_activity_csv": "artifacts/intermediate/exchange/calliope_component_activity.csv",
+        "energy_service_balance_csv": "artifacts/intermediate/exchange/energy_service_balance.csv",
+        "prices_and_taxes_csv": "artifacts/intermediate/exchange/prices_and_taxes.csv",
     }
     file_name = _id_to_file.get(artifact_id, artifact_id)
     return f"{run_id}/{file_name}"

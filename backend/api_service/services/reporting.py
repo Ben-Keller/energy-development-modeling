@@ -13,6 +13,43 @@ from typing import Any, Dict, Iterable, List
 
 
 REPORT_SOURCE_SCHEMA_VERSION = "edim_project_report_source_v1"
+EVIDENCE_STATUS_ORDER = {
+    "not_evaluated": 0,
+    "production_ready": 1,
+    "analyst_review": 2,
+    "exploratory_only": 3,
+}
+
+
+def evidence_from_summary(summary: Dict[str, Any]) -> Dict[str, Any]:
+    integrated = summary.get("integrated_results") if isinstance(summary.get("integrated_results"), dict) else {}
+    quality = integrated.get("model_quality") if isinstance(integrated.get("model_quality"), dict) else {}
+    status = str(quality.get("status") or "not_evaluated").strip().lower()
+    if status not in EVIDENCE_STATUS_ORDER:
+        status = "not_evaluated"
+    issues = quality.get("issues") if isinstance(quality.get("issues"), list) else []
+    try:
+        score = int(round(float(quality.get("score") or 0)))
+    except (TypeError, ValueError):
+        score = 0
+    return {
+        "status": status,
+        "score": max(0, min(100, score)),
+        "summary": str(quality.get("summary") or ""),
+        "issue_count": len(issues),
+        "requires_acknowledgement": status == "exploratory_only",
+    }
+
+
+def aggregate_evidence(rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    evidence_rows = [dict(row or {}) for row in rows]
+    statuses = [str(row.get("status") or "not_evaluated") for row in evidence_rows]
+    overall = max(statuses, key=lambda value: EVIDENCE_STATUS_ORDER.get(value, 0), default="not_evaluated")
+    return {
+        "status": overall,
+        "requires_acknowledgement": "exploratory_only" in statuses,
+        "counts": {status: statuses.count(status) for status in EVIDENCE_STATUS_ORDER},
+    }
 
 
 def build_project_report_source_data(
@@ -30,6 +67,8 @@ def build_project_report_source_data(
 
     runs = [_run_source_row(row, summaries.get(str(row.get("run_id") or ""), {})) for row in run_records]
     export_rows = [_export_source_row(row) for row in exports]
+    evidence_rows = [evidence_from_summary(summaries.get(str(row.get("run_id") or ""), {})) for row in run_records]
+    evidence_overview = aggregate_evidence(evidence_rows)
     return {
         "schema_version": REPORT_SOURCE_SCHEMA_VERSION,
         "report_type": str(report_type or "project_summary"),
@@ -45,6 +84,7 @@ def build_project_report_source_data(
         },
         "run_count": len(runs),
         "completed_run_count": sum(1 for row in runs if row.get("status") == "succeeded"),
+        "evidence": evidence_overview,
         "runs": runs,
         "exports": export_rows,
         "options": dict(options or {}),
@@ -63,6 +103,14 @@ def build_project_report_markdown(source_data: Dict[str, Any]) -> str:
     lines = [
         f"# EDIM {report_title}",
         "",
+        f"> Evidence status: **{str((source_data.get('evidence') or {}).get('status') or 'not_evaluated').replace('_', ' ').title()}**",
+        (
+            "> Exploratory output: this report includes results that require explicit analyst acknowledgement "
+            "and must not be treated as policy-grade evidence."
+            if bool((source_data.get("evidence") or {}).get("requires_acknowledgement"))
+            else "> Review the model-quality and provenance sections before using results in decisions."
+        ),
+        "",
         "## Report Metadata",
         "",
         f"- Generated at: {source_data.get('generated_at', '-')}",
@@ -77,17 +125,17 @@ def build_project_report_markdown(source_data: Dict[str, Any]) -> str:
         f"- Geography: {project.get('geography') or '-'}",
         f"- Scenario label: {project.get('scenario_label') or '-'}",
         "",
-        "## Run Overview",
+        "## Model Overview",
         "",
-        f"- Runs included: `{source_data.get('run_count', 0)}`",
-        f"- Completed runs: `{source_data.get('completed_run_count', 0)}`",
+        f"- Models included: `{source_data.get('run_count', 0)}`",
+        f"- Completed executions: `{source_data.get('completed_run_count', 0)}`",
         "",
     ]
 
     if runs:
         lines.extend(
             [
-                "| Run | Status | Energy scenario | MRIO scenario | Target year | Profile |",
+                "| Model | Execution status | Energy scenario | MRIO scenario | Target year | Execution profile |",
                 "| --- | --- | --- | --- | ---: | --- |",
             ]
         )
@@ -107,22 +155,22 @@ def build_project_report_markdown(source_data: Dict[str, Any]) -> str:
                 + " |"
             )
     else:
-        lines.append("No runs were included in this report.")
+        lines.append("No models were included in this report.")
 
     lines.extend(["", "## Integrated Metrics", ""])
     metric_rows = _metric_rows_for_report(runs)
     if metric_rows:
-        lines.extend(["| Run | Metric | Value | Unit |", "| --- | --- | ---: | --- |"])
+        lines.extend(["| Model | Metric | Value | Unit |", "| --- | --- | ---: | --- |"])
         for row in metric_rows:
             lines.append(
                 f"| `{row['run_id']}` | {row['label']} | {_format_value(row['value'])} | {row['unit'] or '-'} |"
             )
     else:
-        lines.append("No integrated metrics were available in the selected run summaries.")
+        lines.append("No integrated metrics were available for the selected models.")
 
     lines.extend(["", "## Export Data", ""])
     if exports:
-        lines.extend(["| Export | Runs | Size | Status |", "| --- | ---: | ---: | --- |"])
+        lines.extend(["| Export | Models | Size | Status |", "| --- | ---: | ---: | --- |"])
         for row in exports:
             lines.append(
                 f"| `{row.get('export_id', '-')}` | {len(row.get('run_ids') or [])} | {_format_value(row.get('size_bytes', 0))} bytes | {row.get('status', '-')} |"
@@ -133,13 +181,13 @@ def build_project_report_markdown(source_data: Dict[str, Any]) -> str:
     lines.extend(["", "## Artifact Availability", ""])
     artifact_rows = _artifact_rows_for_report(runs)
     if artifact_rows:
-        lines.extend(["| Run | Artifact | Kind | Download |", "| --- | --- | --- | --- |"])
+        lines.extend(["| Model | Artifact | Kind | Download |", "| --- | --- | --- | --- |"])
         for row in artifact_rows:
             lines.append(
                 f"| `{row.get('run_id', '-')}` | `{row.get('artifact_id', '-')}` | {row.get('kind', '-')} | {row.get('download_url') or '-'} |"
             )
     else:
-        lines.append("No artifact catalog rows were available in the selected run summaries.")
+        lines.append("No artifact catalog rows were available for the selected models.")
 
     warnings = [warning for run in runs for warning in (run.get("warnings") or []) if warning]
     lines.extend(["", "## Warnings", ""])
@@ -147,7 +195,7 @@ def build_project_report_markdown(source_data: Dict[str, Any]) -> str:
         for warning in warnings[:50]:
             lines.append(f"- {warning}")
     else:
-        lines.append("No run warnings were reported in the selected summaries.")
+        lines.append("No execution warnings were reported for the selected models.")
 
     if options:
         lines.extend(["", "## Report Options", "", "```json", json.dumps(options, indent=2, sort_keys=True), "```"])
@@ -161,6 +209,7 @@ def _run_source_row(record: Dict[str, Any], summary: Dict[str, Any]) -> Dict[str
     overview = integrated.get("integrated_overview") if isinstance(integrated.get("integrated_overview"), dict) else {}
     metrics = overview.get("metrics") if isinstance(overview.get("metrics"), list) else []
     artifacts = summary.get("artifact_catalog") if isinstance(summary.get("artifact_catalog"), list) else record.get("artifact_catalog") or []
+    evidence = evidence_from_summary(summary)
     return {
         "run_id": str(record.get("run_id") or ""),
         "execution_id": str(record.get("execution_id") or ""),
@@ -178,6 +227,7 @@ def _run_source_row(record: Dict[str, Any], summary: Dict[str, Any]) -> Dict[str
         "metrics": [_metric_source_row(metric) for metric in metrics if isinstance(metric, dict)],
         "artifact_catalog": [dict(row) for row in artifacts if isinstance(row, dict)],
         "warnings": list(summary.get("warnings") or []),
+        "evidence": evidence,
     }
 
 

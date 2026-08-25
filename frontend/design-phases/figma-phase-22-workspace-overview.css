@@ -1,0 +1,319 @@
+/*
+ * Figma exploration, Phase 22.
+ *
+ * Moves page orientation into the project overview itself and separates the
+ * workspace summary from the project collection heading.
+ */
+
+.modeling-workspace-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(440px, 0.9fr);
+  align-items: end;
+  gap: 44px;
+  padding: 24px 2px 26px;
+  border-bottom: 1px solid rgba(173, 186, 204, 0.17);
+}
+
+.modeling-workspace-copy {
+  min-width: 0;
+  max-width: 720px;
+}
+
+.workspace-return-home {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 18px;
+  padding: 5px 9px;
+  border: 1px solid rgba(173, 186, 204, 0.2);
+  border-radius: 6px;
+  background: transparent;
+  color: #c8d2df;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.workspace-return-home:hover,
+.workspace-return-home:focus-visible {
+  border-color: rgba(84, 196, 207, 0.62);
+  background: rgba(84, 196, 207, 0.08);
+  color: #f7fafc;
+}
+
+.workspace-return-home > span:first-child {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.modeling-workspace-kicker {
+  margin-bottom: 9px;
+  color: #54c4cf;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.modeling-workspace-copy h1 {
+  margin: 0;
+  color: #f7fafc;
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.modeling-workspace-copy p {
+  max-width: 670px;
+  margin: 15px 0 0;
+  color: #aeb8c7;
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.modeling-workspace-summary {
+  min-width: 0;
+}
+
+.modeling-workspace-user {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) minmax(120px, auto);
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 11px 16px;
+  border-bottom: 1px solid rgba(173, 186, 204, 0.16);
+}
+
+.modeling-workspace-user-icon {
+  width: 28px;
+  height: 28px;
+  display: block;
+  background: #54c4cf;
+  -webkit-mask: url("../assets/icons/user-round.svg") center / contain no-repeat;
+  mask: url("../assets/icons/user-round.svg") center / contain no-repeat;
+}
+
+.modeling-workspace-user-identity,
+.modeling-workspace-user-activity {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.modeling-workspace-user small {
+  color: #8794a5;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.modeling-workspace-user strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #f7fafc;
+  font-size: 15px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modeling-workspace-user-identity > span {
+  overflow: hidden;
+  color: #8794a5;
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modeling-workspace-user-activity {
+  padding-left: 14px;
+  border-left: 1px solid rgba(173, 186, 204, 0.16);
+}
+
+.modeling-workspace-user-activity strong {
+  color: #c8d2df;
+  font-size: 12px;
+}
+
+.modeling-workspace-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.modeling-workspace-metric {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 70px;
+  padding: 11px 16px;
+  border-left: 1px solid rgba(173, 186, 204, 0.16);
+}
+
+.modeling-workspace-metric:nth-child(n + 3) {
+  border-top: 1px solid rgba(173, 186, 204, 0.16);
+}
+
+.modeling-workspace-metric-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+  background: #8ea4c5;
+}
+
+.modeling-workspace-metric-icon.projects {
+  background: #f4c95d;
+  -webkit-mask: url("../assets/icons/archive.svg") center / contain no-repeat;
+  mask: url("../assets/icons/archive.svg") center / contain no-repeat;
+}
+
+.modeling-workspace-metric-icon.models {
+  background: #54c4cf;
+  -webkit-mask: url("../assets/icons/layers.svg") center / contain no-repeat;
+  mask: url("../assets/icons/layers.svg") center / contain no-repeat;
+}
+
+.modeling-workspace-metric-icon.completed {
+  background: #72cf9d;
+  -webkit-mask: url("../assets/icons/target.svg") center / contain no-repeat;
+  mask: url("../assets/icons/target.svg") center / contain no-repeat;
+}
+
+.modeling-workspace-metric-icon.geographies {
+  background: #e99282;
+  -webkit-mask: url("../assets/icons/map-pin.svg") center / contain no-repeat;
+  mask: url("../assets/icons/map-pin.svg") center / contain no-repeat;
+}
+
+.modeling-workspace-metric > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.modeling-workspace-metric dd,
+.modeling-workspace-metric dt {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.modeling-workspace-metric dd {
+  order: 1;
+  color: #f7fafc;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.modeling-workspace-metric dt {
+  order: 2;
+  margin-top: 5px;
+  color: #8794a5;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.projects-overview-header {
+  margin-bottom: 14px;
+}
+
+.projects-overview-header h2 {
+  font-size: 28px !important;
+}
+
+.active-project-grid {
+  margin-top: 0 !important;
+}
+
+@media (max-width: 1040px) {
+  .modeling-workspace-intro {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 24px;
+  }
+
+  .modeling-workspace-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .modeling-workspace-metric:nth-child(n + 3) {
+    border-top: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .modeling-workspace-intro {
+    gap: 20px;
+    padding-top: 16px;
+    padding-bottom: 21px;
+  }
+
+  .modeling-workspace-copy h1 {
+    font-size: 36px;
+  }
+
+  .modeling-workspace-copy p {
+    margin-top: 12px;
+    font-size: 15px;
+  }
+
+  .workspace-return-home {
+    margin-bottom: 15px;
+  }
+
+  .modeling-workspace-user {
+    grid-template-columns: 32px minmax(0, 1fr);
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .modeling-workspace-user-activity {
+    grid-column: 2;
+    padding: 5px 0 0;
+    border-top: 1px solid rgba(173, 186, 204, 0.12);
+    border-left: 0;
+  }
+
+  .modeling-workspace-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .modeling-workspace-metric {
+    min-height: 64px;
+    padding: 9px 12px;
+  }
+
+  .modeling-workspace-metric:nth-child(n + 3) {
+    border-top: 1px solid rgba(173, 186, 204, 0.16);
+  }
+}
+
+@media (max-width: 440px) {
+  .modeling-workspace-copy h1 {
+    font-size: 32px;
+  }
+
+  .modeling-workspace-metric {
+    grid-template-columns: 23px minmax(0, 1fr);
+    gap: 8px;
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+
+  .modeling-workspace-metric-icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  .modeling-workspace-metric dd {
+    font-size: 23px;
+  }
+}

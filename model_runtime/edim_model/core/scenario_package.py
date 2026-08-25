@@ -416,6 +416,31 @@ def write_africa_national_mrio_placeholder_scenarios(config_dir: Path, report: D
     return payload
 
 
+def load_or_build_africa_national_mrio_placeholder_scenarios(config_dir: Path, report: Dict[str, Any]) -> Dict[str, Any]:
+    """Load the generated Africa national scenario expansion without rewriting stable cache files.
+
+    Scenario catalog reads and package builds happen often during UI refreshes,
+    validation, and tests. Rewriting this generated input on every read creates
+    noisy timestamp-only diffs, so the file is regenerated only when missing,
+    malformed, or tied to an older source report hash.
+    """
+    path = config_dir / "generated" / "africa_national_mrio_placeholder_scenarios.json"
+    source_sha = str(report.get("source_sha256") or "")
+    if path.exists():
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if (
+                isinstance(payload, dict)
+                and payload.get("schema_version") == "africa_national_mrio_placeholder_scenarios_v1"
+                and str(payload.get("source_report_sha256") or "") == source_sha
+                and isinstance(payload.get("scenarios"), dict)
+            ):
+                return payload
+        except Exception:
+            pass
+    return write_africa_national_mrio_placeholder_scenarios(config_dir, report)
+
+
 def _target_profile_for_record(record: Dict[str, Any]) -> Dict[str, Any]:
     summary = record.get("summary") or {}
     return {

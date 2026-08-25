@@ -1,0 +1,81 @@
+/*
+ * Phase 25: model comparison uses an explicit page transition instead of
+ * project-level tabs.
+ */
+
+.project-workspace-page .model-comparison-launch {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  padding: 7px 9px 7px 12px;
+  border-color: rgba(125, 211, 252, 0.36);
+  border-radius: 6px;
+  background: #17232d;
+  color: #e9f7ff;
+}
+
+.project-workspace-page .model-comparison-launch:hover:enabled,
+.project-workspace-page .model-comparison-launch:focus-visible {
+  border-color: rgba(125, 211, 252, 0.72);
+  background: #1b2c38;
+}
+
+.project-workspace-page .model-comparison-launch:disabled {
+  border-color: rgba(173, 186, 204, 0.14);
+  background: #141a20;
+  color: #707b88;
+}
+
+.project-workspace-page .model-comparison-launch b {
+  min-width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: rgba(125, 211, 252, 0.14);
+  color: #bcecff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.project-workspace-page .model-comparison-launch:disabled b {
+  background: rgba(173, 186, 204, 0.08);
+  color: #697480;
+}
+
+.project-workspace-page .comparison-back-to-models {
+  margin: 0;
+  justify-self: start;
+}
+
+.project-workspace-page .project-comparison-workbench {
+  padding-top: 14px;
+}
+
+@media (max-width: 760px) {
+  .project-workspace-page .project-selection-toolbar {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .project-workspace-page .model-comparison-launch {
+    align-self: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .project-workspace-page .project-selection-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .project-workspace-page .model-comparison-launch {
+    width: 100%;
+  }
+}

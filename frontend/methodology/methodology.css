@@ -7,7 +7,7 @@
     radial-gradient(900px 520px at 12% 0%, rgba(37, 99, 235, 0.13), transparent 65%),
     linear-gradient(180deg, #f7fbff 0%, #edf4fb 46%, #f9fbfd 100%);
   color: #0b1728;
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-family: "Proxima Nova", sans-serif;
 }
 
 .methodology-shell * {
@@ -86,7 +86,7 @@
 .methodology-eyebrow {
   color: #0ea5e9;
   font-size: 11px;
-  font-weight: 950;
+  font-weight: 900;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
@@ -193,7 +193,7 @@
 .methodology-channel-card span {
   color: #0ea5e9;
   font-size: 11px;
-  font-weight: 950;
+  font-weight: 900;
   letter-spacing: 0.12em;
 }
 
@@ -304,7 +304,7 @@
 .methodology-scroll-step span {
   color: #0ea5e9;
   font-size: 11px;
-  font-weight: 950;
+  font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -494,7 +494,7 @@
 .methodology-architecture-node-type {
   color: #67e8f9;
   font-size: 9px;
-  font-weight: 950;
+  font-weight: 900;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -570,7 +570,7 @@
   color: #075985;
   cursor: help;
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 800;
   padding: 9px 11px;
 }
 
@@ -590,7 +590,7 @@
   background: rgba(255, 255, 255, 0.66);
   color: #334155;
   cursor: pointer;
-  font-weight: 760;
+  font-weight: 700;
   padding: 12px;
   text-align: left;
 }
@@ -604,7 +604,7 @@
   background: rgba(14, 165, 233, 0.11);
   color: #0284c7;
   font-size: 11px;
-  font-weight: 950;
+  font-weight: 900;
 }
 
 .methodology-principle-list button.active,
@@ -720,7 +720,7 @@
   background: #0f172a;
   color: #f8fafc;
   font-size: 11px;
-  font-weight: 950;
+  font-weight: 900;
 }
 
 .methodology-closing-section {
