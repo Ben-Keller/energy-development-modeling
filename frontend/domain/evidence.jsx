@@ -17,7 +17,7 @@
     },
     not_evaluated: {
       label: "Not evaluated",
-      description: "Evidence quality is available after a model completes.",
+      description: "Evidence quality has not been evaluated for this record.",
       className: "evidence-status evidence-status--pending",
     },
   };
@@ -59,7 +59,6 @@
 
   function EvidenceBadge({ status, summary = "", compact = false }) {
     const normalized = normalizeEvidenceStatus(status);
-    if (normalized === "exploratory_only" || normalized === "not_evaluated") return null;
     const meta = EVIDENCE_THEME[normalized];
     const title = String(summary || meta.description);
     return (
@@ -79,14 +78,13 @@
     const status = normalizeEvidenceStatus(resolved.status);
     const meta = EVIDENCE_THEME[status];
     return (
-      <section className={`evidence-notice evidence-notice--${status}`} aria-label={title}>
-        <div>
-          <div className="evidence-notice-eyebrow">{title}</div>
-          <strong>{meta.label}</strong>
+      <details className={`evidence-notice evidence-notice--${status}`}>
+        <summary><span aria-hidden="true">ⓘ</span> {title}: {meta.label}</summary>
+        <div className="evidence-notice-body">
           <p>{resolved.summary || meta.description}</p>
+          {resolved.score ? <span className="evidence-score">Quality score: {resolved.score}/100</span> : null}
         </div>
-        {resolved.score ? <span className="evidence-score">{resolved.score}/100</span> : null}
-      </section>
+      </details>
     );
   }
 

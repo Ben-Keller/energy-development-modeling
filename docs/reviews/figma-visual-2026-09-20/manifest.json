@@ -1,0 +1,85 @@
+{
+  "date": "2026-09-20",
+  "implementation_commit": "14a7781",
+  "figma_file_key": "Mt8Gg5L0MoY0tZsvPFfR4t",
+  "current_capture": "Local frontend build; existing mocked API fixtures; desktop 1280x900, mobile 412x915; no live backend",
+  "screens": [
+    {
+      "title": "Portfolio \u2014 active and archive",
+      "node_id": "812:6947",
+      "source": "https://www.figma.com/design/Mt8Gg5L0MoY0tZsvPFfR4t?node-id=812-6947",
+      "figma_png": "812-6947.png",
+      "current_desktop_png": "current-desktop-projects.png"
+    },
+    {
+      "title": "Portfolio \u2014 active only",
+      "node_id": "812:7124",
+      "source": "https://www.figma.com/design/Mt8Gg5L0MoY0tZsvPFfR4t?node-id=812-7124",
+      "figma_png": "812-7124.png",
+      "current_desktop_png": "current-desktop-projects.png"
+    },
+    {
+      "title": "Create project",
+      "node_id": "812:7301",
+      "source": "https://www.figma.com/design/Mt8Gg5L0MoY0tZsvPFfR4t?node-id=812-7301",
+      "figma_png": "812-7301.png",
+      "current_desktop_png": "current-desktop-create-project.png"
+    },
+    {
+      "title": "Dataset library",
+      "node_id": "812:7502",
+      "source": "https://www.figma.com/design/Mt8Gg5L0MoY0tZsvPFfR4t?node-id=812-7502",
+      "figma_png": "812-7502.png",
+      "current_desktop_png": null
+    },
+    {
+      "title": "Results overview",
+      "node_id": "812:7704",
+      "source": "https://www.figma.com/design/Mt8Gg5L0MoY0tZsvPFfR4t?node-id=812-7704",
+      "figma_png": "812-7704.png",
+      "current_desktop_png": "current-desktop-results.png"
+    },
+    {
+      "title": "Model setup",
+      "node_id": "812:8163",
+      "source": "https://www.figma.com/design/Mt8Gg5L0MoY0tZsvPFfR4t?node-id=812-8163",
+      "figma_png": "812-8163.png",
+      "current_desktop_png": "current-desktop-setup.png"
+    },
+    {
+      "title": "Project and models",
+      "node_id": "812:8383",
+      "source": "https://www.figma.com/design/Mt8Gg5L0MoY0tZsvPFfR4t?node-id=812-8383",
+      "figma_png": "812-8383.png",
+      "current_desktop_png": "current-desktop-project.png"
+    },
+    {
+      "title": "New model",
+      "node_id": "812:8490",
+      "source": "https://www.figma.com/design/Mt8Gg5L0MoY0tZsvPFfR4t?node-id=812-8490",
+      "figma_png": "812-8490.png",
+      "current_desktop_png": "current-desktop-new-model.png"
+    },
+    {
+      "title": "Comparison selection",
+      "node_id": "812:8630",
+      "source": "https://www.figma.com/design/Mt8Gg5L0MoY0tZsvPFfR4t?node-id=812-8630",
+      "figma_png": "812-8630.png",
+      "current_desktop_png": "current-desktop-project.png"
+    },
+    {
+      "title": "Comparison results",
+      "node_id": "812:8750",
+      "source": "https://www.figma.com/design/Mt8Gg5L0MoY0tZsvPFfR4t?node-id=812-8750",
+      "figma_png": "812-8750.png",
+      "current_desktop_png": "current-desktop-comparison.png"
+    },
+    {
+      "title": "Energy results",
+      "node_id": "812:8921",
+      "source": "https://www.figma.com/design/Mt8Gg5L0MoY0tZsvPFfR4t?node-id=812-8921",
+      "figma_png": "812-8921.png",
+      "current_desktop_png": "current-desktop-energy.png"
+    }
+  ]
+}

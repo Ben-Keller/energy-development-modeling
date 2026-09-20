@@ -10,10 +10,6 @@
   min-height: 0 !important;
 }
 
-.flow-node.node-scenario .input-module-layout {
-  padding-bottom: 0;
-}
-
 .flow-node.node-scenario .flow-node-drag-footer {
   position: absolute;
   right: 0;
