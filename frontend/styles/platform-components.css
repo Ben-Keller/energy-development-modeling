@@ -546,6 +546,9 @@ body:has(.platform-shell) { overflow:auto; }
 .comparison-matrix td, .comparison-matrix th { font-size:14px; }
 .comparison-scroll-hint { color:var(--workspace-muted); font-size:14px; }
 .project-workspace-page .project-information-main h1 { font-size:28px; line-height:1.2; }
+.project-workspace-title-row { display:flex; align-items:center; gap:12px; min-width:0; }
+.project-workspace-title-row h1 { overflow-wrap:anywhere; }
+.project-workspace-title-row .project-edit-icon { flex-shrink:0; width:36px; height:36px; }
 .project-information-visual { max-width:90px; max-height:90px; }
 
 @media(max-width:1100px) {

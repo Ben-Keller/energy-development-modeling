@@ -10004,6 +10004,7 @@ function ComparisonArtifactMatrix({
 
 function ProjectComparePanel({
   activeProject,
+  onRenameProject,
   projectRuns,
   projectReports,
   projectExports,
@@ -10022,6 +10023,8 @@ function ProjectComparePanel({
   // It does not depend on live execution internals and remains a parent page
   // above individual immutable or editable model runs.
   const [workspaceTab, setWorkspaceTab] = useState("selection");
+  const [titleDraft, setTitleDraft] = useState(null);
+  const [titleError, setTitleError] = useState("");
   const runs = projectRuns || [];
   // Never assume API list order or label an undated record as the latest.
   function latestDatedRecord(records, fields) {
@@ -10139,6 +10142,27 @@ function ProjectComparePanel({
 
   return (
     <div className="project-workspace-page card">
+      {titleDraft !== null ? (
+        <Modal title="Edit project name" onClose={() => { if (!actionLoading) setTitleDraft(null); }}>
+          <form className="project-create-form" onSubmit={async (event) => {
+            event.preventDefault();
+            const title = titleDraft.trim();
+            if (!title || actionLoading) return;
+            if (title === projectTitle) { setTitleDraft(null); return; }
+            setTitleError("");
+            const updated = await onRenameProject(activeProject.project_id, title);
+            if (updated) setTitleDraft(null);
+            else setTitleError("Could not save the project name. Please try again.");
+          }}>
+            <label>Project name<input autoFocus required maxLength={200} value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} disabled={actionLoading} /></label>
+            {titleError ? <p role="alert">{titleError}</p> : null}
+            <div className="project-model-toolbar-actions">
+              <button type="button" onClick={() => setTitleDraft(null)} disabled={actionLoading}>Cancel</button>
+              <button type="submit" className="primary-action-button" disabled={actionLoading || !titleDraft.trim()}>{actionLoading ? "Saving…" : "Save"}</button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
       {workspaceTab === "selection" ? (
         <section className="project-information-bar" aria-label={`Project overview: ${projectTitle}`}>
         <div className="project-information-main">
@@ -10153,7 +10177,10 @@ function ProjectComparePanel({
             </button>
             <div className="project-information-heading-copy">
               <div className="project-information-eyebrow">Project workspace</div>
-              <h1>{projectTitle}</h1>
+              <div className="project-workspace-title-row">
+                <h1>{projectTitle}</h1>
+                <button type="button" className="project-edit-icon" aria-label="Edit project name" title="Edit project name" disabled={actionLoading || !activeProject} onClick={() => { setTitleError(""); setTitleDraft(projectTitle); }}>✎</button>
+              </div>
             </div>
           </div>
           <p>{projectDescription}</p>
@@ -11506,6 +11533,7 @@ function App() {
       const updated = await api.updateProject(projectId, { title });
       setProjects((prev) => (prev || []).map((project) => project.project_id === projectId ? updated : project));
       setStatusMessage(`Renamed project to ${updated.title || projectId}.`);
+      return updated;
     } catch (err) {
       setErrorMessage(toErrorMessage(err, "Failed to rename project"));
     } finally {
@@ -12247,6 +12275,7 @@ function App() {
 
   async function onSelectJob(job, expectedRouteSequence = null) {
     if (!job) return;
+    setStatusMessage("");
     const id = runExecutionId(job);
     const jobArchitectureId = job.request && job.request.model_architecture_id;
     if (jobArchitectureId) setSelectedArchitectureId(jobArchitectureId);
@@ -12268,7 +12297,6 @@ function App() {
           summary,
         });
         setSelectedRunId(runId);
-        setStatusMessage(`Inspecting ${runLabel(job)}.`);
         setRunViewMode("results");
       } catch (err) {
         setErrorMessage(toErrorMessage(err, "Failed to load selected model results"));
@@ -12615,6 +12643,7 @@ function App() {
       onNewModel={() => setNewModelModalOpen(true)}
       onOpenRun={onSelectJob}
       onReturnToProjects={openProjectsPage}
+      onRenameProject={handleRenameProject}
       renderModelActions={renderModelActions}
       actionLoading={platformActionLoading}
       isAdminView={isAdminView}
