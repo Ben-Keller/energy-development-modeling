@@ -605,8 +605,12 @@ test("project identities persist while model cards prioritize readable metadata"
   await expect(projectInformation.locator(".project-information-meta-item")).toHaveCount(4);
   await expect(projectInformation.locator(".project-information-icon")).toHaveCount(4);
   await expect(projectInformation.locator(".project-information-stats strong")).toHaveText(["1", "0", "0", "0"]);
-  await expect(projectInformation.getByRole("button", { name: "New model" })).toBeVisible();
-  await expect(page.locator(".project-selection-toolbar").getByRole("button", { name: "New model" })).toHaveCount(0);
+  const kpis = await projectInformation.locator(".project-information-stats > div").evaluateAll(nodes => nodes.map(node => { const r = node.getBoundingClientRect(); return {top:r.top,right:r.right}; }));
+  expect(Math.max(...kpis.map(r=>r.top))-Math.min(...kpis.map(r=>r.top))).toBeLessThanOrEqual(1);
+  expect(Math.max(...kpis.map(r=>r.right))).toBeLessThanOrEqual(page.viewportSize().width);
+
+  await expect(projectInformation.getByRole("button", { name: "New model" })).toHaveCount(0);
+  await expect(page.locator(".project-selection-toolbar").getByRole("button", { name: "New model" })).toBeVisible();
   const informationLayout = await projectInformation.evaluate((element) => {
     const heading = element.querySelector("h1");
     const rect = element.getBoundingClientRect();

@@ -1,9 +1,6 @@
 const {test, expect} = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 const {PROJECT, DRAFT_RUN, DATASET, mockPlatformApi, publicRun, completedComparisonRun, comparisonSummary, openProjects} = require('./platform-fixtures');
-const fs = require('fs');
-const path = require('path');
-const screenshots = path.resolve(__dirname, '../../docs/reviews/frontend-implemented-2026-09-20');
 
 async function completed(page, options={}) {
   const run = completedComparisonRun('run_visual',1,'Current policy','baseline',2030);
@@ -26,8 +23,7 @@ test('setup fields, brand and dialogs fit all target widths and save the frozen 
       return nodes.map(node=>{const r=node.getBoundingClientRect(); return {left:r.left,right:r.right,width:r.width,viewport:innerWidth};});
     });
     for (const box of bounds) { expect(box.left,JSON.stringify(box)).toBeGreaterThanOrEqual(0); expect(box.right,JSON.stringify(box)).toBeLessThanOrEqual(width); expect(box.width).toBeGreaterThan(0); }
-    fs.mkdirSync(screenshots,{recursive:true});
-    await page.screenshot({path:path.join(screenshots,`setup-${width}-${info.project.name}.png`),fullPage:true});
+    await page.screenshot({path:info.outputPath(`setup-${width}-${info.project.name}.png`),fullPage:true});
   }
   const saved=page.waitForRequest(r=>r.method()==='PATCH' && r.url().includes('/runs/'));
   await page.getByLabel('Carbon price (USD/tCO2) value',{exact:true}).fill('80');
@@ -99,7 +95,7 @@ test('recorded inputs load lazily, preserve recorded versions and expose evidenc
   await page.locator('.recorded-inputs > summary').click();
   await expect(page.locator('.recorded-inputs')).toContainText('historic-1');
   await expect(page.locator('.recorded-inputs')).not.toContainText(DATASET.active_version_id);
-  await page.screenshot({path:path.join(screenshots,`results-${info.project.name}.png`),fullPage:true});
+  await page.screenshot({path:info.outputPath(`results-${info.project.name}.png`),fullPage:true});
   await page.locator('.recorded-inputs > summary').click();
   await page.unroute('**/diagnostics');
   await page.route('**/diagnostics',route=>route.fulfill({status:404,json:{detail:'Unavailable'}}));
@@ -145,7 +141,7 @@ test('library sorting, assignment and protected deletion use existing operations
   await page.getByRole('button',{name:'Delete version',exact:true}).click();
   await expect(page.getByRole('status').filter({hasText:'referenced'})).toBeVisible();
   await expect(page.locator('.dataset-table')).toContainText('demand.csv');
-  await page.screenshot({path:path.join(screenshots,`datasets-${info.project.name}.png`),fullPage:true});
+  await page.screenshot({path:info.outputPath(`datasets-${info.project.name}.png`),fullPage:true});
   const a11y=await new AxeBuilder({page}).include('.dataset-management-view').analyze();
   expect(a11y.violations).toEqual([]);
 });
@@ -223,6 +219,10 @@ test('recent activity uses timestamps and opens the correct model and report', a
   const models = await page.getByRole('region',{name:'Project models',exact:true}).boundingBox();
   const sidebar = page.getByRole('complementary',{name:'Project activity and files'});
   const side = await sidebar.boundingBox();
+  const heading = await page.locator('.project-information-heading-row').boundingBox();
+  expect(Math.abs(models.x - heading.x)).toBeLessThanOrEqual(1);
+  expect(models.x).toBeGreaterThanOrEqual(16);
+  expect(Math.abs(page.viewportSize().width - side.x - side.width - models.x)).toBeLessThanOrEqual(2);
   if (page.viewportSize().width > 1000) {
     expect(side.x).toBeGreaterThanOrEqual(models.x + models.width);
     expect(Math.abs(side.y-models.y)).toBeLessThanOrEqual(2);
@@ -230,9 +230,9 @@ test('recent activity uses timestamps and opens the correct model and report', a
     expect(side.y).toBeGreaterThanOrEqual(models.y + models.height);
   }
   await expect(sidebar.locator('.project-secondary-disclosure')).toHaveCount(2);
-  await page.locator('.project-content-layout').screenshot({path:path.join(screenshots,`project-sidebar-${info.project.name}.png`)});
+  await page.locator('.project-content-layout').screenshot({path:info.outputPath(`project-sidebar-${info.project.name}.png`)});
   await expect(recent.getByRole('link',{name:'Download latest report'})).toHaveAttribute('href',/reports\/new\//);
-  await recent.screenshot({path:path.join(screenshots,`recent-activity-${info.project.name}.png`)});
+  await recent.screenshot({path:info.outputPath(`recent-activity-${info.project.name}.png`)});
   await recent.getByRole('button',{name:/Open latest model:/}).click();
   await expect(page).toHaveURL(/\/models\/newer\/setup$/);
 });
@@ -253,7 +253,7 @@ test('evidence stays collapsed until requested and preserves missing bounds',asy
   await expect(evidence).toContainText('0 to 20');
   await expect(evidence).toContainText('relative_bounds_v1');
   await expect(evidence).toContainText('Unavailable');
-  await evidence.screenshot({path:path.join(screenshots,`evidence-summary-${info.project.name}.png`)});
+  await evidence.screenshot({path:info.outputPath(`evidence-summary-${info.project.name}.png`)});
   await expect(page.locator('.results-evidence-disclosure')).toHaveAttribute('open','');
   for(const width of [360,1280]) {
     await page.setViewportSize({width,height:960});
@@ -277,4 +277,34 @@ test('dataset library opens from the account menu and projects section',async({p
   await expect(page).toHaveURL(/#\/datasets$/);
   await page.reload();
   await expect(page.getByRole('heading',{name:'Dataset library',exact:true})).toBeVisible();
+});
+
+test('one persistent header keeps its dimensions across page navigation',async({page})=>{
+  await mockPlatformApi(page);
+  await page.goto('/');
+  await page.getByRole('button',{name:'Open projects',exact:true}).waitFor();
+  await page.evaluate(()=>document.fonts.ready);
+  const baseline=await page.locator('.edim-topbar').evaluate(el=>{
+    window.__persistentHeader=el;
+    const r=el.getBoundingClientRect();return {width:r.width,height:r.height};
+  });
+  async function checkHeader() {
+    await expect(page.locator('.edim-topbar')).toHaveCount(1);
+    const actual=await page.locator('.edim-topbar').evaluate(el=>{
+      const r=el.getBoundingClientRect();return {same:el===window.__persistentHeader,width:r.width,height:r.height};
+    });
+    expect(actual).toEqual({same:true,...baseline});
+  }
+  await page.getByRole('button',{name:'Open projects',exact:true}).click();
+  await page.getByRole('heading',{name:'Your Projects',level:1}).waitFor();await checkHeader();
+  await page.getByRole('button',{name:'Open project',exact:true}).click();
+  await page.getByRole('heading',{name:'Models',exact:true}).waitFor();await checkHeader();
+  await page.getByRole('button',{name:'Open model',exact:true}).click();
+  await page.locator('.setup-form-panel').waitFor();await checkHeader();
+  await page.getByRole('button',{name:/User menu for/}).click();
+  await page.getByRole('button',{name:'Dataset library',exact:true}).click();
+  await page.getByRole('heading',{name:'Dataset library',exact:true}).waitFor();await checkHeader();
+  await page.getByRole('button',{name:'Return to landing page',exact:true}).click();
+  await page.getByRole('button',{name:'Explore the methodology',exact:true}).click();
+  await page.locator('.methodology-shell').waitFor();await checkHeader();
 });

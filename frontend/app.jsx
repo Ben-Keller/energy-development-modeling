@@ -6924,18 +6924,6 @@ function LandingPage({
   }
   return (
     <div className="landing-shell">
-      <UnifiedHeader
-        currentUserId={currentUserId}
-        availableUsers={availableUsers}
-        onUserChange={onUserChange}
-        apiTarget={apiTarget}
-        systemCompatibility={systemCompatibility}
-        onApiTargetModeChange={onApiTargetModeChange}
-        apiTargetLoading={apiTargetLoading}
-        onOpenDatasets={onOpenDatasets}
-        onReturnToLanding={null}
-      />
-
       <main className="landing-main">
         <section className="landing-hero-section" onPointerMove={updateHeroFlashlight} onPointerLeave={clearHeroFlashlight}>
           <LandingHeroVisualSlot tuning={heroDefaults} />
@@ -10230,15 +10218,7 @@ function ProjectComparePanel({
               <span>Reports</span>
             </div>
           </div>
-          <button
-            type="button"
-            className="primary-action-button project-information-new-model"
-            onClick={onNewModel}
-            disabled={actionLoading || !activeProject}
-          >
-            <span aria-hidden="true">+</span>
-            New model
-          </button>
+
         </div>
         </section>
       ) : null}
@@ -10254,6 +10234,7 @@ function ProjectComparePanel({
               <h2>Models</h2>
               <div className="muted">{runs.length} models · {successfulRuns.length} complete · {selectedRuns.length} selected</div>
             </div>
+            <div className="project-model-toolbar-actions">
             <button
               type="button"
               className="secondary-action-button model-comparison-launch"
@@ -10264,6 +10245,16 @@ function ProjectComparePanel({
               <span>Compare models</span>
               <b aria-label={`${selectedRuns.length} selected`}>{selectedRuns.length}</b>
             </button>
+          <button
+            type="button"
+            className="primary-action-button project-new-model"
+            onClick={onNewModel}
+            disabled={actionLoading || !activeProject}
+          >
+            <span aria-hidden="true">+</span>
+            New model
+          </button>
+            </div>
           </div>
 
           <div className="project-run-card-grid">
@@ -12657,24 +12648,12 @@ function App() {
     setRunViewMode("projects");
   }
 
+  function renderPage() {
   if (methodologyOpen) {
     const MethodologyPage = window.EDIMMethodology && window.EDIMMethodology.MethodologyPage;
     return MethodologyPage ? (
       <MethodologyPage
         architectureCatalog={architectureCatalog}
-        header={(
-          <UnifiedHeader
-            currentUserId={currentUserId}
-            availableUsers={availableUsers}
-            onUserChange={handleUserChange}
-            apiTarget={apiTarget}
-            systemCompatibility={systemCompatibility}
-            onApiTargetModeChange={handleApiTargetModeChange}
-            apiTargetLoading={platformActionLoading}
-            onOpenDatasets={openDatasetLibrary}
-        onReturnToLanding={openLandingPage}
-          />
-        )}
         onOpenProjects={openProjectsPage}
         onStartProject={openProjectsPage}
         onReturnDashboard={openLandingPage}
@@ -12713,18 +12692,6 @@ function App() {
 
   return (
     <div className="app-shell">
-      <UnifiedHeader
-        currentUserId={currentUserId}
-        availableUsers={availableUsers}
-        onUserChange={handleUserChange}
-        apiTarget={apiTarget}
-        systemCompatibility={systemCompatibility}
-        onApiTargetModeChange={handleApiTargetModeChange}
-        apiTargetLoading={platformActionLoading}
-        onOpenDatasets={openDatasetLibrary}
-        onReturnToLanding={openLandingPage}
-      />
-
       {newModelModalOpen ? (
         <NewModelModal
           projectRuns={projectRuns}
@@ -12776,6 +12743,24 @@ function App() {
           scenarioSelections={scenarioSelections}
         />}
       </div>
+    </div>
+  );
+  }
+
+  return (
+    <div className="platform-shell">
+      <UnifiedHeader
+        currentUserId={currentUserId}
+        availableUsers={availableUsers}
+        onUserChange={handleUserChange}
+        apiTarget={apiTarget}
+        systemCompatibility={systemCompatibility}
+        onApiTargetModeChange={handleApiTargetModeChange}
+        apiTargetLoading={platformActionLoading}
+        onOpenDatasets={openDatasetLibrary}
+        onReturnToLanding={openLandingPage}
+      />
+      {renderPage()}
     </div>
   );
 }

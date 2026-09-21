@@ -44,7 +44,7 @@ Use this file as the entry point, then jump to the deeper references as needed.
 - [Root README](../README.md): local setup, placeholder data status, quickstart, and artifact locations.
 - [System documentation](system/SYSTEM_DOCUMENTATION.md): detailed system architecture and runtime behavior.
 - [Backend handoff](handoff/BACKEND_HANDOFF.md): backend/provider replacement contract for Azure or another hosted platform.
-- [Technical architecture handoff](handoff/EDIM_Technical_Architecture_and_Requirements_Handoff.md): short navigation document for backend, frontend, and design teams.
+- [Frontend handoff](handoff/FRONTEND_HANDOFF.md): delivered UI behavior, verification, and deferred backend follow-ups.
 - [Model runtime README](../model_runtime/README.md): black-box model package contract, runtime CLI, manifests, and module boundary.
 - [Modeling methodology](model/MODELING_METHODOLOGY.md): implemented methods, datasets, assumptions, interpretation limits, and scientific gap register.
 - [Frontend README](../frontend/README.md): frontend file organization, build, runtime switching, and handoff notes.

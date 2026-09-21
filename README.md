@@ -13,6 +13,7 @@ Supporting technical documentation:
 - [System documentation](docs/system/SYSTEM_DOCUMENTATION.md)
 - [Modeling methodology technical reference](docs/model/MODELING_METHODOLOGY.md)
 - [Backend handoff](docs/handoff/BACKEND_HANDOFF.md)
+- [Frontend handoff and deferred backend work](docs/handoff/FRONTEND_HANDOFF.md)
 - [Model I/O catalog](docs/model/EDIM_model_io_catalog.xlsx)
 
 ## Data status
