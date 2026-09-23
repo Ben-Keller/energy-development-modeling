@@ -68,3 +68,5 @@ feedback/
 ~$*
 *.swp
 *.swo
+.local
+__azurite_data__

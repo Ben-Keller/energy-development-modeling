@@ -836,9 +836,9 @@ function displayStatus(status) {
 const evidenceComponents = window.EDIM_EVIDENCE || {};
 const EvidenceBadge = evidenceComponents.EvidenceBadge || function EvidenceBadgeFallback({ status }) {
   const normalized = String(status || "not_evaluated").trim().toLowerCase();
-  if (normalized === "exploratory_only" || normalized === "not_evaluated") return null;
   return <StatusBadge status={normalized} />;
 };
+const EvidenceNotice = evidenceComponents.EvidenceNotice;
 const evidenceFromSummary = evidenceComponents.evidenceFromSummary || (() => ({ status: "not_evaluated", score: 0 }));
 const evidenceFromModel = evidenceComponents.evidenceFromModel || ((model) => ({
   status: String((model && model.evidence_status) || "not_evaluated"),
@@ -1976,8 +1976,15 @@ function formatElapsed(totalSeconds) {
   return `${m}m ${String(s).padStart(2, "0")}s`;
 }
 
+function metricNumber(value) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function compact(value) {
-  const n = toNumber(value);
+  const n = metricNumber(value);
+  if (n == null) return "Unavailable";
   const abs = Math.abs(n);
   if (abs >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
   if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -1986,8 +1993,8 @@ function compact(value) {
 }
 
 function formatSharePercent(value, digits = 1) {
-  const n = toNumber(value, NaN);
-  if (!Number.isFinite(n)) return "-";
+  const n = metricNumber(value);
+  if (n == null) return "Unavailable";
   return `${(n * 100).toFixed(digits)}%`;
 }
 
@@ -3542,6 +3549,7 @@ function evaluateSystemManifest(manifest, target) {
       const suffix = qs.toString() ? `?${qs.toString()}` : "";
       return apiDelete(`/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}${suffix}`, "Failed to delete run");
     },
+    fetchRunInputs: async (projectId, runId) => (await apiGet(`/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/diagnostics`, "Recorded input provenance is unavailable")).run,
     fetchRunLogs: async (runId) => apiGet(`/api/runs/${encodeURIComponent(runId)}/logs`, "Failed to load run logs"),
     createProjectReport: async (projectId, payload) => (await apiPost(`/api/projects/${encodeURIComponent(projectId)}/reports`, payload || {}, "Failed to create report")).report,
     fetchProjectReports: async (projectId) => (await apiGet(`/api/projects/${encodeURIComponent(projectId)}/reports`, "Failed to load reports")).reports || [],
@@ -3942,8 +3950,8 @@ const DatasetRows = workspaceDataComponents.DatasetRows || function DatasetRowsF
 function MetricCard({ label, value }) {
   return (
     <div className="metric-card">
-      <div className="muted" style={{ fontSize: 11 }}>{label}</div>
-      <div style={{ marginTop: 4, fontWeight: 700 }}>{value}</div>
+      <div className="muted metric-card-label">{label}</div>
+      <div className="metric-card-value">{value}</div>
     </div>
   );
 }
@@ -3995,7 +4003,7 @@ function Modal({ title, subtitle = "", onClose, children, wide = false }) {
       if (previousActive && typeof previousActive.focus === "function") previousActive.focus();
     };
   }, []);
-  return (
+  return ReactDOM.createPortal(
     <div className="modal-backdrop" role="presentation" onMouseDown={() => {
       if (typeof onCloseRef.current === "function") onCloseRef.current();
     }}>
@@ -4021,7 +4029,7 @@ function Modal({ title, subtitle = "", onClose, children, wide = false }) {
         </div>
         <div className="modal-body">{children}</div>
       </div>
-    </div>
+    </div>, document.body
   );
 }
 
@@ -4306,18 +4314,21 @@ function RankedBars({
   normalizedFilter = false,
 }) {
   const [limit, setLimit] = useState("10");
+  const [filter, setFilter] = useState("");
+  const normalizedFilter = filter.trim().toLowerCase();
   const normalizedRows = useMemo(
     () => (records || [])
       .map((r) => ({
         label: String(r && r[labelKey] != null ? r[labelKey] : ""),
-        value: toNumber(r && r[valueKey]),
+        value: r && r[valueKey] != null && r[valueKey] !== "" ? Number(r[valueKey]) : null,
       }))
-      .filter((r) => r.label)
+      .filter((r) => r.label && r.value != null && Number.isFinite(r.value))
       .sort((a, b) => Math.abs(b.value) - Math.abs(a.value)),
     [records, labelKey, valueKey]
   );
   const rankedLimit = Math.max(5, Math.round(toNumber(limit, 10)));
-  const rows = normalizedRows.slice(0, rankedLimit);
+  const matchingRows = normalizedRows.filter((row) => row.label.replace(/[_:]/g, " ").toLowerCase().includes(normalizedFilter));
+  const rows = matchingRows.slice(0, rankedLimit);
   const showLimit = normalizedRows.length > 10;
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.value)), 1);
   const displayLabel = (value) => String(value || "")
@@ -4329,6 +4340,10 @@ function RankedBars({
 
   return (
     <div className="ranked-bars">
+      <div className="chart-filter-row">
+        <label>Filter {controlsLabel}<input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Search labels" /></label>
+        <small aria-live="polite">Showing {rows.length} of {matchingRows.length} matching · {normalizedRows.length} total</small>
+      </div>
       {showLimit ? (
         <div className="ranked-bars-display-controls" role="group" aria-label={`${controlsLabel} display controls`}>
           <label>
@@ -4832,7 +4847,7 @@ function RunDiagnosticsCard({ confidence }) {
       <h3 style={{ marginTop: 0, fontSize: 15 }}>Execution diagnostics</h3>
       <div className="row muted" style={{ marginTop: 8, fontSize: 12 }}>
         <span>Coupling mode: <code>{String((confidence && confidence.coupling_mode) || "unknown")}</code></span>
-        <span>Mapping coverage: {formatSharePercent(toNumber(confidence && confidence.mapping_coverage_share), 1)}</span>
+        <span>Mapping coverage: {formatSharePercent(confidence && confidence.mapping_coverage_share, 1)}</span>
         <span>Unmapped technologies: {formatSharePercent(toNumber(confidence && confidence.unmapped_mapping_share), 1)}</span>
         <span>Placeholder rows: <code>{toNumber(confidence && confidence.placeholder_input_row_count, 0)}</code></span>
         <span>Reliability penalty method: <code>{String((confidence && confidence.reliability_penalty_method) || "-")}</code></span>
@@ -4852,9 +4867,32 @@ function RunDiagnosticsCard({ confidence }) {
   );
 }
 
+function ResultsEvidenceSummary({ modelQuality, confidence, developmentUncertainty, includesDevelopment }) {
+  const score = metricNumber(modelQuality && modelQuality.score);
+  const bounds = (developmentUncertainty && developmentUncertainty.totals_bounds) || {};
+  function range(low, high) {
+    return metricNumber(low) == null || metricNumber(high) == null ? "Unavailable" : `${compact(low)} to ${compact(high)}`;
+  }
+  return (
+    <section className="results-evidence-summary" aria-label="Evidence summary">
+      <div><h3>Evidence at a glance</h3><p className="muted">Whole-model diagnostics; these do not change with map selection. Ranges reflect the recorded method, not a guarantee.</p></div>
+      <div className="evidence-summary-metrics">
+        <MetricCard label="Quality score" value={score == null ? "Unavailable" : String(Math.round(score))} />
+        <MetricCard label="Mapping coverage" value={formatSharePercent(confidence && confidence.mapping_coverage_share, 1)} />
+        {includesDevelopment ? <>
+          <MetricCard label="Jobs total range" value={range(bounds.jobs_total_low, bounds.jobs_total_high)} />
+          <MetricCard label="GVA range (MUSD)" value={range(bounds.gva_total_musd_low, bounds.gva_total_musd_high)} />
+        </> : null}
+      </div>
+      {modelQuality && modelQuality.summary ? <p className="muted">{String(modelQuality.summary)}</p> : null}
+      {includesDevelopment ? <p className="muted">Recorded uncertainty method: {developmentUncertainty && developmentUncertainty.method ? String(developmentUncertainty.method) : "Unavailable"}. Full ranges and checks are below.</p> : null}
+    </section>
+  );
+}
+
 function ModelQualityCard({ modelQuality, confidence }) {
   const qualityStatus = String((modelQuality && modelQuality.status) || "").trim().toLowerCase();
-  const qualityScore = toNumber(modelQuality && modelQuality.score, 0);
+  const qualityScore = metricNumber(modelQuality && modelQuality.score);
   const qualityIssues = Array.isArray(modelQuality && modelQuality.issues) ? modelQuality.issues : [];
   const qualityDiagnostics = (modelQuality && modelQuality.diagnostics) || {};
   return (
@@ -4864,18 +4902,18 @@ function ModelQualityCard({ modelQuality, confidence }) {
         {qualityStatus ? <span className={displayStatus(qualityStatus).className}>{displayStatus(qualityStatus).label}</span> : null}
       </div>
       <div className="row" style={{ gap: 10, marginTop: 8 }}>
-        <MetricCard label="Quality score" value={String(Math.round(qualityScore))} />
+        <MetricCard label="Quality score" value={qualityScore == null ? "Unavailable" : String(Math.round(qualityScore))} />
         <MetricCard
           label="Mapping coverage"
-          value={formatSharePercent(toNumber(confidence && confidence.mapping_coverage_share), 1)}
+          value={formatSharePercent(confidence && confidence.mapping_coverage_share, 1)}
         />
         <MetricCard
           label="Energy balance gap"
-          value={formatSharePercent(toNumber(qualityDiagnostics.energy_balance_gap_share), 2)}
+          value={formatSharePercent(qualityDiagnostics.energy_balance_gap_share, 2)}
         />
         <MetricCard
           label="CO2 method gap"
-          value={formatSharePercent(toNumber(qualityDiagnostics.emissions_method_gap_share), 2)}
+          value={formatSharePercent(qualityDiagnostics.emissions_method_gap_share, 2)}
         />
       </div>
       {modelQuality && modelQuality.summary ? (
@@ -5586,9 +5624,11 @@ function RunResultsPanel({
   selectedRunLabel,
   selectedRunName,
   onRenameModel,
-  onDuplicateModel,
-  duplicateModelLoading = false,
-  technicalExecutionPanel,
+  modelActions,
+  recordedInputs,
+  evidence,
+  activeSection,
+  setActiveSection,
   technicalDetailsPanel,
   selectedModelDetailsPanel,
   runMetadata,
@@ -5626,7 +5666,6 @@ function RunResultsPanel({
   spatialFilter,
   setSpatialFilter,
 }) {
-  const [activeSection, setActiveSection] = useState("overview");
   const [mapViewportsByRun, setMapViewportsByRun] = useState({});
   const [modelNameEditing, setModelNameEditing] = useState(false);
   const [modelNameDraft, setModelNameDraft] = useState("");
@@ -5862,7 +5901,7 @@ function RunResultsPanel({
     const rows = Array.isArray(displayIntegratedMetrics) ? displayIntegratedMetrics : [];
     return rows.map((metric) => {
       const key = String((metric && metric.key) || "");
-      let value = toNumber(metric && metric.value, 0);
+      let value = metricNumber(metric && metric.value);
       if (spatialFilter) {
         if (key === "monetary_cost" && filteredMonetaryCost.hasAny) {
           value = filteredMonetaryCost.total;
@@ -5895,10 +5934,10 @@ function RunResultsPanel({
   const displayedDevelopmentDrivers = useMemo(() => {
     if (!spatialFilter) {
       return {
-        capex_effect_musd: toNumber(developmentDrivers && developmentDrivers.capex_effect_musd, 0),
-        opex_effect_musd: toNumber(developmentDrivers && developmentDrivers.opex_effect_musd, 0),
-        reliability_penalty_proxy: toNumber(developmentDrivers && developmentDrivers.reliability_penalty_proxy, 0),
-        import_leakage_musd: toNumber(developmentDrivers && developmentDrivers.import_leakage_musd, 0),
+        capex_effect_musd: metricNumber(developmentDrivers && developmentDrivers.capex_effect_musd),
+        opex_effect_musd: metricNumber(developmentDrivers && developmentDrivers.opex_effect_musd),
+        reliability_penalty_proxy: metricNumber(developmentDrivers && developmentDrivers.reliability_penalty_proxy),
+        import_leakage_musd: metricNumber(developmentDrivers && developmentDrivers.import_leakage_musd),
       };
     }
     return {
@@ -5906,10 +5945,10 @@ function RunResultsPanel({
       opex_effect_musd: filteredLocationShockTotals.opexShockMusd,
       reliability_penalty_proxy: filteredReliabilitySummary.hasAny
         ? filteredReliabilitySummary.unservedTotal
-        : toNumber(developmentDrivers && developmentDrivers.reliability_penalty_proxy, 0),
+        : metricNumber(developmentDrivers && developmentDrivers.reliability_penalty_proxy),
       import_leakage_musd: canApplyImportLeakage
         ? filteredImportLeakageMusd
-        : toNumber(developmentDrivers && developmentDrivers.import_leakage_musd, 0),
+        : metricNumber(developmentDrivers && developmentDrivers.import_leakage_musd),
     };
   }, [
     spatialFilter,
@@ -5922,26 +5961,26 @@ function RunResultsPanel({
   const displayedReliability = useMemo(() => {
     if (!spatialFilter) {
       return {
-        demandTotal: toNumber(reliability && reliability.demand_total, 0),
-        unservedTotal: toNumber(reliability && reliability.unserved_total, 0),
-        unservedEnergyShare: toNumber(reliability && reliability.unserved_energy_share, 0),
+        demandTotal: metricNumber(reliability && reliability.demand_total),
+        unservedTotal: metricNumber(reliability && reliability.unserved_total),
+        unservedEnergyShare: metricNumber(reliability && reliability.unserved_energy_share),
       };
     }
     if (!filteredReliabilitySummary.hasAny) {
       return {
-        demandTotal: toNumber(reliability && reliability.demand_total, 0),
-        unservedTotal: toNumber(reliability && reliability.unserved_total, 0),
-        unservedEnergyShare: toNumber(reliability && reliability.unserved_energy_share, 0),
+        demandTotal: metricNumber(reliability && reliability.demand_total),
+        unservedTotal: metricNumber(reliability && reliability.unserved_total),
+        unservedEnergyShare: metricNumber(reliability && reliability.unserved_energy_share),
       };
     }
     return filteredReliabilitySummary;
   }, [spatialFilter, reliability, filteredReliabilitySummary]);
   const globalDevelopmentDrivers = useMemo(
     () => ({
-      capex_effect_musd: toNumber(developmentDrivers && developmentDrivers.capex_effect_musd, 0),
-      opex_effect_musd: toNumber(developmentDrivers && developmentDrivers.opex_effect_musd, 0),
-      reliability_penalty_proxy: toNumber(developmentDrivers && developmentDrivers.reliability_penalty_proxy, 0),
-      import_leakage_musd: toNumber(developmentDrivers && developmentDrivers.import_leakage_musd, 0),
+      capex_effect_musd: metricNumber(developmentDrivers && developmentDrivers.capex_effect_musd),
+      opex_effect_musd: metricNumber(developmentDrivers && developmentDrivers.opex_effect_musd),
+      reliability_penalty_proxy: metricNumber(developmentDrivers && developmentDrivers.reliability_penalty_proxy),
+      import_leakage_musd: metricNumber(developmentDrivers && developmentDrivers.import_leakage_musd),
     }),
     [developmentDrivers]
   );
@@ -5949,7 +5988,7 @@ function RunResultsPanel({
     ? confidence.placeholder_input_files
     : [];
   const qualityStatus = String((modelQuality && modelQuality.status) || "").trim().toLowerCase();
-  const qualityScore = toNumber(modelQuality && modelQuality.score, 0);
+  const qualityScore = metricNumber(modelQuality && modelQuality.score);
   const qualityIssues = Array.isArray(modelQuality && modelQuality.issues) ? modelQuality.issues : [];
   const qualityDiagnostics = (modelQuality && modelQuality.diagnostics) || {};
   const resultEvidence = evidenceFromSummary((result && result.summary) || {});
@@ -6082,23 +6121,10 @@ function RunResultsPanel({
             <div className="view-subtitle">
               Explore this model's outputs by overview, energy-system, development, and method views.
             </div>
-            {technicalExecutionPanel ? (
-              <div className="analysis-inline-technical-execution" aria-label="Technical execution">
-                {technicalExecutionPanel}
-              </div>
-            ) : null}
+            <EvidenceNotice evidence={evidence} />
           </div>
           <div className="analysis-title-actions analysis-title-actions-stacked">
-            {typeof onDuplicateModel === "function" ? (
-              <button
-                type="button"
-                className="primary-action-button analysis-duplicate-model-button"
-                onClick={onDuplicateModel}
-                disabled={duplicateModelLoading}
-              >
-                {duplicateModelLoading ? "Duplicating..." : "Duplicate model"}
-              </button>
-            ) : null}
+            {modelActions}
             {technicalDetailsPanel ? (
               <DetailDialogButton
                 label="Technical details"
@@ -6155,6 +6181,8 @@ function RunResultsPanel({
         </div>
       </div>
 
+      {recordedInputs}
+      {runWarnings.length ? <details className="execution-limitations"><summary><span aria-hidden="true">ⓘ</span> Execution limitations ({runWarnings.length})</summary><ul>{runWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></details> : null}
       <nav className="analysis-filter-row results-section-tab-row" aria-label="Model result views">
         <div className="segmented-control results-section-tabs" role="tablist" aria-label="Result sections">
           {sectionTabs.map((tab, index) => (
@@ -6303,6 +6331,7 @@ function RunResultsPanel({
                 <span>Confidence and diagnostics</span>
                 <small>Quality, uncertainty, and execution checks</small>
               </summary>
+              <ResultsEvidenceSummary modelQuality={modelQuality} confidence={confidence} developmentUncertainty={developmentUncertainty} includesDevelopment={includesDevelopment} />
               <div className="results-support-widget-grid">
                 <RunDiagnosticsCard confidence={confidence} />
                 <ModelQualityCard modelQuality={modelQuality} confidence={confidence} />
@@ -6370,7 +6399,7 @@ function RunResultsPanel({
                 <div className="row" style={{ gap: 18 }}>
                   <MetricCard label="Demand total" value={compact(displayedReliability.demandTotal)} />
                   <MetricCard label="Unserved total" value={compact(displayedReliability.unservedTotal)} />
-                  <MetricCard label="Unserved share" value={`${(toNumber(displayedReliability.unservedEnergyShare) * 100).toFixed(3)}%`} />
+                  <MetricCard label="Unserved share" value={formatSharePercent(displayedReliability.unservedEnergyShare, 3)} />
                 </div>
                 {spatialFilter ? (
                   <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
@@ -6719,6 +6748,7 @@ function UnifiedHeader({
   onApiTargetModeChange,
   apiTargetLoading,
   onReturnToLanding,
+  onOpenDatasets,
 }) {
   const activeUser = (availableUsers || []).find((user) => user.user_id === currentUserId) || null;
   const activeUserLabel = (activeUser && (activeUser.display_name || activeUser.user_id)) || currentUserId || "User";
@@ -6750,6 +6780,11 @@ function UnifiedHeader({
               <b>{activeUserLabel}</b>
               <span>{(activeUser && (activeUser.organization || activeUser.email)) || "Active user"}</span>
             </div>
+            {onOpenDatasets ? <button type="button" className="user-dataset-link" onClick={event => {
+              const menu = event.currentTarget.closest("details");
+              if (menu) menu.open = false;
+              onOpenDatasets();
+            }}><img src="./assets/icons/layers.svg" alt="" aria-hidden="true" />Dataset library</button> : null}
             <label className="header-user-select">
               <span>Switch user</span>
               <select value={currentUserId || ""} onChange={handleUserSelect} disabled={apiTargetLoading}>
@@ -6843,6 +6878,7 @@ function LandingPage({
   apiTargetLoading,
   onEnter,
   onOpenMethodology,
+  onOpenDatasets,
   statusMessage,
   errorMessage,
 }) {
@@ -6895,17 +6931,6 @@ function LandingPage({
   }
   return (
     <div className="landing-shell">
-      <UnifiedHeader
-        currentUserId={currentUserId}
-        availableUsers={availableUsers}
-        onUserChange={onUserChange}
-        apiTarget={apiTarget}
-        systemCompatibility={systemCompatibility}
-        onApiTargetModeChange={onApiTargetModeChange}
-        apiTargetLoading={apiTargetLoading}
-        onReturnToLanding={null}
-      />
-
       <main className="landing-main">
         <section className="landing-hero-section" onPointerMove={updateHeroFlashlight} onPointerLeave={clearHeroFlashlight}>
           <LandingHeroVisualSlot tuning={heroDefaults} />
@@ -7713,7 +7738,7 @@ function FlowModelCanvas({
 
   function renderNodeBody(id) {
     const box = boxById.get(id) || {};
-    if (id === "scenario") return scenarioControls;
+    if (id === "scenario") return <div className="diagram-note">Scenario: <b>{scenarioKey || "Not selected"}</b>. Configure scenario selectors and policy levers in the form above.</div>;
     if (id === "calliope_data") {
       return (
         <>
@@ -8426,6 +8451,69 @@ function RunTabs({
   );
 }
 
+function ModelActions({ model, onRename, onDuplicate, onDelete, busy = false, compact = false }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  if (!model) return null;
+  const active = isActiveStatus(model.status);
+  async function perform(action, close = true) {
+    setPending(true); setError("");
+    try { const result = await action(); if (close && result !== false) setOpen(false); }
+    catch (err) { setError(toErrorMessage(err, "Model action failed")); }
+    finally { setPending(false); }
+  }
+  return <>
+    <button type="button" className={compact ? "model-card-manage" : "secondary-action-button"} aria-label="Model actions" title="Model actions" onClick={() => { setName(runCustomName(model) || modelDisplayName(model)); setError(""); setOpen(true); }}>{compact ? <img src="./assets/icons/sliders-horizontal.svg" alt="" aria-hidden="true" /> : "Model actions"}</button>
+    {open ? <Modal title="Model actions" subtitle={modelDisplayName(model)} onClose={() => { if (!pending && !busy) setOpen(false); }}>
+      <form className="project-create-form" onSubmit={(event) => { event.preventDefault(); perform(() => onRename(model, name)); }}>
+        <label>Model name<input type="text" value={name} onChange={event => setName(event.target.value)} required maxLength={200} /></label>
+        <button type="submit" disabled={pending || busy || !name.trim()}>Save name</button>
+      </form>
+      <div className="model-action-buttons">
+        <button type="button" onClick={() => perform(() => onDuplicate(model))} disabled={pending || busy}>Duplicate model</button>
+        <button type="button" className="danger-menu-button" onClick={() => perform(() => onDelete(model))} disabled={pending || busy || active}>Delete model</button>
+      </div>
+      {active ? <p className="muted">Cancel the queued or running execution before deleting this model.</p> : <p className="muted">Deletion removes the model record and generated files. You will be asked to confirm.</p>}
+      {error ? <p className="warn" role="alert">{error}</p> : null}
+    </Modal> : null}
+  </>;
+}
+
+function RecordedInputs({ model, projectId }) {
+  const [open, setOpen] = useState(false);
+  const [snapshot, setSnapshot] = useState(null);
+  const [state, setState] = useState("idle");
+  useEffect(() => {
+    if (!open || !model || !model.run_id || !projectId) return;
+    let cancelled = false;
+    setState("loading"); setSnapshot(null);
+    api.fetchRunInputs(projectId, model.run_id).then(record => {
+      if (!cancelled) { setSnapshot(record && record.dataset_snapshot); setState("loaded"); }
+    }).catch(() => { if (!cancelled) setState("unavailable"); });
+    return () => { cancelled = true; };
+  }, [open, projectId, model && model.run_id]);
+  const request = runConfigurationPayload(model || {});
+  const raw = snapshot && (snapshot.datasets || snapshot);
+  const rows = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? Object.entries(raw).filter(([, value]) => value && typeof value === "object" && !Array.isArray(value)).map(([id, value]) => ({id, ...value})) : [];
+  return <details className="recorded-inputs" onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>Inputs — recorded configuration</summary>
+    <p className="muted">Read-only inputs for this model. Duplicate the model to change its configuration.</p>
+    <div className="analysis-technical-grid">
+      <ReadOnlyScenarioValue label="Architecture" value={request.model_architecture_id || "Unavailable"} />
+      <ReadOnlyScenarioValue label="Energy model" value={request.energy_model_engine || "Unavailable"} />
+      <ReadOnlyScenarioValue label="Input package" value={request.energy_scenario_key || "Unavailable"} />
+      <ReadOnlyScenarioValue label="Target pathway" value={request.mrio_scenario_id || "Not specified"} />
+      <ReadOnlyScenarioValue label="Target year" value={request.target_year || "Unavailable"} />
+      <ReadOnlyScenarioValue label="Execution profile" value={request.run_profile || "Unavailable"} />
+    </div>
+    <dl className="recorded-levers">{Object.entries(request.levers || {}).map(([key, value]) => <div key={key}><dt>{key.replace(/_/g, " ")}</dt><dd>{String(value)}</dd></div>)}</dl>
+    <h3>Recorded dataset versions</h3>
+    {state === "loading" ? <p role="status">Loading recorded provenance…</p> : rows.length ? <ul>{rows.map((row, index) => <li key={row.dataset_id || row.id || index}><b>{row.label || row.dataset_id || row.id || "Dataset"}</b> — {row.version_id || row.active_version_id || "Version unavailable"}{row.filename ? ` · ${row.filename}` : ""}</li>)}</ul> : <p className="muted">Recorded dataset provenance is unavailable for this model. Current library settings are not a substitute for its original inputs.</p>}
+  </details>;
+}
+
 function ReadOnlyScenarioValue({ label, value, note = "" }) {
   return (
     <div className="scenario-readonly-value">
@@ -8570,11 +8658,14 @@ function UploadedDatasetsPanel({
   const [message, setMessage] = useState("");
   const [datasetSearch, setDatasetSearch] = useState("");
   const [datasetFormat, setDatasetFormat] = useState("all");
+  const [datasetSort, setDatasetSort] = useState({ key: "name", direction: 1 });
   const [localActionLoading, setLocalActionLoading] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const defaultDatasetDraft = { label: "", role: "User-provided dataset", layer: "user" };
   const [createDraft, setCreateDraft] = useState(defaultDatasetDraft);
   const [createFile, setCreateFile] = useState(null);
+  const [uploadTarget, setUploadTarget] = useState(null);
+  const [createdDatasetId, setCreatedDatasetId] = useState("");
   const [attachTarget, setAttachTarget] = useState(null);
   const [attachProjectId, setAttachProjectId] = useState(activeProjectId || "");
   const [renameTarget, setRenameTarget] = useState(null);
@@ -8605,10 +8696,10 @@ function UploadedDatasetsPanel({
     setLoading(true);
     setMessage("");
     try {
-      const pairs = await Promise.all(
-        datasets.map(async (dataset) => [dataset.id, await api.fetchInputDatasetVersions(dataset.id)])
-      );
-      setVersionsByDataset(Object.fromEntries(pairs));
+      const results = await Promise.allSettled(datasets.map(async (dataset) => [dataset.id, await api.fetchInputDatasetVersions(dataset.id)]));
+      setVersionsByDataset(previous => ({...previous, ...Object.fromEntries(results.filter(row => row.status === "fulfilled").map(row => row.value))}));
+      const failures = results.filter(row => row.status === "rejected");
+      if (failures.length) setMessage(`${failures.length} dataset version lists could not be loaded. ${toErrorMessage(failures[0].reason, "Try refreshing the library.")}`);
     } catch (err) {
       setMessage(toErrorMessage(err, "Failed to load uploaded dataset versions"));
     } finally {
@@ -8635,6 +8726,13 @@ function UploadedDatasetsPanel({
     uploadedRows.map(({ version }) => formatFromFilename(version.filename || version.version_id))
   )).sort();
   const normalizedDatasetSearch = datasetSearch.trim().toLowerCase();
+  function sortValue({dataset, version}, key) {
+    if (key === "name") return dataset.label || dataset.id;
+    if (key === "format") return formatFromFilename(version.filename);
+    if (key === "size") return version.size_bytes ?? -1;
+    if (key === "projects") return (version.project_ids || dataset.project_ids || []).length;
+    return version.created_at || "";
+  }
   const filteredUploadedRows = uploadedRows.filter(({ dataset, version }) => {
     const filename = version.filename || version.version_id;
     const format = formatFromFilename(filename);
@@ -8649,6 +8747,10 @@ function UploadedDatasetsPanel({
       version.version_id,
     ].some((value) => String(value || "").toLowerCase().includes(normalizedDatasetSearch));
   });
+  filteredUploadedRows.sort((a, b) => {
+    const x = sortValue(a, datasetSort.key), y = sortValue(b, datasetSort.key);
+    return datasetSort.direction * (typeof x === "number" ? x - y : String(x).localeCompare(String(y), undefined, {numeric:true}));
+  });
   const filtersActive = Boolean(normalizedDatasetSearch || datasetFormat !== "all");
 
   function projectAvailabilityLabel(dataset, version) {
@@ -8657,7 +8759,7 @@ function UploadedDatasetsPanel({
       (Array.isArray(dataset && dataset.project_ids) && dataset.project_ids) ||
       (Array.isArray(dataset && dataset.attached_project_ids) && dataset.attached_project_ids) ||
       null;
-    if (!projectIds) return "Available";
+    if (!projectIds) return "Usage unavailable";
     return `${projectIds.length} project${projectIds.length === 1 ? "" : "s"}`;
   }
 
@@ -8678,7 +8780,7 @@ function UploadedDatasetsPanel({
     setLocalActionLoading(true);
     setMessage("");
     try {
-      const created = await api.createInputDataset({
+      const created = createdDatasetId ? {id:createdDatasetId} : await api.createInputDataset({
         label,
         role,
         layer,
@@ -8687,10 +8789,12 @@ function UploadedDatasetsPanel({
       });
       const datasetId = String((created && (created.id || created.dataset_id)) || "").trim();
       if (!datasetId) throw new Error("Dataset creation response did not include an id.");
+      setCreatedDatasetId(datasetId);
       await api.uploadInputDataset(datasetId, createFile);
       await refreshDatasetLibrary();
       setCreateModalOpen(false);
       setCreateDraft(defaultDatasetDraft);
+      setCreatedDatasetId("");
       setCreateFile(null);
       setMessage(`Created dataset "${label}" and uploaded ${createFile.name}.`);
     } catch (err) {
@@ -8698,6 +8802,18 @@ function UploadedDatasetsPanel({
     } finally {
       setLocalActionLoading(false);
     }
+  }
+
+  async function submitVersionUpload(event) {
+    event.preventDefault();
+    if (!uploadTarget || !createFile) return;
+    setLocalActionLoading(true); setMessage("");
+    try {
+      await api.uploadInputDataset(uploadTarget.id, createFile);
+      await refreshDatasetLibrary();
+      setUploadTarget(null); setCreateFile(null); setMessage("Dataset version uploaded.");
+    } catch (err) { setMessage(toErrorMessage(err, "Failed to upload dataset version")); }
+    finally { setLocalActionLoading(false); }
   }
 
   function openAttachModal(dataset, version) {
@@ -8790,7 +8906,7 @@ function UploadedDatasetsPanel({
     <div className="dataset-management-view">
       <div className="dataset-management-header">
         <div>
-          <h2 style={{ margin: "0 0 4px" }}>Project data overrides</h2>
+          <h2 style={{ margin: "0 0 4px" }}>Dataset library</h2>
           <div className="muted" style={{ fontSize: 13 }}>{uploadedRows.length} uploaded versions</div>
         </div>
         <div className="dataset-management-actions">
@@ -8802,12 +8918,13 @@ function UploadedDatasetsPanel({
                 ...prev,
                 layer: prev.layer || "user",
               }));
+              setCreatedDatasetId("");
               setCreateModalOpen(true);
               setMessage("");
             }}
             disabled={busy}
           >
-            Add override
+            Add dataset
           </button>
           <button
             type="button"
@@ -8825,6 +8942,14 @@ function UploadedDatasetsPanel({
         </div>
       </div>
       {message ? <div className="warn" role="status" aria-live="polite" style={{ marginTop: 10 }}>{message}</div> : null}
+      <p className="muted">Reusable user uploads. Assign a version to a project, or make it the active library version. These are separate actions; completed models retain their recorded inputs.</p>
+      {loading ? <p role="status">Loading dataset versions…</p> : null}
+      {datasets.filter(dataset => !loading && !(versionsByDataset[dataset.id] || []).length).map(dataset => <div className="dataset-empty-source" key={dataset.id}><span>{dataset.label || dataset.id} — no versions loaded</span><button type="button" disabled={busy} onClick={() => {setUploadTarget(dataset); setCreateFile(null);}}>Upload version</button></div>)}
+      {uploadTarget ? <Modal title="Upload dataset version" subtitle={uploadTarget.label || uploadTarget.id} onClose={() => {if (!localActionLoading) setUploadTarget(null);}}>
+        <form className="project-create-form" onSubmit={submitVersionUpload}><label>File<input type="file" required onChange={event => setCreateFile(event.target.files[0] || null)} /></label>
+        {message ? <p className="warn" role="alert">{message}</p> : null}
+        <button type="submit" disabled={localActionLoading || !createFile}>Upload version</button></form>
+      </Modal> : null}
       {createModalOpen ? (
         <Modal title="Add dataset" subtitle="Upload a reusable source" onClose={() => setCreateModalOpen(false)}>
           <form className="project-create-form dataset-action-form" onSubmit={submitCreateDataset}>
@@ -8953,7 +9078,7 @@ function UploadedDatasetsPanel({
             <div><dt>Role</dt><dd>{detailsTarget.dataset.role || "-"}</dd></div>
             <div><dt>Layer</dt><dd>{detailsTarget.dataset.layer || "-"}</dd></div>
             <div><dt>Source</dt><dd>{detailsTarget.dataset.path || detailsTarget.dataset.filename || "-"}</dd></div>
-            <div><dt>File size</dt><dd>{compact(detailsTarget.version.size_bytes || 0)} bytes</dd></div>
+            <div><dt>File size</dt><dd>{detailsTarget.version.size_bytes == null ? "Unavailable" : `${compact(detailsTarget.version.size_bytes)} bytes`}</dd></div>
             <div><dt>Project access</dt><dd>{projectAvailabilityLabel(detailsTarget.dataset, detailsTarget.version)}</dd></div>
             <div><dt>Updated</dt><dd>{formatTimestamp(detailsTarget.version.created_at)}</dd></div>
           </dl>
@@ -8964,7 +9089,7 @@ function UploadedDatasetsPanel({
       ) : null}
       {uploadedRows.length ? (
         <>
-          <details className="dataset-filter-disclosure">
+          <details className="dataset-filter-disclosure" open>
             <summary>
               <span>Filter datasets</span>
               <small>
@@ -8992,6 +9117,10 @@ function UploadedDatasetsPanel({
                   ))}
                 </select>
               </label>
+              <label><span>Sort datasets</span><select aria-label="Sort datasets" value={datasetSort.key} onChange={event => setDatasetSort({key:event.target.value,direction:1})}>
+                <option value="name">Name</option><option value="format">Format</option><option value="size">Size</option><option value="updated">Last updated</option><option value="projects">Projects</option>
+              </select></label>
+              <button type="button" onClick={() => setDatasetSort(prev => ({...prev,direction:-prev.direction}))}>{datasetSort.direction === 1 ? "Ascending" : "Descending"}</button>
               <div className="dataset-filter-summary" aria-live="polite">
                 {filteredUploadedRows.length} of {uploadedRows.length} versions
               </div>
@@ -9013,9 +9142,11 @@ function UploadedDatasetsPanel({
             <table className="panel-table dataset-table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Format</th>
-                  <th>Last updated</th>
+                  {[["name", "Name"], ["format", "Format"], ["size", "Size"], ["updated", "Last updated"], ["projects", "Projects"]].map(([key, label]) => (
+                    <th key={key} aria-sort={datasetSort.key === key ? (datasetSort.direction === 1 ? "ascending" : "descending") : "none"}>
+                      <button type="button" onClick={() => setDatasetSort(prev => ({key, direction:prev.key === key ? -prev.direction : 1}))}>{label}{datasetSort.key === key ? (datasetSort.direction === 1 ? " ↑" : " ↓") : ""}</button>
+                    </th>
+                  ))}
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -9024,14 +9155,16 @@ function UploadedDatasetsPanel({
                   const filename = version.filename || version.version_id;
                   return (
                     <tr key={`${dataset.id}-${version.version_id}`}>
-                      <td data-label="Dataset">
+                      <td data-label="Dataset"><div>
                         <b>{dataset.label || dataset.id}</b> {active ? <span className="badge badge-succeeded">Active</span> : null}
                         <div className="muted" style={{ fontSize: 11 }}>
                           {filename}
                         </div>
-                      </td>
+                      </div></td>
                       <td data-label="Format">{formatFromFilename(filename)}</td>
-                      <td data-label="Updated">{formatTimestamp(version.created_at)}</td>
+                      <td data-label="Size">{version.size_bytes == null ? "Unavailable" : `${compact(version.size_bytes)} bytes`}</td>
+                      <td data-label="Updated">{version.created_at ? formatTimestamp(version.created_at) : "Unavailable"}</td>
+                      <td data-label="Projects">{projectAvailabilityLabel(dataset, version)}</td>
                       <td data-label="Actions">
                         <div className="dataset-table-actions">
                           <button
@@ -9047,9 +9180,14 @@ function UploadedDatasetsPanel({
                             <summary aria-label={`Actions for ${dataset.label || dataset.id}`} title="More dataset actions">
                               ...
                             </summary>
-                            <div className="dataset-overflow-menu-body">
+                            <div className="dataset-overflow-menu-body" onClick={event => {
+                              if (!event.target.closest("button, a")) return;
+                              const menu = event.currentTarget.closest("details");
+                              menu.removeAttribute("open"); menu.querySelector("summary").focus();
+                            }}>
                               <button type="button" onClick={() => setDetailsTarget({ dataset, version })}>View details</button>
                               <button type="button" onClick={() => openRenameModal(dataset)} disabled={busy}>Rename</button>
+                              <button type="button" onClick={() => { setUploadTarget(dataset); setCreateFile(null); setMessage(""); }} disabled={busy}>Upload version</button>
                               <button
                                 type="button"
                                 onClick={() => activateDatasetVersion(dataset, version)}
@@ -9074,7 +9212,7 @@ function UploadedDatasetsPanel({
                   );
                 }) : (
                   <tr>
-                    <td colSpan="4" className="dataset-no-results">
+                    <td colSpan="6" className="dataset-no-results">
                       No dataset versions match the current filters.
                     </td>
                   </tr>
@@ -9087,7 +9225,7 @@ function UploadedDatasetsPanel({
         <div className="dataset-empty-state">
           <div style={{ fontWeight: 900 }}>No project overrides.</div>
           <div className="muted" style={{ fontSize: 13, marginTop: 5 }}>
-            This project currently uses the platform's system inputs without uploaded replacements.
+            Your dataset library has no uploaded versions. Add a reusable dataset or inspect the system sources below.
           </div>
         </div>
       )}
@@ -9282,6 +9420,7 @@ function ProjectsOverviewPanel({
   onDeleteProject,
   onDownloadProjectFiles,
   onReturnHome,
+  onOpenDatasets,
   currentUser,
   actionLoading,
   isAdminView = false,
@@ -9467,6 +9606,8 @@ function ProjectsOverviewPanel({
               {visualData.modelCount} {visualData.modelCount === 1 ? "model" : "models"}
               {" · "}
               {visualData.completedCount} complete
+              {project.visual_summary && project.visual_summary.active_count != null ? ` · ${project.visual_summary.active_count} active` : ""}
+              {project.visual_summary && project.visual_summary.failed_count != null ? ` · ${project.visual_summary.failed_count} failed` : ""}
             </div>
           </div>
           <button
@@ -9495,7 +9636,7 @@ function ProjectsOverviewPanel({
             <span>Return to home</span>
           </button>
           <div className="modeling-workspace-kicker">Analysis portfolio</div>
-          <h1 id="modeling-workspace-title">Modeling Workspace</h1>
+          <h1 id="modeling-workspace-title">Your Projects</h1>
           <p>
             Organize energy and development analyses, explore alternative pathways,
             and bring model evidence together for planning and policy decisions.
@@ -9550,7 +9691,7 @@ function ProjectsOverviewPanel({
       <section className="projects-collection" aria-labelledby="your-projects-title">
           <div className="row projects-overview-header" style={{ justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
             <div>
-              <h2 id="your-projects-title" style={{ margin: "0 0 6px" }}>Your Projects</h2>
+              <h2 id="your-projects-title" style={{ margin: "0 0 6px" }}>Active projects</h2>
               <div className="muted" style={{ fontSize: 13 }}>
                 {activeProjects.length} active · {archivedProjects.length} archived
               </div>
@@ -9642,6 +9783,10 @@ function ProjectsOverviewPanel({
               )}
             </div>
           </details>
+      </section>
+      <section className="projects-dataset-section" aria-labelledby="projects-dataset-title">
+        <div><h2 id="projects-dataset-title">Dataset library</h2><p>Manage your uploaded datasets and versions, and reuse them across your projects.</p></div>
+        <button type="button" className="secondary-action-button" onClick={onOpenDatasets}><img src="./assets/icons/layers.svg" alt="" aria-hidden="true" />Open dataset library <span aria-hidden="true">→</span></button>
       </section>
     </div>
   );
@@ -9866,6 +10011,7 @@ function ComparisonArtifactMatrix({
 
 function ProjectComparePanel({
   activeProject,
+  onRenameProject,
   projectRuns,
   projectReports,
   projectExports,
@@ -9876,6 +10022,7 @@ function ProjectComparePanel({
   onNewModel,
   onOpenRun,
   onReturnToProjects,
+  renderModelActions,
   actionLoading = false,
   isAdminView = false,
 }) {
@@ -9883,7 +10030,19 @@ function ProjectComparePanel({
   // It does not depend on live execution internals and remains a parent page
   // above individual immutable or editable model runs.
   const [workspaceTab, setWorkspaceTab] = useState("selection");
+  const [titleDraft, setTitleDraft] = useState(null);
+  const [titleError, setTitleError] = useState("");
   const runs = projectRuns || [];
+  // Never assume API list order or label an undated record as the latest.
+  function latestDatedRecord(records, fields) {
+    return (records || []).reduce((latest, record) => {
+      const dates = fields.map(field => Date.parse(record[field])).filter(Number.isFinite);
+      const timestamp = dates.length ? Math.max(...dates) : null;
+      return timestamp != null && (!latest || timestamp > latest.timestamp) ? {record, timestamp} : latest;
+    }, null)?.record;
+  }
+  const latestModel = latestDatedRecord(runs, ["updated_at", "finished_at", "started_at", "created_at"]);
+  const latestReport = latestDatedRecord(projectReports, ["created_at"]);
   const successfulRuns = succeededProjectRuns(runs);
   const activeRuns = runs.filter((run) => ["queued", "running"].includes(normalizeStatus(run && run.status)));
   const selectedIds = compareRunIds;
@@ -9990,6 +10149,27 @@ function ProjectComparePanel({
 
   return (
     <div className="project-workspace-page card">
+      {titleDraft !== null ? (
+        <Modal title="Edit project name" onClose={() => { if (!actionLoading) setTitleDraft(null); }}>
+          <form className="project-create-form" onSubmit={async (event) => {
+            event.preventDefault();
+            const title = titleDraft.trim();
+            if (!title || actionLoading) return;
+            if (title === projectTitle) { setTitleDraft(null); return; }
+            setTitleError("");
+            const updated = await onRenameProject(activeProject.project_id, title);
+            if (updated) setTitleDraft(null);
+            else setTitleError("Could not save the project name. Please try again.");
+          }}>
+            <label>Project name<input autoFocus required maxLength={200} value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} disabled={actionLoading} /></label>
+            {titleError ? <p role="alert">{titleError}</p> : null}
+            <div className="project-model-toolbar-actions">
+              <button type="button" onClick={() => setTitleDraft(null)} disabled={actionLoading}>Cancel</button>
+              <button type="submit" className="primary-action-button" disabled={actionLoading || !titleDraft.trim()}>{actionLoading ? "Saving…" : "Save"}</button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
       {workspaceTab === "selection" ? (
         <section className="project-information-bar" aria-label={`Project overview: ${projectTitle}`}>
         <div className="project-information-main">
@@ -10004,10 +10184,15 @@ function ProjectComparePanel({
             </button>
             <div className="project-information-heading-copy">
               <div className="project-information-eyebrow">Project workspace</div>
-              <h1>{projectTitle}</h1>
+              <div className="project-workspace-title-row">
+                <h1>{projectTitle}</h1>
+                <button type="button" className="project-edit-icon" aria-label="Edit project name" title="Edit project name" disabled={actionLoading || !activeProject} onClick={() => { setTitleError(""); setTitleDraft(projectTitle); }}>✎</button>
+              </div>
             </div>
           </div>
           <p>{projectDescription}</p>
+        </div>
+        <div className="project-information-summary">
           <div className="project-information-metadata">
             <div className="project-information-meta-item">
               <span className="project-information-icon icon-map-pin" aria-hidden="true" />
@@ -10049,11 +10234,6 @@ function ProjectComparePanel({
               </div>
             ) : null}
           </div>
-        </div>
-        <div className="project-information-summary">
-          <div className="project-information-visual">
-            {activeProject ? <ProjectIdentityVisual project={activeProject} /> : null}
-          </div>
           <div className="project-information-stats" aria-label="Project totals">
             <div>
               <strong>{runs.length}</strong>
@@ -10068,24 +10248,17 @@ function ProjectComparePanel({
               <span>In progress</span>
             </div>
             <div>
-              <strong>{(projectReports || []).length}</strong>
+              <strong>{projectReports == null ? "—" : projectReports.length}</strong>
               <span>Reports</span>
             </div>
           </div>
-          <button
-            type="button"
-            className="primary-action-button project-information-new-model"
-            onClick={onNewModel}
-            disabled={actionLoading || !activeProject}
-          >
-            <span aria-hidden="true">+</span>
-            New model
-          </button>
+
         </div>
         </section>
       ) : null}
 
       {workspaceTab === "selection" ? (
+        <div className="project-content-layout">
         <section
           className="project-selection-workbench"
           aria-label="Project models"
@@ -10095,6 +10268,7 @@ function ProjectComparePanel({
               <h2>Models</h2>
               <div className="muted">{runs.length} models · {successfulRuns.length} complete · {selectedRuns.length} selected</div>
             </div>
+            <div className="project-model-toolbar-actions">
             <button
               type="button"
               className="secondary-action-button model-comparison-launch"
@@ -10105,6 +10279,16 @@ function ProjectComparePanel({
               <span>Compare models</span>
               <b aria-label={`${selectedRuns.length} selected`}>{selectedRuns.length}</b>
             </button>
+          <button
+            type="button"
+            className="primary-action-button project-new-model"
+            onClick={onNewModel}
+            disabled={actionLoading || !activeProject}
+          >
+            <span aria-hidden="true">+</span>
+            New model
+          </button>
+            </div>
           </div>
 
           <div className="project-run-card-grid">
@@ -10127,20 +10311,18 @@ function ProjectComparePanel({
                       <h3>{modelDisplayName(run)}</h3>
                       <div className="muted">{modelNumberLabel(run)} · {runMetadataLine(run)}</div>
                     </div>
-                    <StatusBadge status={run.status} />
+                    <div className="model-card-header-tools"><StatusBadge status={run.status} />{renderModelActions ? renderModelActions(run, true) : null}</div>
                   </div>
-                  <div className="project-model-card-visual">
-                    <ModelIdentityVisual run={run} />
-                  </div>
-                  <div className="project-model-card-actions">
-                    <div>
+                  <div className="model-card-evidence">
                       <EvidenceBadge
                         status={evidenceFromModel(run, summaries[run.run_id]).status}
                         summary={evidenceFromModel(run, summaries[run.run_id]).summary}
                         compact
                       />
-                    </div>
-                    <div className="project-card-open-actions">
+                  </div>
+                  <div className="project-model-card-actions">
+                    <div className="model-card-selection">
+                      {!complete ? <span className="muted comparison-eligibility">Compare after completion</span> : null}
                       {complete ? (
                         <label className="project-compare-toggle">
                           <input
@@ -10151,15 +10333,17 @@ function ProjectComparePanel({
                           Compare
                         </label>
                       ) : null}
+                    </div>
+                    <div className="project-card-open-actions">
                       {complete ? (
-                        <button type="button" className="ghost-utility-button" onClick={() => onCreateRunExport(run.run_id)} disabled={actionLoading}>Export</button>
+                        <button type="button" className="ghost-utility-button" onClick={() => onCreateRunExport(run.run_id)} disabled={actionLoading}><span className="card-action-symbol" aria-hidden="true">↓</span> Export</button>
                       ) : null}
                       <button
                         type="button"
-                        className="secondary-action-button project-primary-open"
+                        className="primary-action-button project-primary-open"
                         onClick={() => onOpenRun(run)}
                       >
-                        Open model
+                        Open model <span className="card-action-symbol" aria-hidden="true">→</span>
                       </button>
                     </div>
                   </div>
@@ -10173,11 +10357,26 @@ function ProjectComparePanel({
             )}
           </div>
 
+
+        </section>
+        <aside className="project-activity-panel" aria-label="Project activity and files">
+          <h2>Activity &amp; files</h2>
+      <section className="project-resume-links" aria-label="Recent project activity">
+        <div><small>Latest model activity</small>
+          {latestModel ? <><button type="button" onClick={() => onOpenRun(latestModel)}>Open latest model: {modelDisplayName(latestModel)}</button><StatusBadge status={latestModel.status} /></> : <span>{runs.length ? "Model dates unavailable" : "No models yet"}</span>}
+        </div>
+        <div><small>Latest report in loaded history</small>
+          {latestReport ? <><span>{latestReport.report_type || "Project report"} · {formatTimestamp(latestReport.created_at)}</span><StatusBadge status={latestReport.status} />
+            {["succeeded", "completed", "ready"].includes(normalizeStatus(latestReport.status)) ? <a href={api.projectReportDownloadUrl(latestReport.project_id, latestReport.report_id)} download>Download latest report</a> : <span>Download available when ready</span>}
+          </> : <span>{projectReports == null ? "Report history unavailable" : projectReports.length ? "Report dates unavailable" : "No reports yet"}</span>}
+        </div>
+      </section>
+
           <div className="project-secondary-panels">
             <details className="project-secondary-panel project-secondary-disclosure">
               <summary>
                 <span>Reports</span>
-                <small>{(projectReports || []).length}</small>
+                <small>{projectReports == null ? "Unavailable" : projectReports.length}</small>
               </summary>
               <div className="project-secondary-disclosure-body">
                 <div className="project-selection-section-header">
@@ -10186,7 +10385,7 @@ function ProjectComparePanel({
                 </div>
                 {(projectReports || []).length ? (
                   <div className="project-artifact-list">
-                    {(projectReports || []).slice(0, 6).map((report) => (
+                    {(projectReports || []).map((report) => (
                       <div key={report.report_id} className="diagram-dataset-version-row">
                         <div>
                           <div>
@@ -10206,19 +10405,19 @@ function ProjectComparePanel({
                       </div>
                     ))}
                   </div>
-                ) : <div className="muted">No reports generated yet.</div>}
+                ) : <div className="muted">{projectReports == null ? "Report history is unavailable. Refresh the project to retry." : "No reports generated yet."}</div>}
               </div>
             </details>
 
             <details className="project-secondary-panel project-secondary-disclosure">
               <summary>
                 <span>Exports</span>
-                <small>{(projectExports || []).length}</small>
+                <small>{projectExports == null ? "Unavailable" : projectExports.length}</small>
               </summary>
               <div className="project-secondary-disclosure-body">
                 {(projectExports || []).length ? (
                   <div className="project-artifact-list">
-                    {(projectExports || []).slice(0, 6).map((row) => (
+                    {(projectExports || []).map((row) => (
                       <div key={row.export_id} className="diagram-dataset-version-row">
                         <div>
                           <div>
@@ -10227,7 +10426,7 @@ function ProjectComparePanel({
                             <EvidenceBadge status={row.evidence_status} compact />
                           </div>
                           <div className="project-artifact-meta" title={`Export id: ${row.export_id || "-"}`}>
-                            {compact(row.size_bytes || 0)} bytes
+                            {row.size_bytes == null ? "Size unavailable" : `${compact(row.size_bytes)} bytes`}
                             {row.created_at ? ` · ${formatTimestamp(row.created_at)}` : ""}
                           </div>
                         </div>
@@ -10235,11 +10434,12 @@ function ProjectComparePanel({
                       </div>
                     ))}
                   </div>
-                ) : <div className="muted">No export bundles generated yet.</div>}
+                ) : <div className="muted">{projectExports == null ? "Export history is unavailable. Refresh the project to retry." : "No export bundles generated yet."}</div>}
               </div>
             </details>
           </div>
-        </section>
+        </aside>
+        </div>
       ) : (
         <section
           className="project-comparison-workbench"
@@ -10311,6 +10511,8 @@ function ProjectComparePanel({
               </div>
             ) : (
               <div className="comparison-workbench-body">
+                <p className="comparison-scroll-hint">Scroll the table horizontally to inspect every model. Output labels stay visible; changes are relative to the selected reference.</p>
+                <button type="button" className="secondary-action-button" onClick={onCreateReport} disabled={actionLoading}>{reportLabel}</button>
                 <div className="comparison-control-bar">
                   <label>
                     <span>Reference model</span>
@@ -10410,6 +10612,14 @@ function ProjectComparePanel({
   );
 }
 
+function ModelFlowDisclosure({ children }) {
+  const [opened, setOpened] = useState(false);
+  return <details className="model-flow-disclosure" onToggle={event => { if (event.currentTarget.open) setOpened(true); }}>
+    <summary>Model flow and input datasets</summary>
+    {opened ? children : null}
+  </details>;
+}
+
 function ArchitectureRunWorkspace({
   architecture,
   runViewMode,
@@ -10479,10 +10689,17 @@ function ArchitectureRunWorkspace({
                 comparePanel
               ) : runViewMode === "results" && result ? (
                 <div className="results-mode-stack">
-                  <main className="results-mode-main">{resultsPanel}</main>
+                  <div className="results-mode-main">{resultsPanel}</div>
                 </div>
               ) : (
-                <FlowModelCanvas
+                <div className="setup-workspace-stack">
+                  <section className="card setup-form-panel" aria-label="Configure model">
+                    <h1>Configure the model</h1>
+                    <p className="muted">Choose the scenario and adjust policy levers, then review execution readiness.</p>
+                    {scenarioControls}
+                  </section>
+                  <ModelFlowDisclosure>
+                    <FlowModelCanvas
                   activeJob={flowActiveJob}
                   result={result}
                   architecture={architecture}
@@ -10498,6 +10715,8 @@ function ArchitectureRunWorkspace({
                   scenarioKey={scenarioKey}
                   scenarioSelections={scenarioSelections}
                 />
+                  </ModelFlowDisclosure>
+                </div>
               )}
             </main>
             {runViewMode === "project" || (runViewMode === "results" && result) ? null : runManagementPanel}
@@ -10552,8 +10771,8 @@ function App() {
   const [projects, setProjects] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState("");
   const [projectRuns, setProjectRuns] = useState([]);
-  const [projectReports, setProjectReports] = useState([]);
-  const [projectExports, setProjectExports] = useState([]);
+  const [projectReports, setProjectReports] = useState(null);
+  const [projectExports, setProjectExports] = useState(null);
   const [compareRunIds, setCompareRunIds] = useState([]);
   const [platformActionLoading, setPlatformActionLoading] = useState(false);
   const [draftSaving, setDraftSaving] = useState(false);
@@ -10594,6 +10813,11 @@ function App() {
   const [runSpatialTechError, setRunSpatialTechError] = useState("");
   const [spatialFilter, setSpatialFilter] = useState(null);
   const [runViewMode, setRunViewMode] = useState("projects");
+  const [resultsSection, setResultsSection] = useState("overview");
+  const [routeReady, setRouteReady] = useState(false);
+  const routeApplying = useRef(false);
+  const routeHandler = useRef(null);
+  const routeSequence = useRef(0);
   const [methodologyOpen, setMethodologyOpen] = useState(() => window.location.hash === "#/methodology");
   const [landingOpen, setLandingOpen] = useState(() => window.location.hash !== "#/methodology");
   const [newModelModalOpen, setNewModelModalOpen] = useState(false);
@@ -10615,16 +10839,67 @@ function App() {
     [scenarios, scenarioKey]
   );
 
-  useEffect(() => {
-    function handleHashChange() {
-      const nextMethodologyOpen = window.location.hash === "#/methodology";
-      setMethodologyOpen(nextMethodologyOpen);
-      if (nextMethodologyOpen) setLandingOpen(false);
+  // History contains only client routes; the frozen service and host need no rewrites.
+  routeHandler.current = async () => {
+    const sequence = ++routeSequence.current;
+    routeApplying.current = true;
+    setRouteReady(false);
+    const hash = window.location.hash || "#/";
+    try {
+      const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
+      setMethodologyOpen(parts[0] === "methodology");
+      setLandingOpen(!parts.length);
+      setErrorMessage(""); setStatusMessage("");
+      if (!parts.length || parts[0] === "methodology") return;
+      if (parts[0] === "datasets") { setRunViewMode("datasets"); return; }
+      if (parts[0] !== "projects") throw new Error("This workspace link is not recognized. Open Projects to continue.");
+      if (!parts[1]) { setRunViewMode("projects"); return; }
+      const rows = await api.fetchProjects();
+      if (sequence !== routeSequence.current) return;
+      const project = rows.find(row => row.project_id === parts[1]);
+      if (!project) throw new Error("This project is unavailable. Open Projects to choose another project.");
+      setProjects(rows); setActiveProjectId(project.project_id);
+      setSelectedArchitectureId(project.model_architecture_id || DEFAULT_MODEL_ARCHITECTURE_ID);
+      setResult(null); setSelectedRunId(""); setIntegratedPayload(null); setSelectedJobId("");
+      setCompareRunIds([]); setActiveJob(null); setRunViewMode("project");
+      const runs = await refreshProjectWorkspace(project.project_id);
+      if (sequence !== routeSequence.current) return;
+      if (parts[2] === "models" && parts[3]) {
+        let model = runs.find(row => row.run_id === parts[3] || runExecutionId(row) === parts[3]);
+        if (!model) {
+          const response = await window.EDIM_HTTP_CLIENT.apiGet(`/api/projects/${encodeURIComponent(project.project_id)}/runs/${encodeURIComponent(parts[3])}`, "This model is unavailable");
+          model = projectRunToDisplayRun(response.run);
+          if (!model || !model.run_id) throw new Error("This model is unavailable. Open Projects to continue.");
+          if (sequence !== routeSequence.current) return;
+          setJobs(prev => [...prev, model]); setProjectRuns(prev => [...prev, model]);
+        }
+        await onSelectJob(model, sequence);
+        if (sequence !== routeSequence.current) return;
+        setResultsSection(["overview", "system", "development", "method"].includes(parts[4]) ? parts[4] : "overview");
+      }
+    } catch (err) {
+      if (sequence === routeSequence.current) { setLandingOpen(false); setMethodologyOpen(false); setRunViewMode("projects"); setErrorMessage(toErrorMessage(err, "Unable to open this workspace link.")); }
+    } finally {
+      if (sequence === routeSequence.current) { routeApplying.current = false; setRouteReady(true); }
     }
-    handleHashChange();
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+  };
+  useEffect(() => {
+    const handle = () => routeHandler.current();
+    window.addEventListener("hashchange", handle);
+    return () => window.removeEventListener("hashchange", handle);
   }, []);
+  useEffect(() => {
+    if (!routeReady || routeApplying.current) return;
+    let route = methodologyOpen ? "#/methodology" : landingOpen ? "#/" : runViewMode === "datasets" ? "#/datasets" : "#/projects";
+    if (!methodologyOpen && !landingOpen && ["project", "setup", "results"].includes(runViewMode) && activeProjectId) {
+      route += `/${encodeURIComponent(activeProjectId)}`;
+      if (["setup", "results"].includes(runViewMode) && selectedJobId) {
+        const model = jobs.find(row => runExecutionId(row) === selectedJobId || row.run_id === selectedJobId);
+        route += `/models/${encodeURIComponent(model ? model.run_id : selectedJobId)}/${runViewMode === "results" ? resultsSection : "setup"}`;
+      }
+    }
+    if (window.location.hash !== route) window.history.pushState(null, "", route);
+  }, [routeReady, navigationPageKey, resultsSection, jobs, runViewMode]);
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
@@ -10869,6 +11144,7 @@ function App() {
       setProjectExports(exports);
       return { reports, exports };
     } catch (err) {
+      setProjectReports(null); setProjectExports(null);
       setErrorMessage(toErrorMessage(err, "Failed to load project reports/exports"));
       return { reports: [], exports: [] };
     }
@@ -11136,6 +11412,8 @@ function App() {
       await probeSystemCompatibility();
       await reloadPlatformShell("");
       if (cancelled) return;
+      if (window.location.hash && !["#", "#/"].includes(window.location.hash)) await routeHandler.current();
+      else setRouteReady(true);
     }
     boot();
     return () => {
@@ -11194,6 +11472,7 @@ function App() {
     const architectureId = String((project && project.model_architecture_id) || "").trim();
     if (architectureId) setSelectedArchitectureId(architectureId);
     if (projectId === activeProjectId) {
+      await refreshProjectOutputs(projectId);
       if (nextMode === "project") {
         setSelectedJobId("");
         setSelectedRunId("");
@@ -11204,6 +11483,7 @@ function App() {
       return;
     }
     setActiveProjectId(projectId);
+    setProjectReports(null); setProjectExports(null);
     setActiveJob(null);
     setSelectedJobId("");
     setResult(null);
@@ -11260,6 +11540,7 @@ function App() {
       const updated = await api.updateProject(projectId, { title });
       setProjects((prev) => (prev || []).map((project) => project.project_id === projectId ? updated : project));
       setStatusMessage(`Renamed project to ${updated.title || projectId}.`);
+      return updated;
     } catch (err) {
       setErrorMessage(toErrorMessage(err, "Failed to rename project"));
     } finally {
@@ -11867,8 +12148,8 @@ function App() {
     setCustomRunName(String(payload.run_name || ""));
   }
 
-  async function onDuplicateSelectedConfiguration() {
-    const source = selectedJob || activeJob;
+  async function onDuplicateSelectedConfiguration(targetModel = null) {
+    const source = targetModel && targetModel.run_id ? targetModel : selectedJob || activeJob;
     const sourceRunId = source && source.run_id;
     const projectId = activeProjectId || (source && source.request && source.request.project_id) || "";
     if (!sourceRunId || !projectId) {
@@ -11890,13 +12171,14 @@ function App() {
       setStatusMessage(`Duplicated configuration as draft "${runLabel(draft)}".`);
     } catch (err) {
       setErrorMessage(toErrorMessage(err, "Failed to duplicate configuration"));
+      throw err;
     } finally {
       setPlatformActionLoading(false);
     }
   }
 
-  async function onDeleteSelectedRun() {
-    const source = selectedJob || activeJob;
+  async function onDeleteSelectedRun(targetModel = null) {
+    const source = targetModel && targetModel.run_id ? targetModel : selectedJob || activeJob;
     const sourceRunId = source && source.run_id;
     const projectId = activeProjectId || (source && source.request && source.request.project_id) || "";
     const status = normalizeStatus(source && source.status);
@@ -11909,7 +12191,7 @@ function App() {
       return;
     }
     const confirmed = window.confirm(`Delete ${runLabel(source)}? This removes the run record and generated run files.`);
-    if (!confirmed) return;
+    if (!confirmed) return false;
     setPlatformActionLoading(true);
     setErrorMessage("");
     try {
@@ -11926,6 +12208,7 @@ function App() {
       setStatusMessage(`Deleted ${runLabel(source)}.`);
     } catch (err) {
       setErrorMessage(toErrorMessage(err, "Failed to delete run"));
+      throw err;
     } finally {
       setPlatformActionLoading(false);
     }
@@ -11997,18 +12280,21 @@ function App() {
     }
   }
 
-  async function onSelectJob(job) {
+  async function onSelectJob(job, expectedRouteSequence = null) {
     if (!job) return;
+    setStatusMessage("");
     const id = runExecutionId(job);
     const jobArchitectureId = job.request && job.request.model_architecture_id;
     if (jobArchitectureId) setSelectedArchitectureId(jobArchitectureId);
     if (job.request) applyRunRequestToControls(job.request);
     setSelectedJobId(id);
+    setResultsSection("overview");
     setErrorMessage("");
     const runId = job.run_id || (job.artifacts && job.artifacts.run_id);
     if (normalizeStatus(job.status) === "succeeded" && runId) {
       try {
         const summary = job.summary || await api.fetchSummary(runId);
+        if (expectedRouteSequence != null && expectedRouteSequence !== routeSequence.current) return;
         setResult({
           artifacts: job.artifacts || {
             run_id: runId,
@@ -12018,7 +12304,6 @@ function App() {
           summary,
         });
         setSelectedRunId(runId);
-        setStatusMessage(`Inspecting ${runLabel(job)}.`);
         setRunViewMode("results");
       } catch (err) {
         setErrorMessage(toErrorMessage(err, "Failed to load selected model results"));
@@ -12202,13 +12487,17 @@ function App() {
       lockReason={selectedRunLockReason}
     />
   );
+  function renderModelActions(model, compact = false) {
+    return <ModelActions compact={compact} model={model} onRename={onRenameModel} onDuplicate={onDuplicateSelectedConfiguration} onDelete={onDeleteSelectedRun} busy={platformActionLoading} />;
+  }
   const operationsPanel = (
     <div className="diagram-ops-stack">
+      {renderModelActions(selectedJob)}
       {selectedRunInputsLocked ? (
         <DuplicateConfigurationPanel
           selectedJob={selectedJob}
-          onDuplicateConfiguration={onDuplicateSelectedConfiguration}
-          onDeleteRun={onDeleteSelectedRun}
+          onDuplicateConfiguration={() => onDuplicateSelectedConfiguration().catch(() => false)}
+          onDeleteRun={() => onDeleteSelectedRun().catch(() => false)}
           actionLoading={platformActionLoading}
           technicalExecution={result ? null : technicalExecution}
           showDuplicate={!result}
@@ -12269,8 +12558,8 @@ function App() {
       activeJob={activeJob}
       selectedJob={selectedJob}
       operationsPanel={operationsPanel}
-      errorMessage={errorMessage}
-      statusMessage={statusMessage}
+      errorMessage=""
+      statusMessage=""
       runViewMode={runViewMode}
     />
   );
@@ -12280,10 +12569,12 @@ function App() {
       architecture={selectedArchitecture}
       selectedRunLabel={selectedRunLabel}
       selectedRunName={selectedRunName}
+      modelActions={renderModelActions(selectedJob)}
+      recordedInputs={<RecordedInputs key={selectedJobId} model={selectedJob} projectId={activeProjectId} />}
+      evidence={evidenceFromModel(selectedJob, result.summary)}
+      activeSection={resultsSection}
+      setActiveSection={setResultsSection}
       onRenameModel={(nextName) => onRenameModel(selectedJob, nextName)}
-      onDuplicateModel={selectedRunInputsLocked ? onDuplicateSelectedConfiguration : null}
-      duplicateModelLoading={platformActionLoading}
-      technicalExecutionPanel={technicalExecution}
       technicalDetailsPanel={resultsTechnicalDetails}
       selectedModelDetailsPanel={selectedJob && selectedRunStatus !== "draft" ? (
         <SelectedJobDetailsPanel job={selectedJob} style={{ marginTop: 0 }} showOutputLinks={false} />
@@ -12340,6 +12631,7 @@ function App() {
       onDeleteProject={handleDeleteProject}
       onDownloadProjectFiles={onDownloadProjectFiles}
       onReturnHome={openLandingPage}
+      onOpenDatasets={openDatasetLibrary}
       currentUser={currentUser}
       actionLoading={platformActionLoading}
       isAdminView={isAdminView}
@@ -12358,56 +12650,46 @@ function App() {
       onNewModel={() => setNewModelModalOpen(true)}
       onOpenRun={onSelectJob}
       onReturnToProjects={openProjectsPage}
+      onRenameProject={handleRenameProject}
+      renderModelActions={renderModelActions}
       actionLoading={platformActionLoading}
       isAdminView={isAdminView}
     />
   );
-  const showRunTabs = runViewMode !== "projects" && runViewMode !== "project" && Boolean(activeProject);
-  const clearMethodologyRoute = () => {
-    if (window.location.hash === "#/methodology" && window.history && window.history.pushState) {
-      window.history.pushState("", document.title, window.location.pathname + window.location.search);
-    }
-  };
+  const showRunTabs = ["setup", "results"].includes(runViewMode) && Boolean(activeProject);
   const openMethodologyPage = () => {
     setStatusMessage("");
     setErrorMessage("");
     setMethodologyOpen(true);
     setLandingOpen(false);
-    if (window.location.hash !== "#/methodology") window.location.hash = "/methodology";
   };
   function openLandingPage() {
     setStatusMessage("");
     setErrorMessage("");
-    clearMethodologyRoute();
     setMethodologyOpen(false);
     setLandingOpen(true);
+  }
+  function openDatasetLibrary() {
+    setStatusMessage("");
+    setErrorMessage("");
+    setMethodologyOpen(false);
+    setLandingOpen(false);
+    setRunViewMode("datasets");
   }
   function openProjectsPage() {
     setStatusMessage("");
     setErrorMessage("");
-    clearMethodologyRoute();
     setMethodologyOpen(false);
     setLandingOpen(false);
     setRunViewMode("projects");
   }
 
+  function renderPage() {
   if (methodologyOpen) {
     const MethodologyPage = window.EDIMMethodology && window.EDIMMethodology.MethodologyPage;
     return MethodologyPage ? (
       <MethodologyPage
         architectureCatalog={architectureCatalog}
-        header={(
-          <UnifiedHeader
-            currentUserId={currentUserId}
-            availableUsers={availableUsers}
-            onUserChange={handleUserChange}
-            apiTarget={apiTarget}
-            systemCompatibility={systemCompatibility}
-            onApiTargetModeChange={handleApiTargetModeChange}
-            apiTargetLoading={platformActionLoading}
-            onReturnToLanding={openLandingPage}
-          />
-        )}
         onOpenProjects={openProjectsPage}
         onStartProject={openProjectsPage}
         onReturnDashboard={openLandingPage}
@@ -12437,6 +12719,7 @@ function App() {
           openProjectsPage();
         }}
         onOpenMethodology={openMethodologyPage}
+        onOpenDatasets={openDatasetLibrary}
         statusMessage={statusMessage}
         errorMessage={errorMessage}
       />
@@ -12445,17 +12728,6 @@ function App() {
 
   return (
     <div className="app-shell">
-      <UnifiedHeader
-        currentUserId={currentUserId}
-        availableUsers={availableUsers}
-        onUserChange={handleUserChange}
-        apiTarget={apiTarget}
-        systemCompatibility={systemCompatibility}
-        onApiTargetModeChange={handleApiTargetModeChange}
-        apiTargetLoading={platformActionLoading}
-        onReturnToLanding={openLandingPage}
-      />
-
       {newModelModalOpen ? (
         <NewModelModal
           projectRuns={projectRuns}
@@ -12467,6 +12739,8 @@ function App() {
         />
       ) : null}
 
+      {errorMessage ? <div className="workspace-message warn" role="alert">{errorMessage}</div> : null}
+      {statusMessage ? <div className="workspace-message muted" role="status">{statusMessage}</div> : null}
       <div className={`global-run-tab-bar ${showRunTabs ? "" : "empty"}`}>
         {showRunTabs ? (
           <RunTabs
@@ -12483,7 +12757,7 @@ function App() {
       </div>
 
       <div className={`app-body app-body-single workspace-mode-${runViewMode}`}>
-        <ArchitectureRunWorkspace
+        {runViewMode === "datasets" ? <div className="dataset-library-page"><button type="button" className="workspace-back-button" onClick={openProjectsPage}>← Back to projects</button><UploadedDatasetsPanel inputDatasets={inputDatasets} projects={projects} activeProjectId={activeProjectId} onRefresh={refreshInputDatasets} actionLoading={platformActionLoading} /></div> : <ArchitectureRunWorkspace
           architecture={selectedArchitecture}
           runViewMode={runViewMode}
           flowActiveJob={selectedRunActiveJob}
@@ -12494,8 +12768,8 @@ function App() {
           inputDatasets={inputDatasets}
           onUploadDataset={onUploadDataset}
           onDatasetVersionChange={onDatasetVersionChange}
-          errorMessage={errorMessage}
-          statusMessage={statusMessage}
+          errorMessage=""
+          statusMessage=""
           runManagementPanel={runManagementPanel}
           projectsOverviewPanel={projectsOverviewPanel}
           comparePanel={comparePanel}
@@ -12503,8 +12777,26 @@ function App() {
           resultsPanel={resultsPanel}
           scenarioKey={scenarioKey}
           scenarioSelections={scenarioSelections}
-        />
+        />}
       </div>
+    </div>
+  );
+  }
+
+  return (
+    <div className="platform-shell">
+      <UnifiedHeader
+        currentUserId={currentUserId}
+        availableUsers={availableUsers}
+        onUserChange={handleUserChange}
+        apiTarget={apiTarget}
+        systemCompatibility={systemCompatibility}
+        onApiTargetModeChange={handleApiTargetModeChange}
+        apiTargetLoading={platformActionLoading}
+        onOpenDatasets={openDatasetLibrary}
+        onReturnToLanding={openLandingPage}
+      />
+      {renderPage()}
     </div>
   );
 }

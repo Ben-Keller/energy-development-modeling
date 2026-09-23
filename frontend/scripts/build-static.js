@@ -222,7 +222,7 @@ function writeHtmlEntrypoint() {
     .replace(/\n\s*<link rel="stylesheet" href="\.\/(?:design-phases|styles)\/[^"]+" \/>/g, '')
     .replace(
       /(<link rel="stylesheet" href="\.\/methodology\/methodology\.css" \/>)/,
-      '$1\n    <link rel="stylesheet" href="./design-system.css?v=platform-reliability-5" />'
+      '$1\n    <link rel="stylesheet" href="./design-system.css?v=workspace-polish-6" />'
     )
     .replace(/\n\s*<script src="https:\/\/unpkg\.com\/@babel\/standalone\/babel\.min\.js"[^>]*><\/script>/, '')
     .replace(
@@ -251,7 +251,17 @@ function writeConsolidatedDesignStyles() {
     (match) => match[1]
   );
   const content = paths.map((relativePath) => {
-    const css = fs.readFileSync(path.join(root, relativePath), 'utf8');
+    // The bundle moves CSS from subdirectories to dist/. Keep local URLs
+    // relative to their original stylesheet, including when hosted at /ui/.
+    const css = fs.readFileSync(path.join(root, relativePath), 'utf8').replace(
+      /url\(\s*(["']?)([^"')]+)\1\s*\)/g,
+      (match, quote, rawUrl) => {
+        const url = rawUrl.trim();
+        if (/^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(url)) return match;
+        const rebased = path.posix.normalize(path.posix.join(path.posix.dirname(relativePath), url));
+        return `url(${quote}./${rebased}${quote})`;
+      }
+    );
     return `/* ${relativePath} */\n${css.trim()}\n`;
   }).join('\n');
   fs.writeFileSync(path.join(dist, 'design-system.css'), content, 'utf8');

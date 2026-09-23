@@ -30,34 +30,12 @@
 
 .evidence-status--ready { --evidence-color: #69d69f; }
 .evidence-status--review { --evidence-color: #f0c66b; }
-.evidence-status--exploratory { --evidence-color: #f28b8b; }
+.evidence-status--exploratory { --evidence-color: #a7bac9; }
 .evidence-status--pending { --evidence-color: #aeb9c7; }
 
-.evidence-notice {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 14px 16px;
-  border: 1px solid #364557;
-  border-left-width: 4px;
-  color: #e7edf5;
-  background: #111820;
-}
-
-.evidence-notice--exploratory_only {
-  border-color: #e06565;
-  background: #21171a;
-}
-
-.evidence-notice--analyst_review {
-  border-color: #d5a94c;
-  background: #211d14;
-}
-
-.evidence-notice--production_ready {
-  border-color: #45b77d;
-  background: #14211c;
-}
+.evidence-notice { color:var(--workspace-muted,#b1bac4); font-size:13px; }
+.evidence-notice > summary { cursor:pointer; padding:6px 0; min-height:32px; }
+.evidence-notice-body { padding:8px 12px; border-left:2px solid #55606e; }
 
 .evidence-notice-eyebrow {
   color: #9da9b8;
@@ -73,11 +51,7 @@
   font-size: 12px;
 }
 
-.evidence-score {
-  align-self: center;
-  font-size: 18px;
-  font-weight: 800;
-}
+.evidence-score { display:block; margin-top:8px; font-size:13px; font-weight:600; }
 
 .result-scope-token {
   display: inline-flex;
@@ -326,6 +300,7 @@
 .project-workspace-page .project-information-bar {
   align-items: start;
   padding-top: 11px;
+  padding-right: 17px;
   padding-left: 17px;
 }
 
@@ -472,3 +447,270 @@
     font-size: 20px;
   }
 }
+
+/* Workspace foundations resolved from Figma: Proxima Nova, 14px fields,
+   40px controls, restrained surfaces and cyan actions. Component scope takes
+   precedence over the legacy inline shell without changing audience pages. */
+:root {
+  --workspace-surface: #1c1d18;
+  --workspace-panel: #151b22;
+  --workspace-border: #55606e;
+  --workspace-text: #f6f6f6;
+  --workspace-muted: #b1bac4;
+  --workspace-accent: #78dfe9;
+}
+/* Navigation and messages add rows; use document flow instead of the old
+   fixed three-row shell. The secondary graph keeps its own pan viewport. */
+.platform-shell > .app-shell { display:flex; flex-direction:column; height:auto; min-height:0; flex:1; }
+body:has(.platform-shell) { overflow:auto; }
+.platform-shell { display:flex; flex-direction:column; min-height:100dvh; }
+.platform-shell > .landing-shell { height:auto; min-height:0; flex:1; overflow:visible; grid-template-rows:minmax(0,1fr) auto; }
+.platform-shell > .methodology-shell { min-height:0; flex:1; }
+.app-shell > .app-body { flex:1 0 auto; display:block; overflow:visible; }
+.workspace-message { margin:8px 18px; padding:8px 12px; }
+.platform-shell > .edim-topbar { padding:8px 18px; min-height:76px; height:auto; display:flex; justify-content:space-between; gap:16px; }
+.platform-shell > .edim-topbar .edim-brand { margin:0; transform:none; padding:0; min-width:0; gap:12px; }
+.platform-shell > .edim-topbar .edim-logo { width:30px; height:60px; object-fit:contain; flex:0 0 30px; }
+.platform-shell > .edim-topbar .edim-brand-copy strong { font-size:18px; line-height:1.2; }
+.platform-shell > .edim-topbar .edim-brand-copy small { font-size:13px; line-height:1.3; text-transform:none; }
+.platform-shell > .edim-topbar .header-project-area { display:none; }
+.platform-shell > .edim-topbar .header-right-controls { display:flex; flex-wrap:wrap; gap:12px; margin:0; }
+.app-shell :is(button,select,input,a,summary):focus-visible { outline:2px solid var(--workspace-accent); outline-offset:3px; }
+.app-shell :is(.primary-action-button,.run-play-button):not(:disabled) { background:var(--workspace-accent); color:#10151d; border-color:var(--workspace-accent); }
+/* Primary setup form and secondary flow. */
+.app-shell .model-workspace-with-management { align-items:start; }
+.app-shell .model-workspace-primary { height:auto; overflow:visible; }
+.app-shell .model-run-management-pane { height:auto; min-height:0; position:static; }
+.setup-workspace-stack { display:grid; gap:16px; min-width:0; }
+.app-shell .setup-form-panel.card { margin:0; padding:24px; background:var(--workspace-surface); border:1px solid var(--workspace-border); }
+.setup-form-panel h1 { font-size:24px; margin:0 0 8px; }
+.setup-form-panel .diagram-scenario-layout { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
+.setup-form-panel .input-module-column { min-width:0; padding:0; border:0; background:none; }
+.app-shell .setup-form-panel .diagram-control-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }
+.setup-form-panel .diagram-lever-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }
+.setup-form-panel label { font-size:14px; color:var(--workspace-muted); }
+.setup-form-panel select, .setup-form-panel input:not([type=range]) { width:100%; min-width:0; min-height:40px; font-size:14px; }
+.app-shell .setup-form-panel .diagram-section-heading { padding:0; margin:0 0 16px; min-height:0; }
+.app-shell .setup-form-panel .diagram-section-label { color:var(--workspace-text); font-size:16px; font-weight:700; text-transform:none; letter-spacing:0; }
+.app-shell .setup-form-panel .run-setup-group-eyebrow { margin:4px 0 0; font-size:12px; }
+/* LeverControl also serves the graph: override its inline minimum only here. */
+.setup-form-panel input[type=range] { min-width:0 !important; width:auto; flex:1 1 100px !important; }
+.setup-form-panel input[type=number] { width:90px !important; flex:0 0 90px; }
+.setup-form-panel .lever-label { font-size:14px; }
+.setup-form-panel .input-module-levers { padding:0; }
+.model-flow-disclosure { border:1px solid var(--workspace-border); border-radius:8px; min-width:0; }
+.model-flow-disclosure > summary, .recorded-inputs > summary { padding:16px; cursor:pointer; font-size:16px; font-weight:700; }
+.model-flow-disclosure .flow-model-viewport { height:480px; min-height:320px; }
+/* Reused dialogs and model actions. */
+.modal-backdrop { box-sizing:border-box; padding:16px; }
+.modal-backdrop .modal-card { box-sizing:border-box; width:min(640px,100%); max-width:100%; max-height:calc(100dvh - 32px); margin:auto; border-radius:8px; }
+.modal-backdrop .modal-card.wide { width:min(1080px,100%); }
+.modal-body input:not([type=checkbox]):not([type=radio]), .modal-body select { min-height:40px; font-size:14px; max-width:100%; }
+.modal-body label { font-size:14px; }
+.model-action-buttons { display:flex; gap:12px; margin-top:24px; flex-wrap:wrap; }
+.model-action-buttons button { min-height:40px; font-size:14px; }
+.model-action-buttons .danger-menu-button { color:#ffb0b0; border-color:#d17575; background:transparent; }
+/* Results retain existing metric, map and diagnostic components. */
+.recorded-inputs { background:var(--workspace-surface); border:1px solid var(--workspace-border); border-radius:8px; padding:0 16px 12px; }
+.recorded-inputs > summary { margin:0 -16px; }
+.recorded-levers { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+.recorded-levers dt { color:var(--workspace-muted); text-transform:capitalize; }
+.recorded-levers dd { margin:4px 0; font-variant-numeric:tabular-nums; }
+.app-shell .analysis-shell .card { border-color:var(--workspace-border); background:var(--workspace-panel); }
+.analysis-header-card .evidence-notice { margin-top:4px; padding:0; }
+.analysis-header-card .evidence-notice p { margin:4px 0; font-size:14px; }
+.chart-filter-row { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:end; gap:8px; margin:8px 0 12px; }
+.chart-filter-row label { display:grid; gap:4px; font-size:13px; flex:1 1 180px; }
+.chart-filter-row input { width:100%; min-height:40px; padding:8px 12px; background:#10151d; color:var(--workspace-text); border:1px solid var(--workspace-border); border-radius:4px; }
+.chart-filter-row input::placeholder { color:var(--workspace-muted); }
+.chart-filter-row small { color:var(--workspace-muted); }
+/* Dataset table becomes labeled cards on narrow screens; sorting remains
+   reachable independently of the hidden table header. */
+.app-shell .dataset-management-view { padding:24px; min-width:0; align-content:start; }
+.app-shell .dataset-filter-disclosure .dataset-library-toolbar { display:grid; grid-template-columns:minmax(180px,1fr) repeat(2,minmax(120px,180px)) auto; align-items:end; gap:16px; }
+.dataset-library-toolbar label { display:grid; gap:6px; font-size:14px; }
+.app-shell .dataset-library-toolbar input, .app-shell .dataset-library-toolbar select { background:#10151d; color:var(--workspace-text); border:1px solid var(--workspace-border); border-radius:4px; min-height:40px; font-size:14px; }
+.app-shell .dataset-filter-summary { grid-column:1 / -1; text-align:left; }
+.dataset-table th button { background:none; border:0; font:inherit; color:inherit; padding:8px 0; text-align:left; }
+.app-shell .dataset-table-wrap { overflow:visible; min-height:0; }
+.app-shell .dataset-table { min-width:0; }
+.app-shell .dataset-table td { font-size:14px; overflow-wrap:anywhere; }
+.dataset-empty-source { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 0; }
+/* Project hierarchy and comparison. */
+.app-shell .project-model-card .project-model-card-actions { flex-direction:column; align-items:stretch; }
+.app-shell .project-model-card .project-card-open-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:8px; }
+.app-shell .project-workspace-page .project-model-card-actions button { min-height:40px; padding:8px; font-size:14px; }
+.project-model-card .project-compare-toggle { min-height:40px; }
+.comparison-eligibility { font-size:12px; }
+.comparison-matrix th:first-child { position:sticky; left:0; z-index:1; background:var(--workspace-panel); min-width:170px; }
+.comparison-matrix td, .comparison-matrix th { font-size:14px; }
+.comparison-scroll-hint { color:var(--workspace-muted); font-size:14px; }
+.project-workspace-page .project-information-main h1 { font-size:28px; line-height:1.2; }
+.project-workspace-title-row { display:flex; align-items:center; gap:12px; min-width:0; }
+.project-workspace-title-row h1 { overflow-wrap:anywhere; }
+.project-workspace-title-row .project-edit-icon { flex-shrink:0; width:36px; height:36px; }
+.project-information-visual { max-width:90px; max-height:90px; }
+
+@media(max-width:1100px) {
+  .setup-form-panel .diagram-scenario-layout { grid-template-columns:minmax(0,1fr); }
+}
+@media(max-width:760px) {
+  .platform-shell > .edim-topbar { flex-wrap:wrap; padding:12px 16px; gap:10px; }
+  .platform-shell > .edim-topbar .edim-brand { width:100%; }
+  .platform-shell > .edim-topbar .edim-brand-copy strong { font-size:17px; }
+  .platform-shell > .edim-topbar .edim-brand-copy small { font-size:12px; }
+  .platform-shell > .edim-topbar .header-right-controls { width:100%; justify-content:space-between; }
+  .platform-shell > .edim-topbar .header-right-controls .runtime-target-control { width:auto; min-width:0; flex:1; justify-content:flex-start; }
+  .platform-shell > .edim-topbar .header-right-controls .header-user-menu { margin:0; }
+  .app-shell .model-workspace-with-management { display:flex; flex-direction:column; gap:16px; }
+  .app-shell .model-workspace-primary, .app-shell .model-run-management-pane { width:100%; min-width:0; min-height:0; }
+  .app-shell .setup-form-panel.card, .app-shell .dataset-management-view { padding:16px; }
+  .project-workspace-page .project-information-main h1 { font-size:24px; }
+  .app-shell .dataset-filter-disclosure .dataset-library-toolbar { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .app-shell .dataset-search-field { grid-column:1 / -1; }
+  .app-shell .dataset-library-toolbar label { min-width:0; width:100%; }
+  .app-shell .dataset-library-toolbar select { width:100%; }
+  .dataset-management-view .dataset-table thead { display:none; }
+}
+
+/* Compact Figma-inspired context without expanding the detailed diagnostics. */
+.results-evidence-summary { padding:16px; border:1px solid #55606e; border-radius:8px; background:#1c1d18; }
+.results-evidence-summary h3 { margin:0; font-size:16px; }
+.results-evidence-summary p { margin:8px 0; font-size:13px; overflow-wrap:anywhere; }
+.evidence-summary-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:12px; }
+.evidence-summary-metrics > * { min-width:0; }
+.project-resume-links { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:16px 0; }
+.project-resume-links > div { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 16px; border:1px solid #55606e; border-radius:8px; min-width:0; }
+.project-resume-links small { width:100%; color:#a9b1b7; }
+.project-resume-links button,.project-resume-links a { min-height:40px; overflow-wrap:anywhere; white-space:normal; text-align:left; }
+.project-resume-links a { display:inline-flex; align-items:center; }
+@media(max-width:700px) { .project-resume-links { grid-template-columns:1fr; } .evidence-summary-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* Workspace hierarchy: navigation, content headings, and analytical cards. */
+.app-shell {
+  --workspace-heading-size:18px;
+  --workspace-label-size:14px;
+  --workspace-caption-size:13px;
+}
+.app-shell :is(.project-selection-toolbar,.dataset-management-header) h2 {
+  font-size:22px; line-height:1.25; letter-spacing:0; margin-bottom:8px;
+}
+.app-shell :is(.analysis-shell,.setup-form-panel,.project-workspace-page,.dataset-management-view) h3 {
+  font-size:var(--workspace-heading-size) !important; line-height:1.3; letter-spacing:0;
+}
+.app-shell :is(.project-model-card-head,.project-information-metadata,.project-artifact-meta,.chart-filter-row) .muted,
+.app-shell .project-artifact-meta { font-size:var(--workspace-caption-size); line-height:1.5; color:var(--workspace-muted); }
+.metric-card-label { font-size:var(--workspace-caption-size,13px); line-height:1.4; }
+.metric-card-value { margin-top:6px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1.25; overflow-wrap:anywhere; }
+.app-shell .project-workspace-page .project-model-card { min-height:0; padding:20px; gap:16px; background:var(--workspace-panel); }
+.app-shell .project-model-card .project-model-card-head { gap:12px; align-items:flex-start; }
+.app-shell .project-model-card .project-model-card-head > div:first-child { padding-right:0; min-width:0; max-width:none; }
+.app-shell .project-model-card h3 { margin-bottom:6px; overflow-wrap:anywhere; }
+.app-shell .project-model-card .project-model-card-head .muted { font-size:13px; line-height:1.5; }
+.app-shell .project-model-card-actions { margin-top:0; padding-top:12px; border-top:1px solid var(--workspace-border); }
+.app-shell .analysis-shell .dashboard-stack { gap:20px; }
+.app-shell .analysis-shell :is(.workspace-grid-2,.results-support-widget-grid) { gap:16px; align-items:start; }
+.app-shell .analysis-shell .card { padding:20px; }
+.app-shell .analysis-shell .card > h3 { margin:0 0 16px !important; }
+.app-shell .analysis-shell .metric-card { padding:12px; min-width:0; }
+.app-shell .ranked-bars-display-controls { margin:0 0 12px; }
+.app-shell .ranked-bars-display-controls select { min-height:40px; font-size:14px; padding:8px 12px; }
+.app-shell .hbar-row { font-size:13px; line-height:1.4; gap:10px; }
+.global-run-tab-bar .run-tab[aria-selected="true"] { background:var(--workspace-panel); border-color:var(--workspace-accent); box-shadow:inset 0 3px 0 var(--workspace-accent); }
+.global-run-tab-bar .run-tab[aria-selected="true"] .run-tab-title { color:var(--workspace-text); font-weight:700; }
+.app-shell .results-mode-stack .results-section-tabs { padding:4px; gap:4px; background:#10151d; border:1px solid var(--workspace-border); border-radius:8px; }
+.app-shell .results-mode-stack .results-section-tabs .seg-button { min-height:40px; font-size:14px; line-height:1.25; border-radius:4px; color:var(--workspace-muted); }
+.app-shell .results-mode-stack .results-section-tabs .seg-button[aria-selected="true"] { background:var(--workspace-text); color:#10151d; border-color:var(--workspace-text); font-weight:700; box-shadow:none; }
+@media(max-width:760px) {
+  .app-shell .project-workspace-page .project-model-card,.app-shell .analysis-shell .card { padding:16px; }
+  .app-shell .results-mode-stack .results-section-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .app-shell .results-mode-stack .results-section-tabs .seg-button { width:100%; white-space:normal; }
+}
+
+/* Secondary context stays discoverable without displacing the results. */
+.app-shell .recorded-inputs { background:transparent; border:0; padding:0; }
+.app-shell .recorded-inputs > summary { margin:0; padding:8px 0; font-size:13px; font-weight:600; color:var(--workspace-muted); }
+.app-shell .recorded-inputs[open] { padding-bottom:12px; }
+.execution-limitations { color:var(--workspace-muted); font-size:13px; }
+.execution-limitations > summary { padding:8px 0; cursor:pointer; }
+.execution-limitations ul { margin:8px 0; padding-left:24px; }
+.results-evidence-disclosure > .results-evidence-summary { margin:12px 0; border:0; background:transparent; }
+.project-card .evidence-status,.model-card-evidence .evidence-status { padding:0; border:0; background:transparent; font-weight:400; font-size:12px; color:var(--workspace-muted); min-height:20px; }
+.project-card .evidence-status-dot,.model-card-evidence .evidence-status-dot { width:5px; height:5px; flex-basis:5px; opacity:.65; }
+.app-shell .project-model-card > .project-model-card-head { position:relative; z-index:3; }
+.app-shell .project-model-card .model-card-header-tools { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+.model-card-manage { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; padding:8px; background:transparent; border:1px solid transparent; border-radius:6px; }
+.model-card-manage:hover,.model-card-manage:focus-visible { background:#24303c; border-color:var(--workspace-border); }
+.model-card-manage img { width:18px; height:18px; filter:brightness(0) invert(1); opacity:.8; }
+.model-card-evidence { margin-top:-8px; }
+.app-shell .project-model-card .project-model-card-actions { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; }
+.app-shell .project-model-card .project-card-open-actions { justify-content:flex-end; gap:8px; }
+.model-card-selection { min-width:0; }
+.project-compare-toggle { display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; }
+.project-compare-toggle input { accent-color:var(--workspace-accent); width:16px; height:16px; }
+.app-shell .project-workspace-page .project-model-card-actions .project-primary-open { padding:8px 14px; font-weight:700; }
+.card-action-symbol { display:inline-block; font-size:18px; line-height:1; margin:0 3px; }
+@media(max-width:480px) {
+  .app-shell .project-model-card .project-model-card-actions { grid-template-columns:1fr; gap:8px; }
+  .app-shell .project-model-card .project-card-open-actions { width:100%; }
+  .app-shell .project-model-card .project-card-open-actions .project-primary-open { flex:1; }
+  .app-shell .project-model-card .model-card-header-tools { flex-direction:column-reverse; align-items:flex-end; gap:4px; }
+}
+
+.projects-dataset-section { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; padding:24px 0 8px; margin-top:24px; border-top:1px solid var(--workspace-border); }
+.projects-dataset-section h2 { font-size:22px; margin:0 0 8px; }
+.projects-dataset-section p { margin:0; color:var(--workspace-muted); font-size:14px; }
+.projects-dataset-section button,.user-dataset-link { display:flex; align-items:center; gap:10px; min-height:40px; font-size:14px; }
+.projects-dataset-section img,.user-dataset-link img { width:18px; height:18px; filter:brightness(0) invert(1); opacity:.8; }
+.user-dataset-link { width:100%; margin:12px 0; padding:10px; text-align:left; }
+.dataset-library-page > .workspace-back-button { margin:16px 24px 0; }
+
+/* Models lead the project workspace; activity and artifacts share a sidebar. */
+.project-content-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(290px,340px); align-items:start; gap:24px; margin-top:20px; padding:0 17px 24px; }
+.project-workspace-page .project-content-layout .project-selection-workbench { min-width:0; padding:0; border:0; }
+.project-workspace-page .project-content-layout .project-run-card-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); }
+.project-activity-panel { min-width:0; padding:20px; border:1px solid var(--workspace-border); border-radius:8px; background:var(--workspace-panel); }
+.project-activity-panel > h2 { margin:0 0 16px; font-size:18px; }
+.project-activity-panel .project-resume-links { grid-template-columns:1fr; margin:0; gap:16px; }
+.project-activity-panel .project-resume-links > div { border:0; border-radius:0; padding:0 0 16px; border-bottom:1px solid var(--workspace-border); }
+.project-workspace-page .project-activity-panel .project-secondary-panels { display:grid; grid-template-columns:1fr; margin-top:16px; gap:12px; }
+.project-activity-panel .project-secondary-disclosure { min-width:0; }
+.project-activity-panel .project-secondary-disclosure-body { padding:12px; }
+.project-activity-panel .project-selection-section-header,.project-activity-panel .diagram-dataset-version-row { flex-direction:column; align-items:flex-start; gap:12px; }
+.project-activity-panel .project-artifact-meta { overflow-wrap:anywhere; }
+@media(max-width:1000px) {
+  .project-content-layout { grid-template-columns:minmax(0,1fr); gap:20px; }
+  .project-activity-panel { padding:16px; }
+}
+
+/* Project header mirrors the portfolio's left introduction/right detail grid. */
+.project-workspace-page .project-information-bar { grid-template-columns:minmax(0,1.2fr) minmax(320px,1fr); align-items:start; gap:32px; }
+.project-information-main .project-information-heading-row { display:flex; flex-direction:column; align-items:flex-start; gap:16px; }
+.project-information-heading-copy .project-information-eyebrow { margin:0 0 10px; }
+.project-information-main .project-information-back { margin:0; }
+.project-information-bar .project-information-summary { min-width:0; display:flex; flex-direction:column; align-items:stretch; padding:0; border:0; gap:16px; }
+.project-information-summary .project-information-metadata { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); margin:0; gap:0; }
+.project-information-summary .project-information-meta-item { min-width:0; max-width:none; padding:12px; border:0; border-bottom:1px solid var(--workspace-border); }
+.project-information-summary .project-information-meta-item:nth-child(even) { border-left:1px solid var(--workspace-border); }
+.project-information-meta-item b { overflow-wrap:anywhere; }
+.project-information-summary .project-information-stats { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.project-information-summary .project-information-stats span { text-transform:none; font-size:12px; }
+
+@media(max-width:760px) {
+  .project-workspace-page .project-information-bar { grid-template-columns:minmax(0,1fr); gap:24px; }
+}
+
+.project-information-summary .project-information-stats > div { padding:4px 12px; border-top:0; border-left:1px solid var(--workspace-border); }
+.project-information-summary .project-information-stats > div:first-child { border-left:0; padding-left:0; }
+.project-model-toolbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:12px; flex-wrap:wrap; }
+.project-model-toolbar-actions .project-new-model { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:40px; padding:8px 16px; white-space:nowrap; }
+@media(max-width:760px) {
+  .project-model-toolbar-actions { width:100%; justify-content:flex-start; gap:8px; }
+  .project-information-summary .project-information-stats > div { padding:4px 8px; }
+  .project-information-summary .project-information-stats strong { font-size:24px; }
+}
+
+.project-workspace-page .project-model-toolbar-actions .model-comparison-launch { width:auto; flex:1 1 auto; }
+
+.platform-shell > .edim-topbar { flex-shrink:0; }
+.platform-shell > .edim-topbar :is(button,select,input,a,summary):focus-visible { outline:2px solid var(--workspace-accent); outline-offset:3px; }

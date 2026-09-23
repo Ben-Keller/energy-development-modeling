@@ -14,7 +14,7 @@ Use the two primary documents below first. The remaining files are implementatio
 ## Handoff
 
 - [Backend handoff](handoff/BACKEND_HANDOFF.md): backend/cloud provider replacement contract.
-- [Technical architecture handoff](handoff/EDIM_Technical_Architecture_and_Requirements_Handoff.md): concise architecture navigation document.
+- [Frontend handoff](handoff/FRONTEND_HANDOFF.md): delivered UI behavior, verification, and deferred backend follow-ups.
 
 ## Technical references
 

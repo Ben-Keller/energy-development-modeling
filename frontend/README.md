@@ -12,6 +12,8 @@ This frontend is a static browser app used by the local EDIM backend and by the 
 - `methodology/` contains the isolated user-facing methodology page.
 - `assets/webp/` contains optimized landing-page image assets used by the hero background.
 - `geo/` contains bundled map assets used by the result map.
+- `styles/platform-components.css` holds shared UI styles; `design-phases/` still contains styles used by the build and is not a disposable review archive.
+- `tests/` contains browser regressions and committed screenshot assertion baselines.
 
 ## Build
 
@@ -20,6 +22,19 @@ npm run build
 ```
 
 The build validates the model-owned architecture catalog and writes a static bundle to `frontend/dist/`.
+
+## Verification
+
+From `frontend/`, run `npm ci` to install the pinned dependencies, then:
+
+```bash
+npm run build
+npm run test:ui
+```
+
+The browser suite requires Chrome and starts its own static server on port 4174. API responses are mocked. Inspection screenshots, traces and failure artifacts are generated under ignored `test-results/`; only screenshot assertion baselines in `tests/ui.spec.js-snapshots/` belong in version control. Review intended visual changes before using `npm run test:ui:update`.
+
+See the [frontend handoff](../docs/handoff/FRONTEND_HANDOFF.md) for delivered behavior and deferred backend work.
 
 ## Backend Switching
 
