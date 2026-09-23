@@ -57,3 +57,5 @@ outputs/local_app.*
 ~$*
 *.swp
 *.swo
+.local
+__azurite_data__
