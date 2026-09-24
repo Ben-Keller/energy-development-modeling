@@ -79,10 +79,11 @@ class RuntimeCliModelCatalogProvider(ModelCatalogProvider):
         )
         if architecture_path:
             command.extend(["--architecture-catalog", str(architecture_path)])
+        repo_root = self._repo_root(settings=settings, manifest=manifest)
         completed = subprocess.run(
             command,
-            cwd=str(self._repo_root(settings=settings, manifest=manifest)),
-            env=self._safe_env(),
+            cwd=str(repo_root),
+            env=self._safe_env(repo_root=repo_root),
             text=True,
             capture_output=True,
             timeout=30,
@@ -161,7 +162,20 @@ class RuntimeCliModelCatalogProvider(ModelCatalogProvider):
                 digest.update(chunk)
         return digest.hexdigest()
 
-    def _safe_env(self) -> Dict[str, str]:
+    def _safe_env(self, *, repo_root: Path | None = None) -> Dict[str, str]:
+        """Environment for the catalog subprocess.
+
+        Only a small allow-list is forwarded. When ``repo_root`` is supplied,
+        the repo root and its ``model_runtime`` directory are prepended to
+        PYTHONPATH so ``edim_model`` is importable.
+
+        That prepend is required on App Service: the platform rewrites
+        PYTHONPATH to point at ``/home/site/wwwroot``, but Oryx actually runs
+        the app from an extracted build directory under ``/tmp``. The inherited
+        PYTHONPATH therefore references paths that do not exist, and the
+        subprocess failed with "No module named 'edim_model'" - which broke
+        /api/scenarios and left the UI scenario picker empty.
+        """
         allowed = {
             "PATH",
             "PYTHONPATH",
@@ -173,4 +187,15 @@ class RuntimeCliModelCatalogProvider(ModelCatalogProvider):
             "SYSTEMROOT",
             "WINDIR",
         }
-        return {key: value for key, value in os.environ.items() if key in allowed}
+        env = {key: value for key, value in os.environ.items() if key in allowed}
+
+        if repo_root is not None:
+            required = [str(repo_root), str(repo_root / "model_runtime")]
+            inherited = [
+                part
+                for part in (env.get("PYTHONPATH") or "").split(os.pathsep)
+                if part and part not in required
+            ]
+            env["PYTHONPATH"] = os.pathsep.join(required + inherited)
+
+        return env

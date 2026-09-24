@@ -91,6 +91,22 @@ Copy-Tree -Source (Join-Path $RepoRoot "frontend") -Destination (Join-Path $Stag
 Copy-Tree -Source (Join-Path $RepoRoot "inputs") -Destination (Join-Path $StageDir "inputs") -ExcludeDirs $CommonExcludes
 Copy-Tree -Source (Join-Path $RepoRoot "model_runtime\edim_model") -Destination (Join-Path $StageDir "model_runtime\edim_model") -ExcludeDirs $CommonExcludes
 
+# Calliope CONFIG only, never the data.
+#
+# The API needs Calliope-Africa-main/overrides.yaml to build the scenario
+# catalog served by /api/scenarios (edim_model.core.scenarios reads the
+# `scenarios:` keys). Without it that endpoint returns 500 and the UI scenario
+# picker is empty.
+#
+# The `Timeseries/` directory is ~48.5 MB and is needed ONLY to solve a model,
+# which happens exclusively on the worker VM. Excluding it keeps the App Service
+# package small while still serving the catalog. Everything else here (the YAML
+# overrides and the small config folders) is ~0.75 MB.
+Copy-Tree `
+    -Source (Join-Path $RepoRoot "model_runtime\model_modules\calliope\Calliope-Africa-main") `
+    -Destination (Join-Path $StageDir "model_runtime\model_modules\calliope\Calliope-Africa-main") `
+    -ExcludeDirs ($CommonExcludes + @("Timeseries"))
+
 $ReportDoc = Join-Path $RepoRoot "Energy Modelling Scenario Report.docx"
 if (Test-Path $ReportDoc) {
     Copy-Item $ReportDoc (Join-Path $StageDir "Energy Modelling Scenario Report.docx") -Force
