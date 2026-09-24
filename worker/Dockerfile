@@ -35,9 +35,25 @@ COPY backend /app/backend
 COPY model_runtime /app/model_runtime
 COPY worker /app/worker
 
+# Model input datasets. These ARE a runtime dependency: the model runtime reads
+# config_dir for scenario_metadata.csv, lever_mappings.csv, mario_inputs/* and
+# generated/*. Omitting this made every run fail at model build, and left
+# runtime_config.json absent so the artifact policy came back empty.
+#
+# The narrative "Energy Modelling Scenario Report.docx" is deliberately NOT
+# copied: edim_model.core.scenario_report documents that it is not a runtime
+# dependency and loads structured JSON (inputs/generated/...) instead.
+COPY inputs /app/inputs
+
+# Run workspaces are created under runs_dir at execution time.
+RUN mkdir -p /app/outputs/runs
+
 # Ensure repo-root packages are importable.
 # /app makes 'worker', 'backend', 'model_runtime' importable.
 # /app/model_runtime makes 'edim_model' importable as a top-level package.
+#
+# edim_model.local_runtime derives REPO_ROOT as parents[2] of the module file,
+# which resolves to /app here - matching the paths above.
 ENV PYTHONPATH=/app:/app/model_runtime
 
 # Default command is overridden by docker-compose-dev.yml.

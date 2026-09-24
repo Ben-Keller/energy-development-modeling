@@ -29,6 +29,16 @@ from typing import Any, Callable, Optional
 
 logger = logging.getLogger("edim-worker")
 
+# Repo root inside the worker image (/app). worker/daemon.py -> parents[1].
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+# The model runtime reads its assets from the image, not from the API host.
+DEFAULT_CALLIOPE_ROOT = REPO_ROOT / "model_runtime" / "model_modules" / "calliope" / "Calliope-Africa-main"
+DEFAULT_CONFIG_DIR = REPO_ROOT / "inputs"
+DEFAULT_RUNS_DIR = REPO_ROOT / "outputs" / "runs"
+DEFAULT_MODEL_MANIFEST = REPO_ROOT / "model_runtime" / "edim_model" / "model_manifest.json"
+DEFAULT_DATASET_MANIFEST = REPO_ROOT / "model_runtime" / "edim_model" / "dataset_manifest.json"
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -43,10 +53,16 @@ class WorkerConfig:
         self.worker_id = os.getenv("EDIM_WORKER_ID", f"edim-worker-{uuid.uuid4().hex[:8]}")
 
         # Paths
-        self.calliope_root = Path(os.getenv("EDIM_CALLIOPE_ROOT", "/app/calliope-africa"))
-        self.runs_dir = Path(os.getenv("EDIM_RUNS_DIR", "/app/outputs/runs"))
-        self.config_dir = Path(os.getenv("EDIM_CONFIG_DIR", "/app/inputs"))
-        self.runtime_config_path = Path(os.getenv("EDIM_RUNTIME_CONFIG", "/app/inputs/runtime_config.json"))
+        #
+        # These must resolve inside the worker image. They are NOT taken from
+        # the API: the bundle carries the API host's absolute paths, which do
+        # not exist here (see _rewrite_bundle_paths).
+        self.calliope_root = Path(os.getenv("EDIM_CALLIOPE_ROOT", str(DEFAULT_CALLIOPE_ROOT)))
+        self.runs_dir = Path(os.getenv("EDIM_RUNS_DIR", str(DEFAULT_RUNS_DIR)))
+        self.config_dir = Path(os.getenv("EDIM_CONFIG_DIR", str(DEFAULT_CONFIG_DIR)))
+        self.runtime_config_path = Path(
+            os.getenv("EDIM_RUNTIME_CONFIG", str(DEFAULT_CONFIG_DIR / "runtime_config.json"))
+        )
 
         # Timing / reliability
         self.lock_renewal_seconds = int(os.getenv("EDIM_WORKER_LOCK_RENEWAL_SECONDS", "60"))
@@ -366,6 +382,38 @@ def _append_event_to_blob(
 # ---------------------------------------------------------------------------
 
 
+def _rewrite_bundle_paths(config: WorkerConfig, bundle: dict) -> dict:
+    """Point the bundle's runtime_settings at THIS worker's filesystem.
+
+    The API builds the bundle with ``settings_runtime_snapshot()``, which embeds
+    the API host's absolute paths (on App Service that is a
+    ``/tmp/<build-id>/...`` deployment directory). Those paths do not exist on
+    the worker VM, and ``edim_model.local_runtime._path()`` prefers any
+    non-empty bundle value over its own defaults — so an un-rewritten bundle
+    makes every run fail at model build.
+
+    The worker owns its own layout, so it overwrites the path keys with the
+    paths baked into the image. Empty values are used for assets the worker
+    does not need, letting the runtime fall back to its own defaults.
+    """
+    settings = bundle.get("runtime_settings")
+    if not isinstance(settings, dict):
+        settings = {}
+    else:
+        settings = dict(settings)
+
+    settings["calliope_root"] = str(config.calliope_root)
+    settings["config_dir"] = str(config.config_dir)
+    settings["runs_dir"] = str(config.runs_dir)
+    settings["model_manifest_path"] = str(DEFAULT_MODEL_MANIFEST)
+    settings["dataset_manifest_path"] = str(DEFAULT_DATASET_MANIFEST)
+    # The worker renders no UI; leaving this set to an API path is meaningless.
+    settings["frontend_dir"] = ""
+
+    bundle["runtime_settings"] = settings
+    return bundle
+
+
 def _stage_workspace(config: WorkerConfig, execution_id: str, bundle: dict) -> Path:
     workspace = config.runs_dir / execution_id
     inputs_dir = workspace / "inputs"
@@ -374,6 +422,9 @@ def _stage_workspace(config: WorkerConfig, execution_id: str, bundle: dict) -> P
     work_dir = workspace / "work"
     for d in (inputs_dir, artifacts_dir, logs_dir, work_dir):
         d.mkdir(parents=True, exist_ok=True)
+
+    # Rewrite API-host paths to worker-local paths before the model reads it.
+    bundle = _rewrite_bundle_paths(config, bundle)
 
     bundle_path = inputs_dir / "request_bundle.json"
     bundle_path.write_text(
