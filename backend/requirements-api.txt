@@ -1,0 +1,44 @@
+# API-only dependencies for the Azure App Service (undphq220api001).
+#
+# This is a STRICT SUBSET of backend/requirements.txt. The solver stack
+# (calliope, pyomo, highspy, xarray, netCDF4) is deliberately EXCLUDED:
+# model execution belongs to the isolated worker VM, never to the API.
+#
+# Verified: no module under backend/api_service/ imports calliope, pyomo,
+# highspy, xarray, or netCDF4. numpy/pandas ARE required (summarize.py,
+# mario_runtime.py).
+#
+# The full backend/requirements.txt remains the source of truth for the
+# worker VM image (worker/Dockerfile), which does run the model CLI.
+
+# Web / API framework
+fastapi==0.115.8
+uvicorn[standard]==0.34.0
+watchfiles==0.21.0
+pydantic==2.10.6
+PyYAML==6.0.2
+python-multipart==0.0.20
+python-dotenv>=1.0.1,<2.0.0
+orjson>=3.10.0
+
+# Summaries and MRIO reporting (imported by summarize.py / mario_runtime.py)
+numpy==1.23.5
+pandas==1.5.3
+
+# AI query planner (optional; import-guarded)
+openai>=1.40.0,<3.0.0
+
+# Azure SDKs (Blob + Service Bus via Managed Identity; import-guarded)
+azure-appconfiguration>=1.6.0
+azure-identity>=1.15.0
+azure-servicebus>=7.12.0
+azure-storage-blob>=12.19.0
+
+# Persistence stack (PostgreSQL + Alembic migrations)
+SQLAlchemy>=2.0.30,<2.1
+alembic>=1.13.0
+psycopg[binary]>=3.1.18
+
+# OIDC JWT validation (import-guarded, used only in oidc auth mode)
+PyJWT[crypto]>=2.8.0
+httpx>=0.27.0

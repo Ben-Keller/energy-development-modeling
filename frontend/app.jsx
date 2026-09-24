@@ -4315,7 +4315,7 @@ function RankedBars({
 }) {
   const [limit, setLimit] = useState("10");
   const [filter, setFilter] = useState("");
-  const normalizedFilter = filter.trim().toLowerCase();
+  const normalizedFilterText = filter.trim().toLowerCase();
   const normalizedRows = useMemo(
     () => (records || [])
       .map((r) => ({
@@ -4327,7 +4327,7 @@ function RankedBars({
     [records, labelKey, valueKey]
   );
   const rankedLimit = Math.max(5, Math.round(toNumber(limit, 10)));
-  const matchingRows = normalizedRows.filter((row) => row.label.replace(/[_:]/g, " ").toLowerCase().includes(normalizedFilter));
+  const matchingRows = normalizedRows.filter((row) => row.label.replace(/[_:]/g, " ").toLowerCase().includes(normalizedFilterText));
   const rows = matchingRows.slice(0, rankedLimit);
   const showLimit = normalizedRows.length > 10;
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.value)), 1);
@@ -4382,7 +4382,7 @@ function RankedBars({
           })}
         </div>
       ) : (
-        <div className="muted">{normalizedFilter ? "No matching records." : emptyMessage}</div>
+        <div className="muted">{normalizedFilterText ? "No matching records." : emptyMessage}</div>
       )}
     </div>
   );

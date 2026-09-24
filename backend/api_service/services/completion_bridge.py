@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 # Mapping from worker outcome to project_runs status.
 _OUTCOME_STATUS: dict[str, str] = {
     "running": "running",
+    # Progress messages keep the run active but carry a granular stage so the
+    # frontend can advance its stage tracker instead of showing "running".
+    "progress": "running",
     "succeeded": "succeeded",
     "failed": "failed",
     "cancelled": "cancelled",
@@ -52,12 +55,18 @@ class CompletionBridge:
         connection_string: str | None = None,
         namespace: str | None = None,
         poll_interval: float = 5.0,
+        job_manager=None,
     ) -> None:
         self._repo = platform_repository
         self._queue_name = queue_name
         self._connection_string = connection_string
         self._namespace = namespace
         self._poll_interval = poll_interval
+        # Optional PostgresJobManager. The bridge writes the platform JSON
+        # record; the job manager owns the project_runs row that backs
+        # /api/executions/{id}/status. Without it that row would never leave
+        # "running" for isolated-worker runs.
+        self._job_manager = job_manager
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -158,6 +167,12 @@ class CompletionBridge:
                 )
                 result.append(True)
                 return True  # complete — don't retry
+            finally:
+                # The job manager owns the live job record that backs
+                # /api/runs and the run list; keep it in step with the platform
+                # JSON record so an isolated-worker run reaches a terminal
+                # state and reports the worker's granular stage.
+                _apply_job_manager_update(self._job_manager, run_id, execution_id, updates)
 
         client.receive_one(
             max_wait_seconds=int(self._poll_interval),
@@ -178,15 +193,28 @@ def _build_status_update(payload: Dict[str, Any], status: str) -> Dict[str, Any]
     frontend status view renders identically whether the run was processed
     in-process or by the isolated worker.
     """
+    # The worker reports a granular stage (for example "solve_energy").
+    # Fall back to the coarse status when it is absent so older payloads and
+    # terminal outcomes still produce a renderable stage.
+    stage = str(payload.get("stage") or "").strip() or status
+    message = str(payload.get("message") or "").strip() or _status_message(status, payload)
+
     updates: Dict[str, Any] = {
         "status": status,
-        "stage": status,
-        "message": _status_message(status, payload),
+        "stage": stage,
+        "message": message,
     }
 
     if status == "running":
-        updates["started_at"] = str(payload.get("started_at") or "")
-        updates["progress"] = 0.05
+        started_at = str(payload.get("started_at") or "")
+        if started_at:
+            updates["started_at"] = started_at
+        reported = payload.get("progress")
+        try:
+            progress = float(reported)
+        except (TypeError, ValueError):
+            progress = 0.05
+        updates["progress"] = max(0.0, min(1.0, progress))
         updates["worker_id"] = str(payload.get("worker_id") or "")
         updates["execution_attempts"] = [
             {
@@ -208,6 +236,43 @@ def _build_status_update(payload: Dict[str, Any], status: str) -> Dict[str, Any]
             updates["artifact_catalog"] = list(payload["artifact_catalog"])
 
     return updates
+
+
+def _apply_job_manager_update(
+    job_manager,
+    run_id: str,
+    execution_id: str,
+    updates: Dict[str, Any],
+) -> None:
+    """Mirror a completion update onto the live job record.
+
+    Best-effort: a failure here must not stop message settlement, because the
+    platform JSON record has already been updated and the message would
+    otherwise be retried forever.
+    """
+    if job_manager is None:
+        return
+    apply_update = getattr(job_manager, "apply_worker_update", None)
+    if apply_update is None:
+        return
+    try:
+        apply_update(
+            run_id,
+            execution_id=execution_id or None,
+            status=str(updates.get("status") or "") or None,
+            stage=str(updates.get("stage") or "") or None,
+            progress=updates.get("progress"),
+            message=str(updates.get("message") or "") or None,
+            error=updates.get("error"),
+            started_at=str(updates.get("started_at") or "") or None,
+            finished_at=str(updates.get("finished_at") or "") or None,
+        )
+    except Exception:
+        logger.warning(
+            "Completion bridge could not update job state for run %s.",
+            run_id,
+            exc_info=True,
+        )
 
 
 def _status_message(status: str, payload: Dict[str, Any]) -> str:

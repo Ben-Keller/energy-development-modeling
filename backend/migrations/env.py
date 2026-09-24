@@ -36,7 +36,9 @@ def _resolve_url() -> str:
     return "postgresql+psycopg://edim:edim@localhost:5432/edim_db_local"
 
 
-config.set_main_option("sqlalchemy.url", _resolve_url())
+database_url = _resolve_url()
+# Alembic's ConfigParser treats '%' as interpolation syntax unless escaped.
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 target_metadata = Base.metadata
 

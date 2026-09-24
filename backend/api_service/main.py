@@ -49,8 +49,10 @@ def _run_alembic_migrations(settings: Settings) -> None:
     logger.info("Running alembic upgrade head...")
     result = subprocess.run(cmd, cwd=str(backend_root), env=env, capture_output=True, text=True)
     if result.returncode != 0:
-        logger.error("alembic upgrade failed:\nstdout=%s\nstderr=%s", result.stdout, result.stderr)
-        raise RuntimeError(f"alembic upgrade failed: {result.stderr or result.stdout}")
+        stdout = result.stdout.replace(database_url, "[REDACTED_DATABASE_URL]")
+        stderr = result.stderr.replace(database_url, "[REDACTED_DATABASE_URL]")
+        logger.error("alembic upgrade failed (exit %s):\nstdout=%s\nstderr=%s", result.returncode, stdout, stderr)
+        raise RuntimeError(f"alembic upgrade failed: {stderr or stdout}")
     logger.info("alembic upgrade head completed.")
 
 
@@ -141,7 +143,7 @@ def _create_execution_queue(settings: Settings):
         return None, True
 
 
-def _create_completion_bridge(platform_repository):
+def _create_completion_bridge(platform_repository, job_manager=None):
     """Start a CompletionBridge when Service Bus is configured.
 
     Returns None when Service Bus is not available (the in-process
@@ -161,6 +163,7 @@ def _create_completion_bridge(platform_repository):
             queue_name=queue_name,
             connection_string=conn_str or None,
             namespace=namespace or None,
+            job_manager=job_manager,
         )
         logger.info("CompletionBridge ready for queue '%s'.", queue_name)
         return bridge
@@ -234,7 +237,7 @@ def create_app(
     # listens on the completion queue and updates run status in Postgres.
     # The isolated worker daemon posts status updates there; the bridge
     # is the only component that writes terminal state to the DB.
-    completion_bridge = _create_completion_bridge(platform_repository)
+    completion_bridge = _create_completion_bridge(platform_repository, job_manager)
     if completion_bridge is not None:
         completion_bridge.start()
 

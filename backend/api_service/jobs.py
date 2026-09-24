@@ -55,6 +55,24 @@ def _fmt_ts(ts: float | None) -> str | None:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
 
 
+def _parse_ts(value: str | None) -> float | None:
+    """Parse an ISO timestamp from a worker payload into epoch seconds.
+
+    Returns None for empty or malformed input so a bad field can never
+    break status ingestion.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
+
+
 def _fmt_elapsed(seconds: float) -> str:
     total = max(0, int(seconds))
     h = total // 3600
@@ -837,6 +855,93 @@ class JobManager:
         with self._lock:
             rec = self._jobs.get(execution_id)
             return bool(rec and rec.cancel_requested)
+
+    # ------------------------------------------------------------------
+    # Isolated-worker status ingestion
+    # ------------------------------------------------------------------
+
+    def apply_worker_update(
+        self,
+        run_id: str,
+        *,
+        execution_id: str | None = None,
+        status: str | None = None,
+        stage: str | None = None,
+        progress: float | None = None,
+        message: str | None = None,
+        error: str | None = None,
+        started_at: str | None = None,
+        finished_at: str | None = None,
+    ) -> bool:
+        """Apply a Service Bus completion/progress update to the live job record.
+
+        When Service Bus dispatches runs to the isolated worker, this process no
+        longer executes the model, so it never observes stage transitions
+        itself. The CompletionBridge calls this to mirror the worker's reported
+        stage/progress onto the job record, matching what the in-process worker
+        loop would have produced.
+
+        Returns True when a known job was updated, False otherwise.
+        """
+        target_status = str(status or "").strip().lower()
+        with self._lock:
+            rec = self._jobs.get(execution_id) if execution_id else None
+            if rec is None:
+                rec = next((r for r in self._jobs.values() if r.run_id == run_id), None)
+            if rec is None:
+                return False
+
+            now = time.time()
+            is_terminal = target_status in FINAL_JOB_STATUSES
+
+            if target_status:
+                rec.status = target_status
+            if progress is not None:
+                try:
+                    rec.progress = max(0.0, min(1.0, float(progress)))
+                except (TypeError, ValueError):
+                    pass
+
+            if is_terminal:
+                # Mirror the in-process worker loop's terminal stages so the
+                # frontend renders the same end state either way.
+                rec.stage = {
+                    "succeeded": "complete",
+                    "failed": "failed",
+                    "cancelled": "cancelled",
+                }.get(target_status, target_status)
+                rec.message = message or {
+                    "succeeded": "Run completed",
+                    "failed": "Run failed",
+                    "cancelled": "Run cancelled.",
+                }.get(target_status, target_status.title())
+                if target_status == "failed":
+                    rec.error = error or message or "Run failed"
+                elif target_status == "cancelled":
+                    rec.error = error or "Cancelled by user."
+                rec.finished_at = _parse_ts(finished_at) or now
+                rec.updated_at = rec.finished_at
+                self._finish_execution_attempt_locked(
+                    rec, status=rec.status, error=rec.error
+                )
+            else:
+                if stage:
+                    rec.stage = stage
+                if message:
+                    rec.message = message
+                rec.updated_at = now
+                if rec.started_at is None:
+                    rec.started_at = _parse_ts(started_at) or now
+                self._update_current_attempt_locked(
+                    rec,
+                    status="running",
+                    heartbeat_at=_fmt_ts(now) or "",
+                    cancellation_requested=bool(rec.cancel_requested),
+                    message=rec.message,
+                )
+
+            self._update_platform_run_record(rec)
+            return True
 
     def _append_result_event_if_missing(self, execution_id: str, result: Any) -> None:
         try:

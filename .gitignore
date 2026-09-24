@@ -70,3 +70,4 @@ feedback/
 *.swo
 .local
 __azurite_data__
+outputs/

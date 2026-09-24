@@ -25,7 +25,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger("edim-worker")
 
@@ -427,6 +427,7 @@ def _run_cli(
     event_log: _EventLog,
     cancel_event: threading.Event,
     max_seconds: float,
+    stage_callback: Optional[Callable[[str, float, str], None]] = None,
 ) -> tuple[int, Optional[str]]:
     proc = subprocess.Popen(
         args,
@@ -439,9 +440,10 @@ def _run_cli(
     )
 
     last_json_line: Optional[str] = None
+    last_reported_stage: Optional[str] = None
 
     def _stdout_reader() -> None:
-        nonlocal last_json_line
+        nonlocal last_json_line, last_reported_stage
         try:
             if proc.stdout is None:
                 return
@@ -453,12 +455,23 @@ def _run_cli(
                     event_log.append(level="info", stage="worker", message=line, payload={"stream": "stdout"})
                     continue
                 if isinstance(payload, dict) and ("stage" in payload or "level" in payload or "message" in payload):
+                    stage = str(payload.get("stage", "") or "")
+                    message = str(payload.get("message", "") or "")
                     event_log.append(
                         level=payload.get("level", "info"),
-                        stage=payload.get("stage", ""),
-                        message=payload.get("message", ""),
+                        stage=stage,
+                        message=message,
                         payload=payload.get("payload"),
                     )
+                    # Report each stage transition once so the API can advance
+                    # the frontend stage tracker during the run.
+                    if stage_callback is not None and stage and stage != last_reported_stage:
+                        last_reported_stage = stage
+                        try:
+                            progress = float(payload.get("progress", 0.0) or 0.0)
+                        except (TypeError, ValueError):
+                            progress = 0.0
+                        stage_callback(stage, progress, message)
                 last_json_line = line
         except Exception:
             logger.exception("stdout reader failed")
@@ -621,6 +634,20 @@ def _execute_payload(
 
     _send_running(config, completion_client, execution_id, run_id, attempt_count, started_at)
 
+    def _report_stage(stage: str, progress: float, message: str) -> None:
+        """Forward a model stage transition to the API (best-effort)."""
+        _send_progress(
+            config,
+            completion_client,
+            execution_id,
+            run_id,
+            attempt_count,
+            stage,
+            progress,
+            message,
+            started_at,
+        )
+
     cancel_thread = threading.Thread(
         target=_poll_cancellation_queue,
         args=(config, cancellation_client, execution_id, cancel_event),
@@ -633,6 +660,7 @@ def _execute_payload(
         _download_datasets(config, blob_client, dataset_versions, workspace)
 
         event_log.append(level="milestone", stage="preflight", message="Running preflight checks")
+        _report_stage("preflight", 0.02, "Running preflight checks")
         rc, _ = _run_cli(
             [sys.executable, "-m", "edim_model.cli", "preflight", "--bundle", str(workspace / "inputs" / "request_bundle.json")],
             cwd=repo_root,
@@ -640,6 +668,7 @@ def _execute_payload(
             event_log=event_log,
             cancel_event=cancel_event,
             max_seconds=300,
+            stage_callback=_report_stage,
         )
         if rc != 0:
             error = f"preflight failed with rc={rc}"
@@ -648,6 +677,7 @@ def _execute_payload(
             return
 
         event_log.append(level="milestone", stage="model_run", message="Starting model solve")
+        _report_stage("model_run", 0.05, "Starting model solve")
         rc, last_json_line = _run_cli(
             [sys.executable, "-m", "edim_model.cli", "run", "--bundle", str(workspace / "inputs" / "request_bundle.json")],
             cwd=repo_root,
@@ -655,6 +685,7 @@ def _execute_payload(
             event_log=event_log,
             cancel_event=cancel_event,
             max_seconds=config.max_run_seconds,
+            stage_callback=_report_stage,
         )
 
         if cancel_event.is_set() or rc == 130:
@@ -810,6 +841,48 @@ def _send_running(
         logger.info("Sent running notification for execution_id=%s", execution_id)
     except Exception:
         logger.exception("Failed to send running notification for execution_id=%s", execution_id)
+
+
+def _send_progress(
+    config: "WorkerConfig",
+    completion_client,
+    execution_id: str,
+    run_id: str,
+    attempt_count: int,
+    stage: str,
+    progress: float,
+    message: str,
+    started_at: str,
+) -> None:
+    """Report a granular stage transition to the API.
+
+    The API's CompletionBridge maps this to the run's stage/progress so the
+    frontend stage tracker advances during the run, matching the in-process
+    job manager's behaviour. Messages are sent only on stage changes, so the
+    volume is a handful per run.
+    """
+    payload = {
+        "execution_id": execution_id,
+        "run_id": run_id,
+        "worker_id": config.worker_id,
+        "outcome": "progress",
+        "attempt_count": attempt_count,
+        "stage": stage,
+        "progress": max(0.0, min(1.0, float(progress))),
+        "message": message,
+        "started_at": started_at,
+    }
+    try:
+        _send_json(
+            completion_client,
+            config.completion_queue_name,
+            payload,
+            message_id=f"{execution_id}_{stage}",
+        )
+    except Exception:
+        # Progress is best-effort telemetry; never fail a run because the
+        # API could not be told about a stage transition.
+        logger.debug("Failed to send progress stage=%s for %s", stage, execution_id, exc_info=True)
 
 
 def _requeue_execution(config: WorkerConfig, execution_client, payload: dict) -> None:
