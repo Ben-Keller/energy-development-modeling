@@ -55,6 +55,15 @@ def _public_stage(stage: str) -> str:
     return _STAGE_ALIASES.get(text, text)
 
 
+def _result_summary(event: object) -> Optional[dict]:
+    """Extract the run summary from the CLI's terminal runtime_event_v1 result."""
+    if not isinstance(event, dict):
+        return None
+    payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    inner = payload.get("summary") if isinstance(payload, dict) else None
+    return inner if isinstance(inner, dict) else None
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -731,15 +740,7 @@ def _execute_payload(
         _download_datasets(config, blob_client, dataset_versions, workspace)
 
         event_log.append(level="milestone", stage=_WORKER_STAGE, message="Running preflight checks")
-        # NOTE: no stage_callback here on purpose. The preflight sub-command
-        # terminates with `_emit("result", stage="preflight", progress=1.0)`,
-        # and that 1.0 means "the preflight sub-command finished", not "the run
-        # is 100% done". Forwarding it drove the frontend's progress bar to
-        # 100% and then back down once the model started.
-        #
-        # Progress is reported as 0.0 because the worker has no meaningful
-        # percentage at this point - `main`'s in-process loop likewise reports
-        # nothing until the model runtime emits its own first stage.
+ 
         _report_stage("preflight", 0.0, "Running preflight checks")
         rc, _ = _run_cli(
             [sys.executable, "-m", "edim_model.cli", "preflight", "--bundle", str(workspace / "inputs" / "request_bundle.json")],
@@ -774,7 +775,7 @@ def _execute_payload(
             outcome = "succeeded"
             if last_json_line:
                 try:
-                    summary = json.loads(last_json_line)
+                    summary = _result_summary(json.loads(last_json_line))
                 except Exception:
                     summary = None
             artifact_catalog = config.artifact_policy.get("manifest", {})
@@ -784,12 +785,7 @@ def _execute_payload(
                     candidate = Path(summary["run_dir"])
                     if candidate.is_dir():
                         artifact_root = candidate
-                # The model runtime resolves its own runs_dir from the bundle
-                # (runtime_settings.runs_dir) and writes to
-                # <runs_dir>/<run_id>. The worker staging directory also has
-                # an empty artifacts/ directory, so checking only whether that
-                # directory exists is not sufficient. Prefer the conventional
-                # model output directory when it contains actual artifacts.
+
                 if artifact_root == workspace:
                     candidate = config.runs_dir / run_id
                     candidate_artifacts = candidate / "artifacts"

@@ -182,7 +182,11 @@ Write-Host "[4/4] Deploying to $AppName ($ResourceGroup)..."
 # Follow the Microsoft Python ZIP-deploy guide: Oryx installs requirements.
 # Remove WEBSITE_RUN_FROM_PACKAGE if an earlier deployment attempt enabled it;
 # this deployment uses the normal extracted ZIP layout.
-az webapp config appsettings set `
+#
+# NOTE: this must be a single `delete`. A stray duplicated `... appsettings set`
+# line previously sat above it; the trailing backtick continuation joined the
+# two into `appsettings set az webapp config appsettings delete ...`, which az
+# rejected with "unrecognized arguments" and the delete never ran.
 az webapp config appsettings delete `
     --resource-group $ResourceGroup `
     --name $AppName `
