@@ -39,6 +39,31 @@ DEFAULT_RUNS_DIR = REPO_ROOT / "outputs" / "runs"
 DEFAULT_MODEL_MANIFEST = REPO_ROOT / "model_runtime" / "edim_model" / "model_manifest.json"
 DEFAULT_DATASET_MANIFEST = REPO_ROOT / "model_runtime" / "edim_model" / "dataset_manifest.json"
 
+# Stage vocabulary parity with the in-process job manager.
+#
+# The isolated worker tags its own activity with private stage names
+# (worker_setup, preflight, model_run, worker). The API's JobManager never
+# produced those: its own stages are draft / starting / complete / cancelling /
+# cancelled / failed, followed by the model runtime's stage ids. Reporting the
+# private names leaked vocabulary the frontend's RUN_STAGE_ORDER does not know,
+# so the tracker fell back to its first entry while they were active.
+#
+# Worker-private stages are therefore aliased onto "starting" before they are
+# reported or logged. The model runtime's own stages pass through unchanged.
+_WORKER_STAGE = "starting"
+_STAGE_ALIASES = {
+    "worker": _WORKER_STAGE,
+    "worker_setup": _WORKER_STAGE,
+    "preflight": _WORKER_STAGE,
+    "model_run": _WORKER_STAGE,
+}
+
+
+def _public_stage(stage: str) -> str:
+    """Translate a worker-private stage name into the API's stage vocabulary."""
+    text = str(stage or "").strip()
+    return _STAGE_ALIASES.get(text, text)
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -503,7 +528,7 @@ def _run_cli(
                 try:
                     payload = json.loads(line)
                 except json.JSONDecodeError:
-                    event_log.append(level="info", stage="worker", message=line, payload={"stream": "stdout"})
+                    event_log.append(level="info", stage=_WORKER_STAGE, message=line, payload={"stream": "stdout"})
                     continue
                 if isinstance(payload, dict) and ("stage" in payload or "level" in payload or "message" in payload):
                     stage = str(payload.get("stage", "") or "")
@@ -533,7 +558,7 @@ def _run_cli(
                 return
             for line in proc.stderr:
                 line = line.rstrip("\n")
-                event_log.append(level="error", stage="worker", message=line, payload={"stream": "stderr"})
+                event_log.append(level="error", stage=_WORKER_STAGE, message=line, payload={"stream": "stderr"})
                 logger.info("subprocess: %s", line)
         except Exception:
             logger.exception("stderr reader failed")
@@ -666,7 +691,7 @@ def _execute_payload(
     event_log = _EventLog(config, blob_client, execution_id, run_id, log_path)
     event_log.append(
         level="milestone",
-        stage="worker_setup",
+        stage=_WORKER_STAGE,
         message="Worker accepted execution",
         payload={"worker_id": config.worker_id, "attempt_count": attempt_count},
     )
@@ -686,14 +711,19 @@ def _execute_payload(
     _send_running(config, completion_client, execution_id, run_id, attempt_count, started_at)
 
     def _report_stage(stage: str, progress: float, message: str) -> None:
-        """Forward a model stage transition to the API (best-effort)."""
+        """Forward a model stage transition to the API (best-effort).
+
+        Worker-private stages are translated to the API's own vocabulary first
+        so the reported status never names a stage the in-process job manager
+        could not have produced.
+        """
         _send_progress(
             config,
             completion_client,
             execution_id,
             run_id,
             attempt_count,
-            stage,
+            _public_stage(stage),
             progress,
             message,
             started_at,
@@ -710,7 +740,7 @@ def _execute_payload(
     try:
         _download_datasets(config, blob_client, dataset_versions, workspace)
 
-        event_log.append(level="milestone", stage="preflight", message="Running preflight checks")
+        event_log.append(level="milestone", stage=_WORKER_STAGE, message="Running preflight checks")
         _report_stage("preflight", 0.02, "Running preflight checks")
         rc, _ = _run_cli(
             [sys.executable, "-m", "edim_model.cli", "preflight", "--bundle", str(workspace / "inputs" / "request_bundle.json")],
@@ -727,7 +757,7 @@ def _execute_payload(
             _send_completion(config, completion_client, execution_id, run_id, "failed", attempt_count, error, None, [], started_at, blob_client=blob_client)
             return
 
-        event_log.append(level="milestone", stage="model_run", message="Starting model solve")
+        event_log.append(level="milestone", stage=_WORKER_STAGE, message="Starting model solve")
         _report_stage("model_run", 0.05, "Starting model solve")
         rc, last_json_line = _run_cli(
             [sys.executable, "-m", "edim_model.cli", "run", "--bundle", str(workspace / "inputs" / "request_bundle.json")],
