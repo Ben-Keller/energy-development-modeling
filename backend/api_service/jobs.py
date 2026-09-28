@@ -73,6 +73,33 @@ def _parse_ts(value: str | None) -> float | None:
     return parsed.timestamp()
 
 
+def _monotonic_progress(current: object, incoming: object) -> float | None:
+    """Clamp ``incoming`` to [0, 1] and never let it fall below ``current``.
+
+    The frontend's ProgressBar reads this value directly, but progress is
+    written by more than one emitter (the in-process worker loop, and - when a
+    Service Bus worker is attached - the worker's own stage reports). Their
+    values are individually sensible yet not globally ordered, so the bar
+    could step backwards mid-run.
+
+    Progress is treated as a high-water mark: it only ever advances. Explicit
+    resets (``_reset_run_to_draft_after_cancel_locked``) are unaffected because
+    they assign the field directly rather than going through here.
+
+    Returns None when ``incoming`` is not a usable number, so callers can leave
+    the existing value untouched.
+    """
+    try:
+        bounded = max(0.0, min(1.0, float(incoming)))
+    except (TypeError, ValueError):
+        return None
+    try:
+        floor = max(0.0, min(1.0, float(current)))
+    except (TypeError, ValueError):
+        floor = 0.0
+    return max(floor, bounded)
+
+
 def _fmt_elapsed(seconds: float) -> str:
     total = max(0, int(seconds))
     h = total // 3600
@@ -839,7 +866,10 @@ class JobManager:
                 self._update_platform_run_record(rec)
                 return
             rec.stage = stage
-            rec.progress = max(0.0, min(1.0, float(progress)))
+            # Never move the bar backwards, whichever emitter reported last.
+            bounded = _monotonic_progress(rec.progress, progress)
+            if bounded is not None:
+                rec.progress = bounded
             rec.message = message
             rec.updated_at = time.time()
             self._update_current_attempt_locked(
@@ -897,10 +927,11 @@ class JobManager:
             if target_status:
                 rec.status = target_status
             if progress is not None:
-                try:
-                    rec.progress = max(0.0, min(1.0, float(progress)))
-                except (TypeError, ValueError):
-                    pass
+                # The worker reports its own stages; keep the bar monotonic so
+                # its values can never contradict the in-process emitter.
+                bounded = _monotonic_progress(rec.progress, progress)
+                if bounded is not None:
+                    rec.progress = bounded
 
             if is_terminal:
                 # Mirror the in-process worker loop's terminal stages so the

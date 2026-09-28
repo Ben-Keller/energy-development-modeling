@@ -249,7 +249,18 @@ systemctl restart edim-worker
 sleep 5
 systemctl --no-pager status edim-worker || true
 "@
-    az vm run-command invoke -g $ResourceGroup -n $VmName --command-id RunShellScript --scripts $script --query "value[0].message" -o tsv
+    # `az vm run-command invoke --command-id RunShellScript` executes the given
+    # text with /bin/sh, which on Ubuntu is dash. Dash rejects bashisms, so the
+    # `set -euo pipefail` above aborted the whole script on line 1 with
+    # "set: Illegal option -o pipefail" and nothing was rebuilt.
+    #
+    # Ship the script as one line of base64 (quoting-safe ASCII, immune to
+    # PowerShell expansion and to the run-command shell) and decode it into a
+    # file that is then executed with bash explicitly.
+    $script = $script -replace "`r`n", "`n"
+    $payload = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($script))
+    $command = "echo '$payload' | base64 -d > /tmp/edim-update-image.sh && bash /tmp/edim-update-image.sh"
+    az vm run-command invoke -g $ResourceGroup -n $VmName --command-id RunShellScript --scripts $command --query "value[0].message" -o tsv
     exit 0
 }
 

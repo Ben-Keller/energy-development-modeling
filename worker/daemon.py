@@ -39,17 +39,7 @@ DEFAULT_RUNS_DIR = REPO_ROOT / "outputs" / "runs"
 DEFAULT_MODEL_MANIFEST = REPO_ROOT / "model_runtime" / "edim_model" / "model_manifest.json"
 DEFAULT_DATASET_MANIFEST = REPO_ROOT / "model_runtime" / "edim_model" / "dataset_manifest.json"
 
-# Stage vocabulary parity with the in-process job manager.
-#
-# The isolated worker tags its own activity with private stage names
-# (worker_setup, preflight, model_run, worker). The API's JobManager never
-# produced those: its own stages are draft / starting / complete / cancelling /
-# cancelled / failed, followed by the model runtime's stage ids. Reporting the
-# private names leaked vocabulary the frontend's RUN_STAGE_ORDER does not know,
-# so the tracker fell back to its first entry while they were active.
-#
-# Worker-private stages are therefore aliased onto "starting" before they are
-# reported or logged. The model runtime's own stages pass through unchanged.
+
 _WORKER_STAGE = "starting"
 _STAGE_ALIASES = {
     "worker": _WORKER_STAGE,
@@ -741,7 +731,16 @@ def _execute_payload(
         _download_datasets(config, blob_client, dataset_versions, workspace)
 
         event_log.append(level="milestone", stage=_WORKER_STAGE, message="Running preflight checks")
-        _report_stage("preflight", 0.02, "Running preflight checks")
+        # NOTE: no stage_callback here on purpose. The preflight sub-command
+        # terminates with `_emit("result", stage="preflight", progress=1.0)`,
+        # and that 1.0 means "the preflight sub-command finished", not "the run
+        # is 100% done". Forwarding it drove the frontend's progress bar to
+        # 100% and then back down once the model started.
+        #
+        # Progress is reported as 0.0 because the worker has no meaningful
+        # percentage at this point - `main`'s in-process loop likewise reports
+        # nothing until the model runtime emits its own first stage.
+        _report_stage("preflight", 0.0, "Running preflight checks")
         rc, _ = _run_cli(
             [sys.executable, "-m", "edim_model.cli", "preflight", "--bundle", str(workspace / "inputs" / "request_bundle.json")],
             cwd=repo_root,
@@ -749,7 +748,6 @@ def _execute_payload(
             event_log=event_log,
             cancel_event=cancel_event,
             max_seconds=300,
-            stage_callback=_report_stage,
         )
         if rc != 0:
             error = f"preflight failed with rc={rc}"
@@ -758,7 +756,7 @@ def _execute_payload(
             return
 
         event_log.append(level="milestone", stage=_WORKER_STAGE, message="Starting model solve")
-        _report_stage("model_run", 0.05, "Starting model solve")
+        _report_stage("model_run", 0.0, "Starting model solve")
         rc, last_json_line = _run_cli(
             [sys.executable, "-m", "edim_model.cli", "run", "--bundle", str(workspace / "inputs" / "request_bundle.json")],
             cwd=repo_root,
