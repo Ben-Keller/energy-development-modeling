@@ -845,6 +845,10 @@ const evidenceFromModel = evidenceComponents.evidenceFromModel || ((model) => ({
   score: Number(model && model.evidence_score) || 0,
   summary: String((model && model.evidence_summary) || ""),
 }));
+const normalizeEvidenceStatus = evidenceComponents.normalizeEvidenceStatus || ((value) => {
+  const status = String(value || "").trim().toLowerCase();
+  return status || "not_evaluated";
+});
 const ENTITY_VISUAL_STATUS_COLORS = {
   draft: "#91A0B7",
   queued: "#F2C14E",

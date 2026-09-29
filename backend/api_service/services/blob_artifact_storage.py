@@ -19,9 +19,11 @@ from typing import Any, Dict
 from urllib.parse import urlencode
 
 from fastapi import HTTPException
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from ..runtime import ArtifactRegistry
+
+from .artifact_storage import LOCAL_PLATFORM_STORAGE_PROVIDER, resolve_local_platform_storage_ref
 
 try:
     from azure.core.exceptions import ResourceNotFoundError
@@ -253,6 +255,12 @@ class BlobArtifactStorageService:
             raise HTTPException(status_code=404, detail="Storage reference not found.")
 
         provider = str(storage_ref.get("storage_provider") or "")
+        if provider == LOCAL_PLATFORM_STORAGE_PROVIDER:
+            return self._local_platform_file_response(
+                storage_ref,
+                filename=filename,
+                default_media_type=default_media_type,
+            )
         if provider and provider != BLOB_STORAGE_PROVIDER:
             raise HTTPException(status_code=501, detail=f"Unsupported storage provider: {provider}")
 
@@ -287,6 +295,19 @@ class BlobArtifactStorageService:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _local_platform_file_response(
+        self,
+        storage_ref: Dict[str, Any],
+        *,
+        filename: str,
+        default_media_type: str,
+    ) -> Response:
+        path = resolve_local_platform_storage_ref(self._settings, storage_ref)
+        if not path.exists() or not path.is_file():
+            raise HTTPException(status_code=404, detail="Platform artifact not found.")
+        media_type = str(storage_ref.get("media_type") or default_media_type or "application/octet-stream")
+        return FileResponse(path=str(path), filename=filename or path.name, media_type=media_type)
 
     def _get_blob_service(self) -> BlobServiceClient:
         if self._blob_service is None:
