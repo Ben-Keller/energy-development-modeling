@@ -1,0 +1,10 @@
+calliope_tech,carrier,tech_group,mario_sector,shock_channel,default_currency,notes
+*,power,Transmission,Transmission_and_distribution,opex,USD_2019,technology-group mapping
+*,power,Demand,Electricity_and_heat,opex,USD_2019,technology-group mapping
+*,power,Hydro,Electricity_and_heat,opex,USD_2019,technology-group mapping
+*,power,VRE,Electricity_and_heat,opex,USD_2019,technology-group mapping
+*,power,Fossil,Electricity_and_heat,fuel,USD_2019,technology-group mapping
+*,power,Nuclear,Electricity_and_heat,opex,USD_2019,technology-group mapping
+*,power,Bioenergy,Electricity_and_heat,fuel,USD_2019,technology-group mapping
+*,power,Geothermal,Electricity_and_heat,opex,USD_2019,technology-group mapping
+*,power,Storage,Electricity_and_heat,opex,USD_2019,technology-group mapping

@@ -1,0 +1,68 @@
+/*
+ * Phase 26: keeps project identity visuals clear of card actions and aligns
+ * the collapsed archive control with the right edge of the project area.
+ */
+
+.projects-overview-panel .project-card-visual-wrap {
+  top: 42px;
+  right: 12px;
+  width: 88px;
+  height: 88px;
+}
+
+.projects-overview-panel .project-card .project-card-context,
+.projects-overview-panel .project-card .project-card-updated,
+.projects-overview-panel .project-card > .muted {
+  max-width: calc(100% - 92px);
+}
+
+.projects-overview-panel .project-card-footer {
+  position: relative;
+  z-index: 2;
+  padding-right: 100px;
+}
+
+.archived-projects-section > summary {
+  grid-template-columns: minmax(0, 1fr) 20px auto auto auto;
+  justify-content: end;
+}
+
+.archived-projects-section .archived-projects-icon {
+  grid-column: 2;
+}
+
+.archived-projects-section .archived-projects-copy {
+  grid-column: 3;
+  text-align: right;
+}
+
+.archived-projects-section .archived-projects-count {
+  grid-column: 4;
+}
+
+.archived-projects-section > summary::after {
+  grid-column: 5;
+}
+
+@media (max-width: 760px) {
+  .projects-overview-panel .project-card-visual-wrap {
+    top: 48px;
+    right: 10px;
+    width: 80px;
+    height: 80px;
+  }
+
+  .projects-overview-panel .project-card .project-card-context,
+  .projects-overview-panel .project-card .project-card-updated,
+  .projects-overview-panel .project-card > .muted {
+    max-width: calc(100% - 84px);
+  }
+
+  .projects-overview-panel .project-card-footer {
+    padding-right: 90px;
+  }
+
+  .archived-projects-section > summary {
+    grid-template-columns: minmax(0, 1fr) 20px minmax(0, auto) auto auto;
+  }
+}

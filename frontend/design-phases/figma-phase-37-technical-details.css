@@ -1,0 +1,63 @@
+/*
+ * Phase 37: consolidate run metadata into the existing scenario details area.
+ */
+
+.results-mode-stack .scenario-technical-details-toggle {
+  border: 1px solid rgba(72, 148, 255, 0.72) !important;
+  background: rgba(41, 108, 211, 0.14) !important;
+  color: #dceaff !important;
+  font-weight: 800;
+}
+
+.results-mode-stack .scenario-technical-details-toggle:hover,
+.results-mode-stack .scenario-technical-details-toggle:focus-visible {
+  border-color: #75adff !important;
+  background: rgba(51, 121, 225, 0.24) !important;
+}
+
+.results-mode-stack .scenario-definition-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  border-bottom-color: rgba(75, 145, 245, 0.48);
+  box-shadow: inset 0 -1px 0 rgba(60, 132, 235, 0.2);
+}
+
+.results-mode-stack .results-technical-summary {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(72, 148, 255, 0.42);
+  border-radius: 6px;
+  background: rgba(14, 29, 50, 0.74);
+}
+
+.results-mode-stack .results-technical-summary .analysis-technical-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 0;
+}
+
+.results-mode-stack .results-technical-summary .analysis-technical-grid > span {
+  min-width: 0;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(173, 186, 204, 0.13);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #bdc9d9;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  .results-mode-stack .results-technical-summary .analysis-technical-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .results-mode-stack .results-technical-summary .analysis-technical-grid {
+    grid-template-columns: 1fr;
+  }
+}

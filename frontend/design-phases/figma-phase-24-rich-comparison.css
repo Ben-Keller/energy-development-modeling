@@ -1,0 +1,432 @@
+/*
+ * Phase 24: full-output model comparison.
+ *
+ * Keeps the comparison workbench compact through output-family tabs and
+ * grouped disclosures while preserving all summary and artifact dimensions.
+ */
+
+.project-workspace-page .comparison-results-heading,
+.project-workspace-page .comparison-control-bar,
+.project-workspace-page .comparison-output-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.project-workspace-page .comparison-results-heading {
+  margin-bottom: 14px;
+}
+
+.project-workspace-page .comparison-results-heading h4 {
+  margin: 2px 0 0;
+  color: #f4f7fa;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.project-workspace-page .comparison-results-total {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 7px;
+  color: #9da9b8;
+}
+
+.project-workspace-page .comparison-results-total b {
+  color: #f4f7fa;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.project-workspace-page .comparison-results-total span {
+  font-size: 11px;
+}
+
+.project-workspace-page .comparison-workbench-body {
+  display: grid;
+  gap: 14px;
+}
+
+.project-workspace-page .comparison-control-bar {
+  min-height: 46px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(173, 186, 204, 0.14);
+  border-bottom: 1px solid rgba(173, 186, 204, 0.14);
+}
+
+.project-workspace-page .comparison-control-bar > label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #9da9b8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.project-workspace-page .comparison-control-bar select {
+  min-width: 210px;
+  min-height: 32px;
+  padding: 5px 30px 5px 9px;
+  border: 1px solid rgba(173, 186, 204, 0.24);
+  border-radius: 5px;
+  background-color: #111820;
+  color: #f4f7fa;
+  font: inherit;
+  font-size: 12px;
+}
+
+.project-workspace-page .comparison-display-control {
+  display: inline-grid;
+  grid-template-columns: repeat(3, minmax(62px, 1fr));
+  padding: 2px;
+  border: 1px solid rgba(173, 186, 204, 0.2);
+  border-radius: 6px;
+  background: #0e141b;
+}
+
+.project-workspace-page .comparison-display-control button {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #9da9b8;
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.project-workspace-page .comparison-display-control button.active {
+  background: #263544;
+  color: #f4f7fa;
+}
+
+.project-workspace-page .comparison-output-tabs {
+  display: flex;
+  gap: 18px;
+  min-width: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(173, 186, 204, 0.16);
+  scrollbar-width: thin;
+}
+
+.project-workspace-page .comparison-output-tabs button {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 7px 0 9px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: #9da9b8;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-workspace-page .comparison-output-tabs button:hover {
+  color: #dce5ed;
+}
+
+.project-workspace-page .comparison-output-tabs button.active {
+  border-bottom-color: #38bdf8;
+  color: #f4f7fa;
+}
+
+.project-workspace-page .comparison-output-tabs button small {
+  min-width: 20px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(125, 211, 252, 0.1);
+  color: #7dd3fc;
+  font-size: 9px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.project-workspace-page .comparison-output-panel {
+  min-width: 0;
+  outline: 0;
+}
+
+.project-workspace-page .comparison-output-panel-heading {
+  align-items: flex-end;
+  margin-bottom: 10px;
+}
+
+.project-workspace-page .comparison-output-panel-heading h5 {
+  margin: 0 0 2px;
+  color: #f4f7fa;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.project-workspace-page .comparison-output-panel-heading p {
+  margin: 0;
+  color: #9da9b8;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.project-workspace-page .comparison-empty {
+  padding: 20px 0;
+  color: #9da9b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.project-workspace-page .comparison-group-list {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid rgba(173, 186, 204, 0.16);
+}
+
+.project-workspace-page .comparison-output-group {
+  border-bottom: 1px solid rgba(173, 186, 204, 0.16);
+}
+
+.project-workspace-page .comparison-output-group > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 8px 4px;
+  color: #dce5ed;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.project-workspace-page .comparison-output-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.project-workspace-page .comparison-output-group > summary::after {
+  content: "+";
+  order: 3;
+  color: #7dd3fc;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.project-workspace-page .comparison-output-group[open] > summary::after {
+  content: "−";
+}
+
+.project-workspace-page .comparison-output-group > summary small {
+  margin-left: auto;
+  color: #7f8c9d;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.project-workspace-page .comparison-table-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.project-workspace-page .comparison-matrix {
+  width: 100%;
+  min-width: 720px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.project-workspace-page .comparison-matrix th,
+.project-workspace-page .comparison-matrix td {
+  width: 190px;
+  padding: 10px 12px;
+  border-right: 1px solid rgba(173, 186, 204, 0.1);
+  border-bottom: 1px solid rgba(173, 186, 204, 0.1);
+  background: #12181f;
+  color: #dce5ed;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: left;
+  vertical-align: top;
+}
+
+.project-workspace-page .comparison-matrix tr:last-child th,
+.project-workspace-page .comparison-matrix tr:last-child td {
+  border-bottom: 0;
+}
+
+.project-workspace-page .comparison-matrix th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 240px;
+  background: #151c24;
+}
+
+.project-workspace-page .comparison-matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #1a232c;
+  color: #f4f7fa;
+  font-weight: 700;
+}
+
+.project-workspace-page .comparison-matrix thead th:first-child {
+  z-index: 3;
+  background: #1a232c;
+}
+
+.project-workspace-page .comparison-matrix th > span,
+.project-workspace-page .comparison-matrix th > small,
+.project-workspace-page .comparison-artifact-cell > small {
+  display: block;
+}
+
+.project-workspace-page .comparison-matrix th > small {
+  margin-top: 3px;
+  color: #7f8c9d;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.project-workspace-page .comparison-value-cell.baseline {
+  background: #16221f;
+}
+
+.project-workspace-page .comparison-value-cell.unavailable,
+.project-workspace-page .comparison-artifact-cell.unavailable {
+  color: #687586;
+  font-style: italic;
+}
+
+.project-workspace-page .comparison-value-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 17px;
+}
+
+.project-workspace-page .comparison-value-main strong {
+  color: #f4f7fa;
+  font-size: 12px;
+}
+
+.project-workspace-page .comparison-value-delta {
+  color: #7dd3fc;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.project-workspace-page .comparison-value-delta.negative {
+  color: #fbbf24;
+}
+
+.project-workspace-page .comparison-value-delta.neutral {
+  color: #7f8c9d;
+}
+
+.project-workspace-page .comparison-value-track {
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 7px;
+  overflow: hidden;
+  background: rgba(173, 186, 204, 0.1);
+}
+
+.project-workspace-page .comparison-value-track > span {
+  display: block;
+  height: 100%;
+  background: #38bdf8;
+}
+
+.project-workspace-page .comparison-value-cell.baseline .comparison-value-track > span {
+  background: #34d399;
+}
+
+.project-workspace-page .comparison-value-cell--text span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.project-workspace-page .comparison-value-cell--text small {
+  display: block;
+  margin-top: 4px;
+  color: #6ee7b7;
+  font-size: 9px;
+}
+
+.project-workspace-page .comparison-artifact-cell a,
+.project-workspace-page .comparison-artifact-cell strong {
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.project-workspace-page .comparison-artifact-cell small {
+  margin-top: 4px;
+  color: #7f8c9d;
+  font-size: 9.5px;
+}
+
+@media (max-width: 760px) {
+  .project-workspace-page .comparison-results-heading,
+  .project-workspace-page .comparison-control-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .project-workspace-page .comparison-results-total {
+    align-self: flex-start;
+  }
+
+  .project-workspace-page .comparison-control-bar > label {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .project-workspace-page .comparison-control-bar select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .project-workspace-page .comparison-display-control {
+    width: 100%;
+  }
+
+  .project-workspace-page .comparison-output-tabs {
+    gap: 16px;
+  }
+
+  .project-workspace-page .comparison-matrix {
+    min-width: 650px;
+  }
+
+  .project-workspace-page .comparison-matrix th,
+  .project-workspace-page .comparison-matrix td {
+    width: 170px;
+    padding: 9px 10px;
+  }
+
+  .project-workspace-page .comparison-matrix th:first-child {
+    width: 210px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-workspace-page .comparison-output-tabs,
+  .project-workspace-page .comparison-table-scroll {
+    scroll-behavior: auto;
+  }
+}

@@ -1,0 +1,321 @@
+/*
+ * Figma exploration, Phase 6.
+ *
+ * Draft/running model-configuration hierarchy and density only. Removing this
+ * stylesheet restores the earlier graph and run-management presentation
+ * without changing inputs, validation, graph behavior, or execution.
+ */
+
+.model-workspace-with-management:not(.no-side-panel) {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+  gap: 10px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-model-shell {
+  gap: 0;
+  border-color: rgba(173, 186, 204, 0.2);
+  border-radius: 8px;
+  background: #0f141a;
+  box-shadow: none;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-model-toolbar {
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(173, 186, 204, 0.16);
+  background: #12181f;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-model-heading {
+  min-width: min(320px, 100%);
+  flex-basis: 320px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-model-eyebrow,
+.model-workspace-with-management:not(.no-side-panel) .run-management-eyebrow,
+.model-workspace-with-management:not(.no-side-panel) .run-management-section-title,
+.model-workspace-with-management:not(.no-side-panel) .diagram-section-label {
+  letter-spacing: 0;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-model-title {
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-model-controls {
+  flex: 1 1 auto;
+  gap: 6px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-model-controls > button {
+  min-height: 30px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  box-shadow: none;
+  font-size: 11px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-io-mode-switch {
+  gap: 2px;
+  padding: 3px;
+  border-color: rgba(173, 186, 204, 0.2);
+  border-radius: 6px;
+  background: #0f141a;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-io-mode-switch button {
+  min-height: 24px;
+  padding: 4px 7px;
+  border-radius: 4px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-io-mode-switch button.active {
+  background: #1b3b4c;
+  box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.34);
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-model-viewport {
+  padding: 10px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-model-canvas {
+  border-radius: 6px;
+  background:
+    linear-gradient(rgba(173, 186, 204, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(173, 186, 204, 0.055) 1px, transparent 1px),
+    #0a0f15;
+  background-size: 44px 44px, 44px 44px, 100% 100%;
+  box-shadow: inset 0 0 0 1px rgba(173, 186, 204, 0.12);
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node {
+  border-radius: 8px;
+  background: #151b22;
+  box-shadow:
+    inset 3px 0 0 var(--flow-node-accent, rgba(173, 186, 204, 0.46)),
+    0 8px 20px rgba(0, 0, 0, 0.24);
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 120ms ease;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node.collapsed {
+  min-height: 112px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node.expanded {
+  z-index: 4;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node.node-scenario {
+  background: #12202a;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node.node-operations {
+  background: #24181c;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node.running {
+  background: #241f15;
+  box-shadow:
+    inset 3px 0 0 var(--flow-node-accent, rgba(245, 158, 11, 0.9)),
+    0 0 0 1px rgba(245, 158, 11, 0.14),
+    0 8px 20px rgba(0, 0, 0, 0.24);
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node.dragging {
+  box-shadow:
+    inset 3px 0 0 var(--flow-node-accent, rgba(103, 232, 249, 0.9)),
+    0 14px 32px rgba(0, 0, 0, 0.36),
+    0 0 0 1px var(--flow-node-border, rgba(103, 232, 249, 0.28));
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node-header {
+  gap: 8px;
+  padding: 11px 11px 8px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node-type {
+  letter-spacing: 0;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node h3 {
+  margin: 3px 0;
+  font-size: 14px;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node p,
+.model-workspace-with-management:not(.no-side-panel) .flow-node-summary {
+  color: #aeb8c7;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node-toggle {
+  min-height: 28px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: #101820;
+  box-shadow: none;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node-body {
+  padding: 0 11px 11px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .diagram-scenario-layout {
+  gap: 12px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .diagram-selector-stack,
+.model-workspace-with-management:not(.no-side-panel) .diagram-slider-stack {
+  gap: 8px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .diagram-scenario-controls select,
+.model-workspace-with-management:not(.no-side-panel) .diagram-scenario-controls input[type="text"],
+.model-workspace-with-management:not(.no-side-panel) .diagram-scenario-controls input[type="number"] {
+  min-height: 34px;
+  border-radius: 6px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .diagram-note {
+  border-color: rgba(173, 186, 204, 0.18);
+  border-radius: 6px;
+  background: #111820;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-io-legend {
+  gap: 6px;
+  padding: 8px 10px;
+  background: #0f141a;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-io-legend-item {
+  border-radius: 4px;
+  background: #151b22;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-io-legend-swatch {
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .model-run-management-pane {
+  gap: 10px;
+  padding: 10px;
+  border-color: rgba(173, 186, 204, 0.2);
+  border-radius: 8px;
+  background: #12181f;
+  box-shadow: none;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .run-management-header {
+  align-items: center;
+  padding: 1px 1px 8px;
+  border-bottom: 1px solid rgba(173, 186, 204, 0.14);
+}
+
+.model-workspace-with-management:not(.no-side-panel) .run-management-header h2 {
+  margin-top: 2px;
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .overall-run-status {
+  padding: 6px 8px;
+  border-radius: 6px;
+  letter-spacing: 0;
+  font-size: 11px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .run-management-section {
+  gap: 7px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .diagram-ops-stack {
+  gap: 8px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .model-run-management-pane .card {
+  padding: 11px;
+  border-color: rgba(173, 186, 204, 0.16);
+  border-radius: 8px;
+  background: #151b22;
+  box-shadow: none;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .model-run-management-pane .run-play-button {
+  min-height: 32px;
+  border-radius: 6px;
+  background: #2563eb;
+  box-shadow: none;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .model-run-management-pane .ghost-utility-button,
+.model-workspace-with-management:not(.no-side-panel) .model-run-management-pane .icon-button {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .validation-expander {
+  margin-top: 8px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .validation-disclosure-toggle {
+  min-height: 34px;
+  padding: 7px 8px;
+  border-color: rgba(173, 186, 204, 0.18);
+  border-radius: 6px;
+  background: #111820;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-inline-status,
+.model-workspace-with-management:not(.no-side-panel) .model-run-management-pane > .ok,
+.model-workspace-with-management:not(.no-side-panel) .model-run-management-pane > .warn {
+  border-radius: 6px;
+}
+
+@media (max-width: 1180px) {
+  .model-workspace-with-management:not(.no-side-panel) {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .model-workspace-with-management:not(.no-side-panel) .flow-model-heading,
+  .model-workspace-with-management:not(.no-side-panel) .flow-model-controls {
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+
+  .model-workspace-with-management:not(.no-side-panel) .model-workspace-primary {
+    order: 1;
+  }
+
+  .model-workspace-with-management:not(.no-side-panel) .model-run-management-pane {
+    order: 2;
+  }
+}
+
+@media (max-width: 760px) {
+  .model-workspace-with-management:not(.no-side-panel) .flow-model-toolbar {
+    align-items: flex-start;
+    padding: 9px;
+  }
+
+  .model-workspace-with-management:not(.no-side-panel) .flow-model-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .model-workspace-with-management:not(.no-side-panel) .flow-model-viewport {
+    padding: 8px;
+  }
+
+  .model-workspace-with-management:not(.no-side-panel) .model-run-management-pane {
+    padding: 9px;
+  }
+}

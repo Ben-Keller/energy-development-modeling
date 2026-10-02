@@ -1,0 +1,6 @@
+calliope_cost_class,calliope_component,mario_account,mario_flow_type,sign_convention,notes
+monetary,energy_cap,Intermediate_demand,investment,+,CAPEX investment flow
+monetary,om_annual,Intermediate_demand,operating,+,fixed O&M
+monetary,om_prod,Intermediate_demand,operating,+,variable O&M
+monetary,om_con,Intermediate_demand,fuel,+,fuel or consumable input
+co2,om_prod,Taxes_on_products,policy,+,carbon cost proxy channel

@@ -1,0 +1,23 @@
+/*
+ * Figma exploration, Phase 13.
+ *
+ * Adds the trailing horizontal-sliders glyph used by the Figma run-management
+ * control. Removing this stylesheet restores the text-only button treatment.
+ */
+
+.results-mode-stack .run-management-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.results-mode-stack .run-management-button-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  background: currentColor;
+  -webkit-mask: url("../assets/icons/sliders-horizontal.svg") center / contain no-repeat;
+  mask: url("../assets/icons/sliders-horizontal.svg") center / contain no-repeat;
+}

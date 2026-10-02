@@ -1,0 +1,86 @@
+/*
+ * Figma exploration, Phase 4.
+ *
+ * Keyboard focus, tab overflow, forced-colors, and reduced-motion behavior.
+ * Removing this stylesheet restores the earlier presentation; the matching
+ * semantic attributes and keyboard handlers in app.jsx can be reverted alone.
+ */
+
+:root {
+  --edim-focus-ring: #67e8f9;
+  --edim-focus-halo: rgba(103, 232, 249, 0.24);
+}
+
+.app-shell :where(
+  button,
+  a[href],
+  input,
+  select,
+  textarea,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [tabindex]
+):focus-visible,
+.landing-shell :where(
+  button,
+  a[href],
+  input,
+  select,
+  textarea,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [tabindex]
+):focus-visible {
+  outline: 2px solid var(--edim-focus-ring) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--edim-focus-halo);
+}
+
+.app-shell :where(input, select, textarea):focus-visible,
+.landing-shell :where(input, select, textarea):focus-visible {
+  outline-offset: 1px;
+}
+
+.run-tab-strip,
+.segmented-control[role="tablist"],
+.project-workspace-tabs[role="tablist"] {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(173, 186, 204, 0.42) transparent;
+}
+
+.segmented-control[role="tablist"],
+.project-workspace-tabs[role="tablist"] {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+[role="tabpanel"]:focus-visible {
+  border-radius: 6px;
+}
+
+@media (forced-colors: active) {
+  .app-shell :where([role="tab"][aria-selected="true"], [aria-pressed="true"]),
+  .landing-shell :where([role="tab"][aria-selected="true"], [aria-pressed="true"]) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell,
+  .app-shell *,
+  .app-shell *::before,
+  .app-shell *::after,
+  .landing-shell,
+  .landing-shell *,
+  .landing-shell *::before,
+  .landing-shell *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

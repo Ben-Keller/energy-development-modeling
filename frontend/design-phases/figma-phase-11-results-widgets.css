@@ -1,0 +1,134 @@
+/*
+ * Figma exploration, Phase 11.
+ *
+ * Responsive result-widget sizing and overview composition. Removing this
+ * stylesheet restores the Phase 2 results layout without changing result data.
+ */
+
+.results-overview-widget-layout {
+  --result-widget-gap: 8px;
+  gap: var(--result-widget-gap);
+}
+
+.results-mode-stack .result-widget {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.results-mode-stack .result-widget-large {
+  min-height: 0;
+}
+
+.results-mode-stack .result-widget-medium {
+  min-height: 176px;
+}
+
+.results-mode-stack .result-widget-small {
+  min-height: 144px;
+}
+
+.results-mode-stack .result-widget-extra-small {
+  min-height: 118px;
+}
+
+.results-mode-stack .results-map-widget-column,
+.results-mode-stack .results-overview-side,
+.results-mode-stack .results-support-widget-grid {
+  gap: var(--result-widget-gap);
+}
+
+.results-mode-stack .results-overview-side {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+}
+
+.results-mode-stack .results-overview-side .card {
+  padding: 10px;
+}
+
+.results-mode-stack .results-overview-side .row {
+  gap: 8px !important;
+}
+
+.results-mode-stack .results-overview-side .metric-card {
+  flex: 1 1 96px;
+  min-width: min(96px, 100%);
+}
+
+.results-mode-stack .results-support-widget-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.results-mode-stack .results-support-widget-grid > .card {
+  height: 100%;
+}
+
+.results-mode-stack .spatial-results-map-host {
+  min-height: 280px !important;
+  height: min(36vh, 360px) !important;
+}
+
+.results-mode-stack .spatial-results-map-card > .row:first-child {
+  gap: 12px;
+}
+
+.results-mode-stack .spatial-results-map-card > .row.muted {
+  gap: 8px !important;
+}
+
+.results-mode-stack .map-technical-details {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(173, 186, 204, 0.14);
+}
+
+.results-mode-stack .map-technical-details > summary {
+  color: #aeb8c7;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (min-width: 1181px) {
+  .results-mode-stack .results-overview-widget-layout > .workspace-map-grid {
+    grid-template-columns: minmax(0, 1.34fr) minmax(480px, 0.96fr);
+    gap: var(--result-widget-gap);
+  }
+}
+
+@media (max-width: 1180px) {
+  .results-mode-stack .results-overview-widget-layout > .workspace-map-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .results-mode-stack .results-support-widget-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .results-mode-stack .results-overview-side,
+  .results-mode-stack .results-support-widget-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .results-mode-stack .result-widget-medium,
+  .results-mode-stack .result-widget-small,
+  .results-mode-stack .result-widget-extra-small {
+    min-height: 0;
+  }
+
+  .results-mode-stack .spatial-results-map-card > .row:first-child {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .results-mode-stack .spatial-results-map-host {
+    min-height: 300px !important;
+    height: 44vh !important;
+    max-height: 420px;
+  }
+}

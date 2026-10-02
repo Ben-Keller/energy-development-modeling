@@ -1,0 +1,6 @@
+calliope_tech,mario_region,mario_sector,share,notes,tech_group
+*Transmission*,ALL,Transmission_and_distribution,1.0,default transmission capex split,Transmission
+*_kV*,ALL,Transmission_and_distribution,1.0,default line capex split,Transmission
+PV*,ALL,Construction_of_power_assets,1.0,default solar capex split,VRE
+Wind*,ALL,Construction_of_power_assets,1.0,default wind capex split,VRE
+*,ALL,Construction_of_power_assets,1.0,default generic capex split,Other

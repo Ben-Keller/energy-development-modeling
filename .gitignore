@@ -1,0 +1,59 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.venv/
+venv/
+env/
+backend/.venv/
+
+# Node / frontend build
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/runtime-config.local.js
+/build/
+/dist/
+/static/
+frontend/test-results/
+frontend/playwright-report/
+
+# Raw source images are large and not used by the app; keep optimized webp assets instead.
+frontend/assets/photos/
+
+# Superseded generated frontend GIS shards
+frontend/geo/countries_topojson/
+frontend/geo/countries_manifest.json
+
+# Runtime artifacts
+outputs/runs/
+outputs/platform/
+outputs/dataset_uploads/
+outputs/figures/
+outputs/local_app.*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Local logs/databases
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Editor / Office temporary files
+~$*
+*.swp
+*.swo

@@ -1,0 +1,433 @@
+/*
+ * Figma exploration, Phase 18.
+ *
+ * Platform-wide typography hierarchy using the native Proxima Nova web
+ * family loaded before application styles. Scale and weight distinguish
+ * display, navigation, analytical UI, and long-form copy.
+ */
+
+:root {
+  --edim-font-display: "Proxima Nova", sans-serif;
+  --edim-font-body: "Proxima Nova", sans-serif;
+  --edim-font-mono: "Proxima Nova", sans-serif;
+  --edim-type-display: 64px;
+  --edim-type-page: 34px;
+  --edim-type-section: 24px;
+  --edim-type-panel: 18px;
+  --edim-type-card: 16px;
+  --edim-type-body: 15px;
+  --edim-type-control: 14px;
+  --edim-type-meta: 12px;
+  --edim-type-label: 11px;
+}
+
+html,
+body,
+#root,
+#root * {
+  font-family: var(--edim-font-body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+html,
+body,
+#root {
+  font-size: var(--edim-type-body);
+}
+
+body * {
+  letter-spacing: 0 !important;
+}
+
+button,
+input,
+select,
+textarea,
+option {
+  font-family: var(--edim-font-body);
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--edim-font-mono);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.view-title,
+  .flow-model-title,
+  .project-card-title,
+  .landing-video-title,
+  .metric-card > div:last-child {
+  font-family: var(--edim-font-display);
+}
+
+p,
+li,
+td,
+dd {
+  line-height: 1.5;
+}
+
+/* Brand and landing display */
+
+.edim-brand-copy strong {
+  font-family: var(--edim-font-display);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.edim-brand-copy small,
+.landing-section-kicker,
+.view-eyebrow,
+.flow-model-eyebrow,
+.run-management-eyebrow,
+.diagram-section-label,
+.scenario-readonly-label,
+.methodology-eyebrow {
+  font-family: var(--edim-font-body);
+  font-size: var(--edim-type-label);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.landing-hero-card h1 {
+  max-width: 920px;
+  font-size: var(--edim-type-display);
+  font-weight: 700;
+  line-height: 1.02;
+}
+
+.landing-hero-section {
+  min-height: max(560px, calc(100svh - var(--edim-header-height) - 80px));
+  height: max(560px, calc(100svh - var(--edim-header-height) - 80px));
+}
+
+.landing-hero-card,
+.landing-hero-d3-root {
+  min-height: 100%;
+}
+
+.landing-hero-card p {
+  max-width: 760px;
+  font-size: 19px;
+  line-height: 1.52;
+}
+
+.landing-section-heading h2 {
+  max-width: 900px;
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1.08;
+}
+
+.landing-section-heading p {
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.landing-feature-card h3,
+.landing-video-title {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.landing-feature-card p,
+.landing-video-copy {
+  font-size: var(--edim-type-body);
+  line-height: 1.55;
+}
+
+/* Workspace page, section, and card hierarchy */
+
+.projects-overview-header h2,
+.dataset-management-header h2 {
+  font-size: var(--edim-type-page) !important;
+  font-weight: 700;
+  line-height: 1.08;
+}
+
+.project-selection-toolbar h3,
+.project-comparison-header h3 {
+  font-size: var(--edim-type-section);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.project-card-title {
+  font-size: var(--edim-type-panel);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.project-model-card h4 {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.project-home-context-title {
+  font-family: var(--edim-font-display);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.project-card-context,
+.project-card-updated,
+.project-model-card .muted,
+.project-home-meta {
+  font-size: var(--edim-type-meta);
+  line-height: 1.4;
+}
+
+.modal-header h2 {
+  font-size: 25px !important;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.modal-header small {
+  font-size: var(--edim-type-label) !important;
+  font-weight: 700;
+}
+
+.project-create-form label,
+.dataset-action-form label {
+  font-size: var(--edim-type-control);
+  font-weight: 600;
+}
+
+/* Model flow and run management */
+
+.model-workspace-with-management:not(.no-side-panel) .flow-model-title {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node h3 {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.22;
+}
+
+.flow-node p,
+.flow-node-summary,
+.diagram-note {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.diagram-scenario-controls label,
+.diagram-scenario-controls select,
+.diagram-scenario-controls input {
+  font-size: 14px;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .run-management-header h2 {
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.run-readiness-panel h3 {
+  font-size: 18px !important;
+  font-weight: 700;
+}
+
+.overall-run-status,
+.validation-status-pill,
+.badge {
+  font-family: var(--edim-font-body);
+  font-size: var(--edim-type-label);
+  font-weight: 700;
+}
+
+/* Results and analytical content */
+
+.results-mode-stack .view-title {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.12;
+}
+
+.results-mode-stack .view-subtitle {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.results-mode-stack .result-widget h3,
+.results-mode-stack .result-selection-prompt h3 {
+  font-size: var(--edim-type-panel) !important;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.metric-card > div:first-child {
+  font-family: var(--edim-font-body);
+  font-size: var(--edim-type-label);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.metric-card > div:last-child {
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.panel-table th,
+.dataset-table th {
+  font-family: var(--edim-font-display);
+  font-size: var(--edim-type-label);
+  font-weight: 600;
+}
+
+.panel-table td,
+.dataset-table td,
+.hbar-row {
+  font-size: 13px;
+}
+
+/* Methodology editorial hierarchy */
+
+.methodology-shell {
+  font-family: var(--edim-font-body);
+}
+
+.methodology-hero-content h1 {
+  max-width: 900px;
+  font-size: var(--edim-type-display);
+  font-weight: 700;
+  line-height: 1.02;
+}
+
+.methodology-hero-content p {
+  font-size: 20px;
+  line-height: 1.6;
+}
+
+.methodology-section-copy h2,
+.methodology-large-card h2,
+.methodology-closing-section h2 {
+  font-size: 42px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.methodology-section-copy p,
+.methodology-large-card p,
+.methodology-closing-section p {
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.methodology-insight-card h3,
+.methodology-channel-card h3,
+.methodology-scroll-step h3,
+.methodology-architecture-node h3 {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+@media (max-width: 1180px) {
+  .landing-hero-section {
+    min-height: max(620px, calc(100svh - 178px));
+    height: auto;
+  }
+
+  .landing-hero-card {
+    min-height: max(620px, calc(100svh - 178px));
+    padding: 96px 24px 42px;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --edim-type-display: 38px;
+    --edim-type-page: 29px;
+    --edim-type-section: 22px;
+    --edim-type-panel: 17px;
+    --edim-type-body: 14px;
+    --edim-type-control: 14px;
+  }
+
+  .edim-brand-copy strong {
+    font-size: 18px;
+  }
+
+  .landing-hero-section {
+    min-height: max(590px, calc(100svh - 254px));
+  }
+
+  .landing-hero-card {
+    width: 100%;
+    min-height: max(590px, calc(100svh - 254px));
+    margin-left: 0;
+    padding: 72px 20px 28px;
+    align-content: end;
+  }
+
+  .landing-hero-card h1 {
+    font-size: var(--edim-type-display);
+    line-height: 1.04;
+  }
+
+  .landing-hero-card p {
+    font-size: 17px;
+  }
+
+  .landing-section-heading h2 {
+    font-size: 32px;
+  }
+
+  .landing-section-heading p {
+    font-size: 15px;
+  }
+
+  .projects-overview-header h2,
+  .dataset-management-header h2 {
+    font-size: var(--edim-type-page) !important;
+  }
+
+  .results-mode-stack .view-title {
+    font-size: 25px;
+  }
+
+  .model-workspace-with-management:not(.no-side-panel) .run-management-header h2 {
+    font-size: 22px;
+  }
+
+  .metric-card > div:last-child {
+    font-size: 22px;
+  }
+
+  .methodology-hero-content h1 {
+    font-size: var(--edim-type-display);
+  }
+
+  .methodology-hero-content p {
+    font-size: 17px;
+  }
+
+  .methodology-section-copy h2,
+  .methodology-large-card h2,
+  .methodology-closing-section h2 {
+    font-size: 31px;
+  }
+
+  .methodology-section-copy p,
+  .methodology-large-card p,
+  .methodology-closing-section p {
+    font-size: 15px;
+  }
+}

@@ -1,0 +1,192 @@
+/*
+ * Figma exploration, Phase 3.
+ *
+ * Dataset-library density and filtering presentation. Removing this stylesheet
+ * restores the earlier table styling; backend capabilities remain unchanged.
+ */
+
+.dataset-management-view {
+  gap: 12px;
+  min-width: 0;
+}
+
+.dataset-management-header {
+  gap: 12px;
+  align-items: center;
+}
+
+.dataset-management-actions > button {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.dataset-library-toolbar {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(173, 186, 204, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.dataset-library-toolbar label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+}
+
+.dataset-library-toolbar label > span {
+  color: #9da9b8;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.dataset-search-field {
+  flex: 1 1 320px;
+}
+
+.dataset-search-field input {
+  width: 100%;
+}
+
+.dataset-format-field {
+  flex: 0 0 150px;
+}
+
+.dataset-library-toolbar input,
+.dataset-library-toolbar select {
+  min-height: 32px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  border-radius: 6px;
+}
+
+.dataset-filter-summary {
+  flex: 0 0 auto;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  color: #aeb8c7;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.dataset-clear-filters {
+  min-height: 32px;
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.dataset-table-wrap {
+  max-height: min(58vh, 640px);
+  overflow: auto;
+  border-color: rgba(173, 186, 204, 0.2);
+  border-radius: 8px;
+  background: #11161d;
+}
+
+.dataset-table {
+  min-width: 980px;
+}
+
+.dataset-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding: 9px 10px;
+  border-bottom-color: rgba(173, 186, 204, 0.24);
+  background: #171c23;
+  color: #bac4d1;
+  font-size: 11px;
+}
+
+.dataset-table tbody td {
+  padding: 10px;
+  border-bottom-color: rgba(173, 186, 204, 0.12);
+  vertical-align: middle;
+}
+
+.dataset-table tbody tr {
+  background: transparent;
+}
+
+.dataset-table tbody tr:hover {
+  background: rgba(56, 189, 248, 0.045);
+}
+
+.dataset-table th:first-child,
+.dataset-table td:first-child {
+  width: 31%;
+}
+
+.dataset-table th:last-child,
+.dataset-table td:last-child {
+  width: 31%;
+}
+
+.dataset-table-actions {
+  gap: 6px;
+}
+
+.dataset-table-actions button,
+.dataset-table-actions a,
+.dataset-details-menu summary {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.dataset-details-body {
+  border-radius: 8px;
+  background: #111820;
+}
+
+.dataset-no-results {
+  height: 120px;
+  text-align: center;
+  color: #9da9b8;
+}
+
+.dataset-empty-state {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+@media (max-width: 760px) {
+  .dataset-management-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dataset-management-actions {
+    justify-content: flex-start;
+  }
+
+  .dataset-library-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dataset-search-field,
+  .dataset-format-field {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .dataset-filter-summary {
+    min-height: 24px;
+  }
+
+  .dataset-clear-filters {
+    align-self: flex-start;
+  }
+
+  .dataset-table-wrap {
+    max-height: none;
+  }
+}

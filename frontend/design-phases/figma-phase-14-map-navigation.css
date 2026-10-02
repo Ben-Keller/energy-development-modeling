@@ -1,0 +1,38 @@
+/*
+ * Figma exploration, Phase 14.
+ *
+ * Map navigation controls accompanying persistent user pan/zoom behavior.
+ * Removing this stylesheet restores the prior stacked map-control treatment.
+ */
+
+.results-mode-stack .map-toolbar-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.results-mode-stack .map-metric-control {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.results-mode-stack .map-metric-control > span {
+  color: #aeb8c7;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .results-mode-stack .map-toolbar-controls {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .results-mode-stack .map-metric-control,
+  .results-mode-stack .map-metric-control select {
+    width: 100%;
+  }
+}

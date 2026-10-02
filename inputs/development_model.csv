@@ -1,0 +1,5 @@
+parameter,value
+mario.uncertainty_relative_bounds.jobs_direct,0.12
+mario.uncertainty_relative_bounds.jobs_total,0.12
+mario.uncertainty_relative_bounds.gva_total_musd,0.12
+mario.uncertainty_relative_bounds.household_income_proxy_musd,0.12

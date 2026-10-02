@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edim-model-runtime"
+version = "0.1.0"
+description = "Executable EDIM model runtime package for black-box backend hosting."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "pandas==1.5.3",
+  "numpy==1.23.5",
+  "pydantic==2.10.6",
+  "xarray==2022.3.0",
+  "netCDF4==1.7.4",
+  "calliope==0.6.10",
+  "pyomo==6.4.4",
+  "highspy>=1.7.2,<2.0",
+  "python-dotenv>=1.0.1,<2.0.0",
+  "orjson>=3.10.0",
+  "PyYAML>=6.0.0"
+]
+
+[project.scripts]
+edim-model-runtime = "edim_model.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["edim_model*"]
+
+[tool.setuptools.package-data]
+edim_model = ["*.json"]

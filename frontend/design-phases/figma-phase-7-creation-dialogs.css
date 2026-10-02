@@ -1,0 +1,180 @@
+/*
+ * Figma exploration, Phase 7.
+ *
+ * Project/model creation dialogs and form hierarchy. Removing this stylesheet
+ * restores the earlier modal presentation; the small focus handoff fix in
+ * Modal can be reverted independently.
+ */
+
+.modal-backdrop {
+  padding: 16px;
+  background: rgba(4, 8, 13, 0.78);
+  backdrop-filter: blur(5px);
+}
+
+.modal-card {
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(88dvh, 760px);
+  border-color: rgba(173, 186, 204, 0.28);
+  border-radius: 8px;
+  background: #11161d;
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.48);
+}
+
+.modal-card.wide {
+  width: min(1080px, calc(100vw - 32px));
+}
+
+.modal-header {
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom-color: rgba(173, 186, 204, 0.18);
+  background: #151b22;
+}
+
+.modal-header > div > div:first-child {
+  color: #9da9b8 !important;
+  font-size: 10px !important;
+  letter-spacing: 0 !important;
+}
+
+.modal-header h2 {
+  margin-top: 3px !important;
+  font-size: 18px !important;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.modal-header .icon-button {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  padding: 0;
+  border-color: rgba(173, 186, 204, 0.24);
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.modal-body {
+  padding: 14px;
+}
+
+.modal-body .project-create-form {
+  gap: 10px;
+}
+
+.modal-body .project-create-form > label {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  color: #bac4d1;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.modal-body .project-create-form input[type="text"],
+.modal-body .project-create-form select {
+  min-height: 36px;
+  margin-top: 0;
+  padding: 7px 9px;
+  border-color: rgba(173, 186, 204, 0.26);
+  border-radius: 6px;
+  background: #0e141b;
+}
+
+.modal-body .new-model-choice-group {
+  gap: 7px;
+  padding: 10px;
+  border-color: rgba(173, 186, 204, 0.2);
+  border-radius: 8px;
+  background: #0f141a;
+}
+
+.modal-body .new-model-choice-group legend {
+  padding: 0 5px;
+  color: #9da9b8;
+  letter-spacing: 0;
+}
+
+.modal-body .new-model-choice {
+  gap: 9px;
+  padding: 9px;
+  border-color: rgba(173, 186, 204, 0.18);
+  border-radius: 6px;
+  background: #151b22;
+}
+
+.modal-body .new-model-choice:has(input:checked) {
+  border-color: rgba(56, 189, 248, 0.52);
+  background: #17232c;
+  box-shadow: inset 3px 0 0 #38bdf8;
+}
+
+.modal-body .new-model-choice:has(input:disabled) {
+  opacity: 0.52;
+}
+
+.modal-body .new-model-choice input {
+  accent-color: #38bdf8;
+}
+
+.modal-body .new-model-choice b {
+  color: #e8edf3;
+  font-size: 12px;
+}
+
+.modal-body .new-model-choice small {
+  margin-top: 2px;
+  color: #9da9b8;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.modal-body .modal-action-row {
+  gap: 7px;
+  margin-top: 2px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(173, 186, 204, 0.14);
+}
+
+.modal-body .modal-action-row button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.modal-body .modal-action-row .run-play-button {
+  border-color: rgba(125, 211, 252, 0.46);
+  background: #1687b7;
+}
+
+@media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 10px;
+  }
+
+  .modal-card,
+  .modal-card.wide {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+
+  .modal-header {
+    padding: 11px 12px;
+  }
+
+  .modal-body {
+    padding: 12px;
+  }
+
+  .modal-body .modal-action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .modal-body .modal-action-row button {
+    width: 100%;
+  }
+}

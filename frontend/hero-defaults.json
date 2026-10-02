@@ -1,0 +1,20 @@
+{
+  "schema": "edim_hero_background_defaults",
+  "theme": "solar",
+  "tuningDefaults": {
+    "scale": 1.16,
+    "curvature": 8.0,
+    "drift": 4.0,
+    "pulseSpeed": 1.0,
+    "interaction": 1.0,
+    "lines": 3.745,
+    "labels": 0.65,
+    "titleStrength": 1.375,
+    "pulses": 1.4,
+    "images": 0.8,
+    "contrast": 0.968,
+    "glow": 1.25,
+    "flashlight": 1.375,
+    "flashlightSize": 1.0
+  }
+}

@@ -1,0 +1,12 @@
+calliope_tech,mario_region,mario_sector,opex_type,share,notes,tech_group
+*Transmission*,ALL,Transmission_and_distribution,om,1.0,default transmission om split,Transmission
+*_kV*,ALL,Transmission_and_distribution,om,1.0,default line om split,Transmission
+Coal*,ALL,Coal_supply_chain,fuel,1.0,default coal fuel split,Fossil
+CCGT*,ALL,Gas_supply_chain,fuel,1.0,default gas fuel split,Fossil
+OCGT*,ALL,Gas_supply_chain,fuel,1.0,default gas peaker fuel split,Fossil
+ISCC*,ALL,Gas_supply_chain,fuel,1.0,default gas integrated fuel split,Fossil
+HFO*,ALL,Oil_supply_chain,fuel,1.0,default heavy fuel oil split,Fossil
+Diesel*,ALL,Oil_supply_chain,fuel,1.0,default diesel fuel split,Fossil
+Bioenergy*,ALL,Bioenergy_supply_chain,fuel,1.0,default bioenergy fuel split,Bioenergy
+*,ALL,Fuel_supply_chain,fuel,1.0,default generic fuel split,Fossil
+*,ALL,Electricity_and_heat,om,1.0,default generic om split,Other

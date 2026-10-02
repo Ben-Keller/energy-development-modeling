@@ -1,0 +1,193 @@
+/*
+ * Phase 27: project context joins the model navigation strip as a distinct
+ * non-tab block, and graph display controls remain directly visible.
+ */
+
+.global-run-tab-bar .run-tab-strip {
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.run-project-context {
+  width: min(340px, 30vw);
+  min-width: 240px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding: 3px 14px 3px 0;
+  border-right: 1px solid rgba(173, 186, 204, 0.18);
+}
+
+.run-project-context > button {
+  width: fit-content;
+  min-height: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #8795a7;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.run-project-context > button > span:first-child {
+  color: #7dd3fc;
+  font-size: 13px;
+}
+
+.run-project-context > button:hover:enabled,
+.run-project-context > button:focus-visible {
+  background: transparent;
+  color: #e7edf4;
+}
+
+.run-project-title {
+  min-width: 0;
+  overflow: hidden;
+  color: #f0f5fa;
+  font-family: var(--edim-font-display);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-run-tab-bar .run-tab-list {
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.flow-display-controls-expanded,
+.flow-display-controls-body {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flow-display-controls-expanded {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.flow-display-controls-label {
+  color: #8f9baa;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.flow-display-controls-body {
+  flex-wrap: wrap;
+}
+
+.flow-display-controls-body > .ghost-utility-button {
+  min-height: 30px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.flow-model-viewport {
+  overscroll-behavior: contain;
+}
+
+.flow-model-canvas {
+  cursor: grab;
+  user-select: none;
+}
+
+.flow-model-viewport.panning,
+.flow-model-viewport.panning .flow-model-canvas {
+  cursor: grabbing;
+}
+
+.flow-model-viewport.panning .flow-node {
+  pointer-events: none;
+}
+
+.model-workspace-with-management:not(.no-side-panel) .flow-node {
+  transition:
+    width 180ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    transform 120ms ease;
+}
+
+@media (max-width: 760px) {
+  .global-run-tab-bar {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .global-run-tab-bar .run-tab-strip {
+    display: grid;
+    gap: 5px;
+  }
+
+  .run-project-context {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 2px 0 6px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(173, 186, 204, 0.16);
+  }
+
+  .run-project-title {
+    justify-self: end;
+    max-width: 100%;
+    font-size: 20px;
+  }
+
+  .global-run-tab-bar .run-tab-list {
+    width: 100%;
+  }
+
+  .flow-display-controls-expanded {
+    width: 100%;
+    display: grid;
+    justify-content: stretch;
+    gap: 5px;
+  }
+
+  .flow-display-controls-label {
+    display: block;
+  }
+
+  .flow-display-controls-body {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .flow-display-controls-body .flow-io-mode-switch {
+    grid-column: 1 / -1;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .flow-display-controls-body > .ghost-utility-button {
+    width: 100%;
+    justify-content: center;
+  }
+}

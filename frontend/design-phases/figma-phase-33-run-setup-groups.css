@@ -1,0 +1,20 @@
+/*
+ * Phase 33: lightweight hierarchy within run setup.
+ */
+
+.run-setup-group-eyebrow {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 8px 0 -3px;
+  color: #8ea4c5;
+  font-family: var(--edim-font-body);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.run-setup-group-eyebrow:first-child {
+  margin-top: 2px;
+}
