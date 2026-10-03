@@ -40,6 +40,7 @@ outputs/runs/
 outputs/platform/
 outputs/dataset_uploads/
 outputs/figures/
+outputs/azure-deploy/
 outputs/local_app.*
 
 # Local environment files
@@ -59,3 +60,5 @@ outputs/local_app.*
 *.swo
 .local
 __azurite_data__
+
+.github
