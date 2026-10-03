@@ -1,0 +1,3 @@
+# Quando si fa merge da `main` (storia riconciliata), questi file restano
+# quelli di `deploy`. Richiede: git config merge.ours.driver true
+.gitignore merge=ours
