@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "edim-deploy-*"
+  workflow_call:
   workflow_dispatch: {}
 
 jobs:

@@ -1,10 +1,9 @@
 name: EDIM worker
 
 on:
-  workflow_run:
-    workflows: ["EDIM check"]
-    types: [completed]
-  workflow_dispatch: {}
+  push:
+    tags:
+      - "edim-deploy-*"
 
 concurrency:
   group: edim-worker
@@ -13,11 +12,10 @@ concurrency:
 env:
   RESOURCE_GROUP: undphq220rg03
   VM_NAME: undphq220vm001
-  GIT_BRANCH: deploy
+  DEPLOY_REMOTE: https://github.com/UNDP-Data/dsc-energy-development-modeling.git
 
 jobs:
   deploy-worker:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -37,15 +35,18 @@ jobs:
         if: steps.power.outputs.state != 'VM running'
         run: echo "VM is '${{ steps.power.outputs.state }}' - leaving it off, nothing to do."
 
-      - name: Rebuild worker image
+      - name: Rebuild worker image for ${{ github.ref_name }}
         if: steps.power.outputs.state == 'VM running'
+        env:
+          DEPLOY_TAG: ${{ github.ref_name }}
         run: |
           read -r -d '' SCRIPT <<EOF || true
           set -euo pipefail
           cd /opt/edim
-          git fetch --all
-          git checkout "$GIT_BRANCH"
-          git pull --ff-only origin "$GIT_BRANCH"
+          git remote set-url origin "$DEPLOY_REMOTE"
+          git fetch --force origin "refs/tags/$DEPLOY_TAG:refs/tags/$DEPLOY_TAG"
+          git checkout --detach "refs/tags/$DEPLOY_TAG"
+          git log -1 --oneline
           docker build -f worker/Dockerfile -t edim-worker:latest .
           systemctl restart edim-worker
           sleep 5
