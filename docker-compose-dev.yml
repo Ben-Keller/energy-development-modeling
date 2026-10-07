@@ -142,6 +142,16 @@ services:
       EDIM_AUTH_MODE: ${EDIM_AUTH_MODE:-test_header}
       EDIM_TEST_USER_ID: ${EDIM_TEST_USER_ID:-dev-user-1}
 
+      # local_password mode: backend login pages at /auth/login
+      EDIM_AUTH_SESSION_SECRET: ${EDIM_AUTH_SESSION_SECRET:-dev-only-change-me}
+      EDIM_AUTH_SESSION_TTL_SECONDS: ${EDIM_AUTH_SESSION_TTL_SECONDS:-43200}
+      EDIM_AUTH_COOKIE_NAME: ${EDIM_AUTH_COOKIE_NAME:-edim_session}
+      EDIM_AUTH_COOKIE_SECURE: ${EDIM_AUTH_COOKIE_SECURE:-false}
+      EDIM_AUTH_PASSWORD_MIN_LENGTH: ${EDIM_AUTH_PASSWORD_MIN_LENGTH:-10}
+      EDIM_AUTH_RESET_TTL_SECONDS: ${EDIM_AUTH_RESET_TTL_SECONDS:-3600}
+      EDIM_AUTH_INVITE_TTL_SECONDS: ${EDIM_AUTH_INVITE_TTL_SECONDS:-172800}
+      EDIM_AUTH_DEV_TOKEN_DISPLAY: ${EDIM_AUTH_DEV_TOKEN_DISPLAY:-true}
+
       # PYTHONPATH includes /app/model_runtime so 'edim_model' is importable
       # as a top-level package regardless of the mounted volume layout.
       PYTHONPATH: /app:/app/model_runtime

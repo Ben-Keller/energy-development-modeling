@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}{{ heading }} · EDIM{% endblock %}
+{% block heading %}{{ heading }}{% endblock %}
+
+{% block content %}
+<div class="d-grid gap-2">
+  <a class="btn btn-edim" href="{{ link_href }}">{{ link_text }}</a>
+  {% if secondary_href %}
+  <a class="btn btn-ghost" href="{{ secondary_href }}">{{ secondary_text }}</a>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block footer %}{% endblock %}

@@ -6746,7 +6746,6 @@ function ProductBrand({ onClick = null }) {
 function UnifiedHeader({
   currentUserId,
   availableUsers,
-  onUserChange,
   apiTarget,
   systemCompatibility,
   onApiTargetModeChange,
@@ -6756,12 +6755,6 @@ function UnifiedHeader({
 }) {
   const activeUser = (availableUsers || []).find((user) => user.user_id === currentUserId) || null;
   const activeUserLabel = (activeUser && (activeUser.display_name || activeUser.user_id)) || currentUserId || "User";
-  const handleUserSelect = (event) => {
-    const userId = event.target.value;
-    const menu = event.currentTarget.closest("details");
-    if (menu) menu.removeAttribute("open");
-    onUserChange(userId);
-  };
   return (
     <header className="edim-topbar">
       <ProductBrand onClick={onReturnToLanding} />
@@ -6789,16 +6782,13 @@ function UnifiedHeader({
               if (menu) menu.open = false;
               onOpenDatasets();
             }}><img src="./assets/icons/layers.svg" alt="" aria-hidden="true" />Dataset library</button> : null}
-            <label className="header-user-select">
-              <span>Switch user</span>
-              <select value={currentUserId || ""} onChange={handleUserSelect} disabled={apiTargetLoading}>
-                {(availableUsers || []).map((user) => (
-                  <option key={user.user_id} value={user.user_id}>
-                    {user.display_name || user.user_id}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <button
+              type="button"
+              className="user-dataset-link user-logout-button"
+              onClick={() => window.location.assign("/auth/logout")}
+            >
+              <img src="./assets/icons/logout.svg" alt="" aria-hidden="true" />Logout
+            </button>
           </div>
         </details>
       </div>
@@ -12792,7 +12782,6 @@ function App() {
       <UnifiedHeader
         currentUserId={currentUserId}
         availableUsers={availableUsers}
-        onUserChange={handleUserChange}
         apiTarget={apiTarget}
         systemCompatibility={systemCompatibility}
         onApiTargetModeChange={handleApiTargetModeChange}

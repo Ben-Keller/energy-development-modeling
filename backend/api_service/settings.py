@@ -153,6 +153,16 @@ class Settings:
     platform_store_backend: str = "sqlite"
     platform_sqlite_path: Path | None = None
 
+    auth_mode: str = "test_header"
+    auth_session_secret: str = "dev-only-change-me"
+    auth_session_ttl_seconds: int = 43200
+    auth_cookie_name: str = "edim_session"
+    auth_cookie_secure: bool = True
+    auth_password_min_length: int = 10
+    auth_reset_ttl_seconds: int = 3600
+    auth_invite_ttl_seconds: int = 172800
+    auth_dev_token_display: bool = True
+
 
 def _repo_root() -> Path:
     here = Path(__file__).resolve()
@@ -280,6 +290,15 @@ def get_settings() -> Settings:
         dataset_manifest_path=dataset_manifest_path,
         platform_store_backend=(os.getenv("EDIM_PLATFORM_STORE_BACKEND", str(_cfg(runtime_config, ["storage", "platform_store_backend"], "sqlite"))) or "sqlite").strip().lower(),
         platform_sqlite_path=platform_sqlite_path,
+        auth_mode=(os.getenv("EDIM_AUTH_MODE", str(_cfg(runtime_config, ["auth", "mode"], "test_header"))) or "test_header").strip().lower(),
+        auth_session_secret=(os.getenv("EDIM_AUTH_SESSION_SECRET") or str(_cfg(runtime_config, ["auth", "session_secret"], "dev-only-change-me")) or "dev-only-change-me"),
+        auth_session_ttl_seconds=_env_int("EDIM_AUTH_SESSION_TTL_SECONDS", int(_cfg(runtime_config, ["auth", "session_ttl_seconds"], 43200)), minimum=60),
+        auth_cookie_name=(os.getenv("EDIM_AUTH_COOKIE_NAME") or str(_cfg(runtime_config, ["auth", "cookie_name"], "edim_session")) or "edim_session").strip() or "edim_session",
+        auth_cookie_secure=_env_bool("EDIM_AUTH_COOKIE_SECURE", bool(_cfg(runtime_config, ["auth", "cookie_secure"], True))),
+        auth_password_min_length=_env_int("EDIM_AUTH_PASSWORD_MIN_LENGTH", int(_cfg(runtime_config, ["auth", "password_min_length"], 10)), minimum=6),
+        auth_reset_ttl_seconds=_env_int("EDIM_AUTH_RESET_TTL_SECONDS", int(_cfg(runtime_config, ["auth", "reset_ttl_seconds"], 3600)), minimum=60),
+        auth_invite_ttl_seconds=_env_int("EDIM_AUTH_INVITE_TTL_SECONDS", int(_cfg(runtime_config, ["auth", "invite_ttl_seconds"], 172800)), minimum=60),
+        auth_dev_token_display=_env_bool("EDIM_AUTH_DEV_TOKEN_DISPLAY", bool(_cfg(runtime_config, ["auth", "dev_token_display"], True))),
     )
 
 

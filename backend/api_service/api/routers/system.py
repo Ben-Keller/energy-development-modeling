@@ -6,7 +6,14 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
-from ..dependencies import get_current_user_context, get_dataset_repository, get_job_manager, get_model_catalog_provider, get_settings
+from ..dependencies import (
+    get_current_user_context,
+    get_dataset_repository,
+    get_job_manager,
+    get_model_catalog_provider,
+    get_optional_user_context,
+    get_settings,
+)
 from ...jobs import JobManager
 from ...runtime import (
     ARTIFACT_MANIFEST_SCHEMA_VERSION,
@@ -31,7 +38,11 @@ router = APIRouter()
 
 
 @router.get("/", include_in_schema=False)
-def root(request: Request):
+async def root(request: Request, user: UserContext = Depends(get_optional_user_context)):
+    settings = getattr(request.app.state, "settings", None)
+    mode = str(getattr(settings, "auth_mode", "") or "").strip().lower()
+    if mode == "local_password" and not user.user_id:
+        return RedirectResponse(url="/auth/login", status_code=307)
     frontend_dir = getattr(request.app.state, "frontend_dir", None)
     if frontend_dir is not None:
         return RedirectResponse(url="/ui/", status_code=307)
@@ -258,10 +269,11 @@ def _system_manifest_payload(
         "provider_boundaries": {
             "auth": {
                 "boundary": "get_current_user_context",
-                "current_provider": "test_header",
+                "current_provider": user.auth_mode,
                 "local_default": "X-EDIM-User-Id local test users",
-                "cloud_target": "Azure/session-backed auth provider returning UserContext",
+                "cloud_target": "fastapi-users cookie session returning UserContext",
                 "replace_at": "backend/api_service/api/dependencies.py",
+                "login_pages": ["/auth/login", "/auth/logout", "/auth/change-password", "/auth/forgot-password", "/auth/reset-password", "/auth/invite", "/auth/admin/invites"],
             },
             "platform_repository": _provider_descriptor(
                 getattr(request.app.state, "platform_repository", None),
@@ -336,7 +348,7 @@ def get_system_manifest(
     settings: Settings = Depends(get_settings),
     job_manager: JobManager = Depends(get_job_manager),
     dataset_repository: DatasetRepository = Depends(get_dataset_repository),
-    user: UserContext = Depends(get_current_user_context),
+    user: UserContext = Depends(get_optional_user_context),
 ):
     """Return the stable system manifest used by CI and platform deployment checks."""
     return _system_manifest_payload(

@@ -663,6 +663,8 @@ body:has(.platform-shell) { overflow:auto; }
 .projects-dataset-section button,.user-dataset-link { display:flex; align-items:center; gap:10px; min-height:40px; font-size:14px; }
 .projects-dataset-section img,.user-dataset-link img { width:18px; height:18px; filter:brightness(0) invert(1); opacity:.8; }
 .user-dataset-link { width:100%; margin:12px 0; padding:10px; text-align:left; }
+.user-logout-button { color:#ffb0b0; border-color:#d17575; background:transparent; margin:-18px 0 0; }
+.user-logout-button img { filter:brightness(0) saturate(100%) invert(80%) sepia(12%) saturate(1600%) hue-rotate(310deg) brightness(102%) contrast(99%); }
 .dataset-library-page > .workspace-back-button { margin:16px 24px 0; }
 
 /* Models lead the project workspace; activity and artifacts share a sidebar. */
