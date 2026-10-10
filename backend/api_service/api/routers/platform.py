@@ -17,7 +17,7 @@ from ...schemas import (
 )
 from ...services.artifact_storage import ArtifactStorageService
 from ...services.platform_repository import PlatformRepository
-from ...services.users import UserContext, list_test_users
+from ...services.users import AUTH_MODE_LOCAL_PASSWORD, UserContext, list_test_users
 
 router = APIRouter()
 
@@ -61,12 +61,13 @@ class ExportPayload(BaseModel):
 
 
 @router.get("/api/session", response_model=SessionResponse)
-def get_session(user: UserContext = Depends(get_current_user_context)):
+async def get_session(user: UserContext = Depends(get_current_user_context)):
+    password_mode = user.auth_mode == AUTH_MODE_LOCAL_PASSWORD
     return {
         "authenticated": True,
         "auth_mode": user.auth_mode,
         "user": user.to_dict(),
-        "available_users": list_test_users(),
+        "available_users": [] if password_mode else list_test_users(),
     }
 
 

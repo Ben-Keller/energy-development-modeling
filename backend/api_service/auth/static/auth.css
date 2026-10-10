@@ -1,0 +1,475 @@
+:root {
+  --edim-bg: #070d17;
+  --edim-glow-1: #1a2f56;
+  --edim-glow-2: #1d3b66;
+  --edim-surface-panel: #11161d;
+  --edim-surface-raised: #171c23;
+  --edim-border-subtle: rgba(173, 186, 204, 0.2);
+  --edim-text-primary: #f8fbff;
+  --edim-text-secondary: #aeb8c7;
+  --edim-text-muted: #8ea4c5;
+  --edim-link: #93c5fd;
+  --edim-accent: #38bdf8;
+  --edim-radius-panel: 8px;
+  --edim-radius-control: 6px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Proxima Nova", sans-serif;
+  font-size: 15px;
+  color: var(--edim-text-primary);
+  background:
+    radial-gradient(1200px 600px at 10% -20%, var(--edim-glow-1) 0%, rgba(26, 47, 86, 0) 60%),
+    radial-gradient(900px 520px at 100% -25%, var(--edim-glow-2) 0%, rgba(29, 59, 102, 0) 62%),
+    var(--edim-bg);
+}
+
+.edim-shell {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  align-items: safe center;
+  padding: 24px;
+}
+
+.edim-card {
+  width: min(420px, 92vw);
+  padding: 32px;
+  background: var(--edim-surface-panel);
+  border: 1px solid var(--edim-border-subtle);
+  border-radius: var(--edim-radius-panel);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.2);
+}
+
+.edim-card--wide {
+  width: min(560px, 94vw);
+}
+
+.edim-card--full {
+  width: min(920px, 96vw);
+}
+
+.edim-shell--full {
+  padding: 0;
+  align-items: stretch;
+}
+
+.edim-shell--full .edim-card--full {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100vh;
+  padding: 28px 36px 32px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.edim-shell--full .edim-card--full .edim-foot {
+  margin-top: auto;
+  padding-top: 30px;
+}
+
+.edim-eyebrow {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--edim-text-muted);
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--edim-text-primary);
+}
+
+.edim-sub {
+  margin: 0 0 22px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--edim-text-secondary);
+}
+
+.edim-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.edim-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edim-alert {
+  margin: 0 0 18px;
+  padding: 11px 13px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  border: 1px solid;
+  border-radius: var(--edim-radius-control);
+}
+
+.edim-alert--error {
+  background: rgba(251, 113, 133, 0.12);
+  border-color: rgba(251, 113, 133, 0.38);
+  color: #fecaca;
+}
+
+.edim-alert--success {
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.38);
+  color: #a7f3d0;
+}
+
+.edim-alert--info {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.38);
+  color: #bae6fd;
+}
+
+.form-label {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--edim-text-muted);
+}
+
+.form-control {
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--edim-text-primary);
+  background: var(--edim-surface-raised);
+  border: 1px solid var(--edim-border-subtle);
+  border-radius: var(--edim-radius-control);
+}
+
+.form-control:focus {
+  color: var(--edim-text-primary);
+  background: var(--edim-surface-raised);
+  border-color: var(--edim-accent);
+  box-shadow: 0 0 0 0.2rem rgba(56, 189, 248, 0.18);
+}
+
+.form-control::placeholder {
+  color: rgba(174, 184, 199, 0.55);
+}
+
+.btn {
+  border-radius: var(--edim-radius-control);
+  font-size: 14px;
+  font-weight: 800;
+  padding: 11px 14px;
+}
+
+.btn-edim {
+  color: #f8fbff;
+  background: linear-gradient(135deg, #2563eb 0%, #2d6bcd 70%, #38bdf8 100%);
+  border: 1px solid rgba(147, 197, 253, 0.5);
+  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.22);
+}
+
+.btn-edim:hover,
+.btn-edim:focus {
+  color: #fff;
+  filter: brightness(1.06);
+}
+
+.btn-edim:active {
+  filter: brightness(0.96);
+}
+
+.btn-ghost {
+  color: #bfdbfe;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(96, 165, 250, 0.5);
+}
+
+.btn-ghost:hover,
+.btn-ghost:focus {
+  color: #e8f2ff;
+  background: rgba(37, 99, 235, 0.26);
+  border-color: rgba(96, 165, 250, 0.82);
+}
+
+a {
+  font-size: 13px;
+  color: var(--edim-link);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--edim-accent);
+  text-decoration: underline;
+}
+
+.edim-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.edim-meta {
+  margin: 22px 0 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--edim-text-muted);
+}
+
+.edim-token {
+  display: block;
+  margin: 10px 0 0;
+  padding: 11px;
+  word-break: break-all;
+  font-family: "Proxima Nova", sans-serif;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--edim-text-secondary);
+  background: var(--edim-surface-raised);
+  border: 1px solid var(--edim-border-subtle);
+  border-radius: var(--edim-radius-control);
+}
+
+.btn-sm {
+  padding: 6px 11px;
+  font-size: 12px;
+}
+
+.edim-section {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid var(--edim-border-subtle);
+}
+
+.edim-section--first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.edim-section h2 {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--edim-text-primary);
+}
+
+.edim-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+}
+
+.edim-grid .full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 560px) {
+  .edim-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.edim-checkline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 22px;
+}
+
+.edim-checkline input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--edim-accent);
+}
+
+.edim-checkline label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--edim-text-muted);
+}
+
+.edim-table-wrap {
+  overflow-x: auto;
+}
+
+.edim-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.edim-table th {
+  padding: 0 12px 10px 0;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--edim-text-muted);
+  border-bottom: 1px solid var(--edim-border-subtle);
+  white-space: nowrap;
+}
+
+.edim-table td {
+  padding: 14px 12px 14px 0;
+  vertical-align: top;
+  color: var(--edim-text-secondary);
+  border-bottom: 1px solid var(--edim-border-subtle);
+}
+
+.edim-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.edim-table td strong {
+  color: var(--edim-text-primary);
+  font-weight: 700;
+}
+
+.edim-cell-sub {
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--edim-text-muted);
+}
+
+.edim-badge {
+  display: inline-block;
+  margin: 0 4px 4px 0;
+  padding: 2px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--edim-text-muted);
+  border: 1px solid var(--edim-border-subtle);
+  border-radius: 999px;
+}
+
+.edim-badge--on {
+  color: #a7f3d0;
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.38);
+}
+
+.edim-badge--off {
+  color: #fecaca;
+  background: rgba(251, 113, 133, 0.12);
+  border-color: rgba(251, 113, 133, 0.38);
+}
+
+.edim-badge--admin {
+  color: #bae6fd;
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.38);
+}
+
+.edim-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 210px;
+}
+
+.edim-danger {
+  color: #fecaca;
+  background: rgba(251, 113, 133, 0.14);
+  border-color: rgba(251, 113, 133, 0.4);
+}
+
+.edim-danger:hover,
+.edim-danger:focus {
+  color: #fff;
+  background: rgba(251, 113, 133, 0.32);
+  border-color: rgba(251, 113, 133, 0.6);
+}
+
+.edim-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.edim-section-head h2 {
+  margin: 0;
+}
+
+.modal-backdrop {
+  background: rgba(4, 9, 22, 0.6);
+  -webkit-backdrop-filter: blur(14px) saturate(125%);
+  backdrop-filter: blur(14px) saturate(125%);
+  transition: opacity 0.24s ease;
+}
+
+.modal-backdrop.show {
+  opacity: 1;
+}
+
+.modal.fade .modal-dialog {
+  transform: translateY(-14px) scale(0.975);
+  opacity: 0;
+  transition:
+    transform 0.26s cubic-bezier(0.2, 0.75, 0.25, 1),
+    opacity 0.2s ease;
+}
+
+.modal.show .modal-dialog {
+  transform: none;
+  opacity: 1;
+}
+
+.modal-content {
+  background: var(--edim-surface-panel);
+  color: var(--edim-text-primary);
+  border: 1px solid var(--edim-border-subtle);
+  border-radius: var(--edim-radius-panel);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.modal-header,
+.modal-footer {
+  border-color: var(--edim-border-subtle);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--edim-text-primary);
+}
+
+.btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+  opacity: 0.7;
+}
+
+.btn-close:hover,
+.btn-close:focus {
+  opacity: 1;
+  box-shadow: none;
+}
+
+.edim-modal-user {
+  margin: 0 0 16px;
+}

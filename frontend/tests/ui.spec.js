@@ -136,17 +136,18 @@ test("project name entry keeps focus across keystrokes", async ({ page }) => {
   await expect(input).toHaveValue("South Africa transition study");
 });
 
-test("runtime switch stays visible and user selection opens from the user icon", async ({ page }) => {
+test("runtime switch stays visible and the user icon menu offers logout", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.locator(".runtime-target-control")).toBeVisible();
   await expect(page.locator(".runtime-target-control").getByText("Local", { exact: true })).toBeVisible();
   await expect(page.locator(".runtime-target-control").getByText("Remote", { exact: true })).toBeVisible();
-  await expect(page.locator(".header-user-select")).toBeHidden();
+  const logout = page.locator(".header-user-menu-body .user-logout-button");
+  await expect(logout).toBeHidden();
   const userMenu = page.getByRole("button", { name: "User menu for UNDP Analyst" });
   await expect(userMenu.locator("img")).toHaveAttribute("src", "./assets/icons/user-round.svg");
   await userMenu.click();
-  await expect(page.locator(".header-user-select")).toBeVisible();
-  await expect(page.locator(".header-user-select select")).toHaveValue("undp_analyst");
+  await expect(logout).toBeVisible();
+  await expect(logout).toHaveText("Logout");
 });
 
 test("project overview keeps workspace context above a focused project collection", async ({ page }) => {

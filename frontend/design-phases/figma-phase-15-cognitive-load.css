@@ -90,18 +90,6 @@
   font-size: 11px;
 }
 
-.header-user-menu-body .header-user-select {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-}
-
-.header-user-menu-body .header-user-select select {
-  width: 100%;
-  max-width: none;
-}
-
 /* Focused run navigation */
 
 .global-run-tab-bar .run-tab-strip {

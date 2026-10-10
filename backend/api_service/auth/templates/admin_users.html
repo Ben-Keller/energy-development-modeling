@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}User management · EDIM{% endblock %}
+{% block heading %}User management{% endblock %}
+
+{% block header_action %}
+<a class="btn btn-ghost btn-sm" href="/auth/logout">Sign out</a>
+{% endblock %}
+
+{% block content %}
+{% if generated_password %}
+<p class="edim-cell-sub">One-time password for the new account — copy it now, it is not shown again.</p>
+<code class="edim-token">{{ generated_password }}</code>
+{% endif %}
+
+<section class="edim-section edim-section--first">
+  <div class="edim-section-head">
+    <h2>Users</h2>
+    <div class="edim-section-actions">
+      <a class="btn btn-ghost btn-sm" href="/auth/admin/invites">Create invitation link</a>
+      <button type="button" class="btn btn-edim btn-sm" data-bs-toggle="modal" data-bs-target="#create-user-modal">
+        Create user
+      </button>
+    </div>
+  </div>
+
+  <div class="edim-table-wrap">
+    <table class="edim-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>E-mail</th>
+          <th>Organization</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>
+            <strong>{{ u.user_id }}</strong>
+            {% if u.display_name %}<div class="edim-cell-sub">{{ u.display_name }}</div>{% endif %}
+          </td>
+          <td>{{ u.email }}</td>
+          <td>{{ u.organization }}</td>
+          <td>
+            <span class="edim-badge {% if u.is_active %}edim-badge--on{% else %}edim-badge--off{% endif %}">
+              {% if u.is_active %}Active{% else %}Inactive{% endif %}
+            </span>
+            {% if u.is_superuser %}<span class="edim-badge edim-badge--admin">Admin</span>{% endif %}
+          </td>
+          <td class="edim-actions">
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              data-bs-toggle="modal"
+              data-bs-target="#set-password-modal"
+              data-user-id="{{ u.id }}"
+              data-user-name="{{ u.user_id }}"
+            >
+              Set password
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              data-bs-toggle="modal"
+              data-bs-target="#confirm-toggle-modal"
+              data-action="/auth/admin/users/{{ u.id }}/admin"
+              data-user-name="{{ u.user_id }}"
+              data-modal-title="{% if u.is_superuser %}Remove admin{% else %}Make admin{% endif %}"
+              data-modal-body="{% if u.is_superuser %}Revoke administrator access. They keep their own projects and models, but can no longer manage users.{% else %}Grant administrator access. They can manage users and see every account.{% endif %}"
+              data-modal-submit="{% if u.is_superuser %}Remove admin{% else %}Make admin{% endif %}"
+            >
+              {% if u.is_superuser %}Remove admin{% else %}Make admin{% endif %}
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              data-bs-toggle="modal"
+              data-bs-target="#confirm-toggle-modal"
+              data-action="/auth/admin/users/{{ u.id }}/active"
+              data-user-name="{{ u.user_id }}"
+              data-modal-title="{% if u.is_active %}Deactivate{% else %}Activate{% endif %}"
+              data-modal-body="{% if u.is_active %}Sign out and block this account. Any open session is signed out immediately.{% else %}Restore access for this account.{% endif %}"
+              data-modal-submit="{% if u.is_active %}Deactivate{% else %}Activate{% endif %}"
+            >
+              {% if u.is_active %}Deactivate{% else %}Activate{% endif %}
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm edim-danger"
+              data-bs-toggle="modal"
+              data-bs-target="#delete-user-modal"
+              data-action="/auth/admin/users/{{ u.id }}/delete"
+              data-user-name="{{ u.user_id }}"
+            >
+              Delete
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="edim-cell-sub">No users yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="modal fade" id="create-user-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Create user</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="/auth/admin/users">
+        <div class="modal-body">
+          <div class="edim-grid">
+            <div>
+              <label class="form-label" for="user_id">User id</label>
+              <input
+                class="form-control"
+                id="user_id"
+                name="user_id"
+                value="{{ form.user_id }}"
+                placeholder="analyst_jane"
+                required
+              />
+            </div>
+            <div>
+              <label class="form-label" for="email">E-mail</label>
+              <input class="form-control" id="email" name="email" type="email" value="{{ form.email }}" required />
+            </div>
+            <div>
+              <label class="form-label" for="display_name">Display name</label>
+              <input class="form-control" id="display_name" name="display_name" value="{{ form.display_name }}" />
+            </div>
+            <div>
+              <label class="form-label" for="organization">Organization</label>
+              <input class="form-control" id="organization" name="organization" value="{{ form.organization }}" />
+            </div>
+            <div>
+              <label class="form-label" for="password">Initial password</label>
+              <input
+                class="form-control"
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="new-password"
+                placeholder="Leave blank to generate"
+              />
+            </div>
+            <div class="edim-checkline">
+              <input id="is_superuser" name="is_superuser" type="checkbox" value="1" />
+              <label for="is_superuser">Administrator</label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-edim">Create user</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="set-password-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Set password</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="/auth/admin/users/password">
+        <div class="modal-body">
+          <p class="edim-cell-sub edim-modal-user">Choose a new password for <strong data-user-label></strong>.</p>
+          <div class="mb-3">
+            <label class="form-label" for="set-password">New password</label>
+            <input
+              class="form-control"
+              id="set-password"
+              name="password"
+              type="password"
+              autocomplete="new-password"
+              required
+            />
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="set-password-confirm">Confirm password</label>
+            <input
+              class="form-control"
+              id="set-password-confirm"
+              name="confirm"
+              type="password"
+              autocomplete="new-password"
+              required
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-edim">Save password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="confirm-toggle-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" data-modal-title>Confirm</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="">
+        <div class="modal-body">
+          <p class="edim-cell-sub edim-modal-user"><strong data-user-label></strong></p>
+          <p class="edim-cell-sub" data-modal-body></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-edim" data-modal-submit>Confirm</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="delete-user-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Delete user</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="">
+        <div class="modal-body">
+          <p class="edim-cell-sub">
+            Permanently remove <strong data-user-label></strong> and any invitations they have not used.
+            Their projects and models are kept. This cannot be undone.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-ghost edim-danger" data-modal-submit>Delete user</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="edim-modal-state" hidden data-open="{{ open_modal }}" data-user-id="{{ open_modal_user.id if open_modal_user else '' }}" data-user-name="{{ open_modal_user.user_id if open_modal_user else '' }}" data-action="{% if open_modal == 'set-password-modal' and open_modal_user %}/auth/admin/users/{{ open_modal_user.id }}/password{% endif %}"></div>
+<script>
+  function readModalData(source) {
+    return {
+      action: source.dataset.action || "",
+      userName: source.dataset.userName || "",
+      title: source.dataset.modalTitle || "",
+      body: source.dataset.modalBody || "",
+      submit: source.dataset.modalSubmit || "",
+    };
+  }
+
+  function bindUserModal(modal, data) {
+    const form = modal.querySelector("form");
+    if (form && data.action) form.action = data.action;
+    modal.querySelectorAll("[data-user-label]").forEach((el) => {
+      el.textContent = data.userName || "";
+    });
+    const overrides = {
+      "[data-modal-title]": data.title,
+      "[data-modal-body]": data.body,
+      "[data-modal-submit]": data.submit,
+    };
+    Object.keys(overrides).forEach((selector) => {
+      const el = modal.querySelector(selector);
+      if (el && overrides[selector]) el.textContent = overrides[selector];
+    });
+  }
+
+  document.addEventListener("show.bs.modal", (event) => {
+    const trigger = event.relatedTarget;
+    if (!trigger) return;
+    bindUserModal(event.target, readModalData(trigger));
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const state = document.getElementById("edim-modal-state");
+    if (!state || !state.dataset.open || !window.bootstrap) return;
+    const modal = document.getElementById(state.dataset.open);
+    if (!modal) return;
+    bindUserModal(modal, readModalData(state));
+    window.bootstrap.Modal.getOrCreateInstance(modal).show();
+  });
+</script>
+{% endblock %}
+
+{% block footer %}{% endblock %}

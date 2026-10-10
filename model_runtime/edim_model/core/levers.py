@@ -6,6 +6,7 @@ import fnmatch
 from pathlib import Path
 from typing import List, Tuple, Any
 
+from ..dataset_paths import dataset_path
 from .schemas import LeverValues
 
 DEFAULT_RENEWABLES_TECHS = [
@@ -64,7 +65,7 @@ def _parse_path(value: str, default: List[str]) -> List[str]:
 
 
 def load_lever_mappings(config_dir: Path) -> LeverMappings:
-    path = config_dir / "lever_mappings.csv"
+    path = dataset_path("lever_mappings", config_dir / "lever_mappings.csv")
     rows = _read_csv_rows(path)
     renewables_techs = list(DEFAULT_RENEWABLES_TECHS)
     fossil_techs = list(DEFAULT_FOSSIL_TECHS)

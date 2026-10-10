@@ -8,7 +8,14 @@ from ..services.artifact_storage import ArtifactStorageService
 from ..services.dataset_repository import DatasetRepository
 from ..services.model_catalog import ModelCatalogProvider
 from ..services.platform_repository import PlatformRepository
-from ..services.users import AUTH_MODE_TEST_HEADER, UserContext, is_known_test_user, resolve_user_context
+from ..services.users import (
+    AUTH_MODE_LOCAL_PASSWORD,
+    AUTH_MODE_TEST_HEADER,
+    UserContext,
+    is_known_test_user,
+    record_auth_admin_flag,
+    resolve_user_context,
+)
 from ..settings import Settings
 
 
@@ -85,9 +92,18 @@ def get_model_catalog_provider(request: Request) -> ModelCatalogProvider:
     return provider
 
 
-def get_current_user_context(request: Request) -> UserContext:
-    # Local handoff auth shim. Production should replace this dependency with
-    # Azure/auth middleware while preserving the downstream user-context shape.
+async def get_current_user_context(request: Request) -> UserContext:
+    settings = get_settings(request)
+    mode = str(getattr(settings, "auth_mode", "") or AUTH_MODE_TEST_HEADER).strip().lower()
+    if mode == AUTH_MODE_LOCAL_PASSWORD:
+        from ..auth.backends import resolve_session_context
+
+        context = await resolve_session_context(request)
+        if context is None:
+            raise HTTPException(status_code=401, detail="Not signed in.")
+        record_auth_admin_flag(context.user_id, context.is_admin)
+        return context
+
     raw_user_id = (
         request.headers.get("x-edim-user-id")
         or request.query_params.get("user_id")
@@ -98,9 +114,16 @@ def get_current_user_context(request: Request) -> UserContext:
     return resolve_user_context(raw_user_id, auth_mode=AUTH_MODE_TEST_HEADER)
 
 
-def get_current_user(request: Request) -> dict:
-    return get_current_user_context(request).to_dict()
+async def get_optional_user_context(request: Request) -> UserContext:
+    try:
+        return await get_current_user_context(request)
+    except HTTPException:
+        return UserContext(user_id="", display_name="Anonymous", auth_mode=AUTH_MODE_TEST_HEADER)
 
 
-def get_current_user_id(request: Request) -> str:
-    return get_current_user_context(request).user_id
+async def get_current_user(request: Request) -> dict:
+    return (await get_current_user_context(request)).to_dict()
+
+
+async def get_current_user_id(request: Request) -> str:
+    return (await get_current_user_context(request)).user_id

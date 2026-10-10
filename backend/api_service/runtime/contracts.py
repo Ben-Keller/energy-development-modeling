@@ -29,6 +29,8 @@ class ExecutionQueueMessage:
     attempt: int = 1
     created_at: str = ""
     retry_policy: Dict[str, Any] = field(default_factory=dict)
+    dataset_versions: List[Dict[str, Any]] = field(default_factory=list)
+    dataset_manifest: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -41,6 +43,8 @@ class ExecutionQueueMessage:
             "created_at": self.created_at,
             "request_payload": dict(self.request_payload),
             "retry_policy": dict(self.retry_policy or {}),
+            "dataset_versions": [dict(row) for row in (self.dataset_versions or [])],
+            "dataset_manifest": dict(self.dataset_manifest or {}),
         }
 
     @classmethod
@@ -56,6 +60,8 @@ class ExecutionQueueMessage:
             created_at=str(payload.get("created_at") or ""),
             request_payload=dict(payload.get("request_payload") or {}),
             retry_policy=dict(payload.get("retry_policy") or {}),
+            dataset_versions=[dict(row) for row in (payload.get("dataset_versions") or []) if isinstance(row, dict)],
+            dataset_manifest=dict(payload.get("dataset_manifest") or {}),
         )
 
 

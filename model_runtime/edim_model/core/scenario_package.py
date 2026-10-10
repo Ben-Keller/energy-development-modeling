@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from ..dataset_paths import dataset_path, dataset_path_override
 from .scenario_report import load_or_parse_scenario_report
 
 
@@ -169,7 +170,7 @@ def _african_country_rows(config_dir: Path) -> List[Dict[str, str]]:
         }
         for code, name in AFRICAN_COUNTRY_NAMES.items()
     }
-    for row in _read_csv_rows(config_dir / "scenario_geography_mapping.csv"):
+    for row in _read_csv_rows(dataset_path("scenario_geography_mapping", config_dir / "scenario_geography_mapping.csv")):
         mrio_geo = str(row.get("mrio_geography_code", "")).strip()
         country = str(row.get("calliope_country_code", "")).strip().upper()
         if not country:
@@ -424,6 +425,15 @@ def load_or_build_africa_national_mrio_placeholder_scenarios(config_dir: Path, r
     noisy timestamp-only diffs, so the file is regenerated only when missing,
     malformed, or tied to an older source report hash.
     """
+    override = dataset_path_override("africa_placeholder_scenarios")
+    if override is not None:
+        try:
+            payload = json.loads(override.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise ValueError(f"Uploaded africa_placeholder_scenarios dataset could not be parsed: {override}") from exc
+        if not isinstance(payload, dict) or not isinstance(payload.get("scenarios"), dict):
+            raise ValueError(f"Uploaded africa_placeholder_scenarios dataset is malformed: {override}")
+        return payload
     path = config_dir / "generated" / "africa_national_mrio_placeholder_scenarios.json"
     source_sha = str(report.get("source_sha256") or "")
     if path.exists():
@@ -504,8 +514,8 @@ def _mrio_shock_mapping_options(report: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 def build_integrated_scenario_catalog(config_dir: Path, calliope_root: Path, energy_scenarios: List[Dict[str, Any]]) -> Dict[str, Any]:
     report = load_or_parse_scenario_report(config_dir)
-    africa_mrio = write_africa_national_mrio_placeholder_scenarios(config_dir, report)
-    mapping_rows = _read_csv_rows(config_dir / "scenario_geography_mapping.csv")
+    africa_mrio = load_or_build_africa_national_mrio_placeholder_scenarios(config_dir, report)
+    mapping_rows = _read_csv_rows(dataset_path("scenario_geography_mapping", config_dir / "scenario_geography_mapping.csv"))
     target_years: set[int] = set()
     target_scenarios: List[Dict[str, Any]] = []
     for scenario_id in ("S1", "S2"):
@@ -566,7 +576,7 @@ def build_geography_alignment(
         selected_locations = sorted(
             {
                 str(row.get("calliope_location", "")).strip()
-                for row in _read_csv_rows(config_dir / "scenario_geography_mapping.csv")
+                for row in _read_csv_rows(dataset_path("scenario_geography_mapping", config_dir / "scenario_geography_mapping.csv"))
                 if str(row.get("mrio_geography_code", "")).strip() in {"ZA", "WF"}
                 and str(row.get("calliope_location", "")).strip() in available
             }
@@ -598,7 +608,7 @@ def build_geography_alignment(
         }
 
     mapped_rows = [
-        row for row in _read_csv_rows(config_dir / "scenario_geography_mapping.csv")
+        row for row in _read_csv_rows(dataset_path("scenario_geography_mapping", config_dir / "scenario_geography_mapping.csv"))
         if str(row.get("mrio_geography_code", "")).strip() == geography_code
     ]
     calliope_locations = _load_calliope_locations(calliope_root)
@@ -655,7 +665,7 @@ def build_scenario_package(
     report = load_or_parse_scenario_report(config_dir)
     scenarios = report.get("scenarios") or {}
     if mrio_scenario_id in AFRICA_MRIO_SCENARIO_LABELS:
-        africa_mrio = write_africa_national_mrio_placeholder_scenarios(config_dir, report)
+        africa_mrio = load_or_build_africa_national_mrio_placeholder_scenarios(config_dir, report)
         mrio_scenario = (africa_mrio.get("scenarios") or {}).get(mrio_scenario_id)
         if not mrio_scenario:
             raise ValueError(f"Africa national MRIO scenario '{mrio_scenario_id}' could not be generated.")

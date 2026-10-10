@@ -18,6 +18,9 @@ from .api.routers import (
     scenarios_router,
     system_router,
 )
+from .auth import auth_pages_router, configure_auth, fastapi_users
+from .auth.backends import auth_backend
+from .auth.schemas import UserRead
 from .jobs import JobManager
 from .runtime import EventStore, LocalEventStore
 from .services.artifact_storage import ArtifactStorageService, LocalArtifactStorageService
@@ -261,6 +264,10 @@ def create_app(
     app.state.job_manager = job_manager
     app.state.completion_bridge = completion_bridge
     app.state.frontend_dir = _discover_frontend_dir(settings)
+    app.state.auth_pending_tokens = {}
+    app.state.auth_dev_token_display = bool(getattr(settings, "auth_dev_token_display", True))
+    app.state.auth_ready = False
+    configure_auth(settings)
 
     app.add_middleware(
         CORSMiddleware,
@@ -276,8 +283,27 @@ def create_app(
     else:
         logger.warning("Frontend directory not found; UI routes disabled.")
 
+    app.mount(
+        "/auth/static",
+        StaticFiles(directory=str(Path(__file__).resolve().parent / "auth" / "static")),
+        name="auth_static",
+    )
+
+    users = fastapi_users()
+    app.include_router(users.get_auth_router(auth_backend()), prefix="/auth/api", tags=["auth"])
+    app.include_router(users.get_reset_password_router(), prefix="/auth/api", tags=["auth"])
+    app.include_router(users.get_verify_router(UserRead), prefix="/auth/api", tags=["auth"])
+    app.include_router(auth_pages_router)
+
     for router in (system_router, platform_router, scenarios_router, datasets_router, runs_router):
         app.include_router(router)
+
+    @app.on_event("startup")
+    async def _seed_auth_accounts() -> None:
+        if str(getattr(settings, "auth_mode", "") or "").strip().lower() == "local_password":
+            from .auth.db import ensure_state_ready
+
+            await ensure_state_ready(app.state)
 
     # Graceful shutdown: stop the completion bridge background thread.
     @app.on_event("shutdown")

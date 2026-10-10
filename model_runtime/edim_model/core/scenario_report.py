@@ -14,6 +14,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
+from ..dataset_paths import dataset_path
+
 
 SCENARIO_REPORT_SCHEMA_VERSION = "scenario_report_v1"
 STRUCTURED_REPORT_JSON = Path("generated") / "scenario_report_scenarios.json"
@@ -36,7 +38,7 @@ def load_or_parse_scenario_report(config_dir: Path, report_path: Path | None = N
     model cannot silently reintroduce narrative documents as runtime inputs.
     """
     config_dir = config_dir.resolve()
-    source_path = (report_path or (config_dir / STRUCTURED_REPORT_JSON)).resolve()
+    source_path = (report_path or dataset_path("scenario_report", config_dir / STRUCTURED_REPORT_JSON)).resolve()
     if source_path.suffix.lower() != ".json":
         raise ValueError("Scenario target data must be supplied as structured JSON.")
     if not source_path.exists():
@@ -48,8 +50,15 @@ def load_or_parse_scenario_report(config_dir: Path, report_path: Path | None = N
     if not isinstance(payload.get("scenarios"), dict) or not payload.get("scenario_ids"):
         raise ValueError(f"Structured scenario report input has no scenarios: {source_path}")
 
-    csv_path = config_dir / STRUCTURED_REPORT_CSV
+    csv_path = dataset_path("scenario_report_scenarios_csv", config_dir / STRUCTURED_REPORT_CSV)
     payload = dict(payload)
-    payload["source_file"] = str(csv_path.relative_to(config_dir.parent) if csv_path.exists() else source_path.relative_to(config_dir.parent))
+    payload["source_file"] = _source_label(csv_path if csv_path.exists() else source_path, config_dir)
     payload["source_sha256"] = _sha256(csv_path if csv_path.exists() else source_path)
     return payload
+
+
+def _source_label(path: Path, config_dir: Path) -> str:
+    try:
+        return str(path.relative_to(config_dir.parent))
+    except ValueError:
+        return path.name

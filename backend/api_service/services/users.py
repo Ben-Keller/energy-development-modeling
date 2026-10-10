@@ -6,6 +6,15 @@ from typing import Any, Dict, List, Tuple
 
 DEFAULT_USER_ID = "undp_analyst"
 AUTH_MODE_TEST_HEADER = "test_user_header"
+AUTH_MODE_LOCAL_PASSWORD = "local_password"
+
+_auth_admin_flags: Dict[str, bool] = {}
+
+
+def record_auth_admin_flag(user_id: str | None, is_admin: bool) -> None:
+    normalized = normalize_user_id(user_id, "")
+    if normalized:
+        _auth_admin_flags[normalized] = bool(is_admin)
 
 
 @dataclass(frozen=True)
@@ -111,6 +120,8 @@ def is_admin_user(user_id: str | None) -> bool:
     normalized = normalize_user_id(user_id, "")
     if normalized in {"system", "completion_bridge", "worker_bridge"}:
         return True
+    if normalized in _auth_admin_flags:
+        return _auth_admin_flags[normalized]
     user = _test_user_by_id().get(normalized)
     if not user:
         return False

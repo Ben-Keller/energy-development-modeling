@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Set up your account · EDIM{% endblock %}
+{% block heading %}Set up your account{% endblock %}
+
+{% block content %}
+<form method="post" action="/auth/invite">
+  <input type="hidden" name="token" value="{{ token }}" />
+
+  <div class="mb-3">
+    <label class="form-label" for="password">Choose a password</label>
+    <input
+      class="form-control"
+      id="password"
+      name="password"
+      type="password"
+      autocomplete="new-password"
+      required
+      autofocus
+    />
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label" for="confirm">Confirm password</label>
+    <input
+      class="form-control"
+      id="confirm"
+      name="confirm"
+      type="password"
+      autocomplete="new-password"
+      required
+    />
+  </div>
+
+  <button class="btn btn-edim w-100" type="submit">Activate account</button>
+</form>
+{% endblock %}
+
+{% block footer %}
+<p class="edim-meta">Invitation for {{ email or "your account" }}.</p>
+{% endblock %}

@@ -254,6 +254,7 @@ class ServiceBusExecutionQueue:
             "user_id": message.get("user_id", ""),
             "request": request_payload,
             "dataset_versions": message.get("dataset_versions") or [],
+            "dataset_manifest": message.get("dataset_manifest") or {},
             "attempt_count": int(message.get("attempt_count", message.get("attempt", 1))),
             "model_runtime": self._manifest,
             "artifact_policy": artifact_policy,

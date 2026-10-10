@@ -137,10 +137,24 @@ services:
       # Persistent runtime outputs
       - ./outputs/runs:/app/outputs/runs
       - ./outputs/figures:/app/outputs/figures
+      - ./outputs/dataset_uploads:/app/outputs/dataset_uploads
+      - ./outputs/platform:/app/outputs/platform
     environment:
       # Local auth shim used on develop branch only (plan 1.4)
       EDIM_AUTH_MODE: ${EDIM_AUTH_MODE:-test_header}
       EDIM_TEST_USER_ID: ${EDIM_TEST_USER_ID:-dev-user-1}
+
+      # local_password mode: backend login pages at /auth/login
+      EDIM_AUTH_SESSION_SECRET: ${EDIM_AUTH_SESSION_SECRET:-dev-only-change-me}
+      EDIM_AUTH_SESSION_TTL_SECONDS: ${EDIM_AUTH_SESSION_TTL_SECONDS:-43200}
+      EDIM_AUTH_COOKIE_NAME: ${EDIM_AUTH_COOKIE_NAME:-edim_session}
+      EDIM_AUTH_COOKIE_SECURE: ${EDIM_AUTH_COOKIE_SECURE:-false}
+      EDIM_AUTH_PASSWORD_MIN_LENGTH: ${EDIM_AUTH_PASSWORD_MIN_LENGTH:-10}
+      EDIM_AUTH_RESET_TTL_SECONDS: ${EDIM_AUTH_RESET_TTL_SECONDS:-3600}
+      EDIM_AUTH_INVITE_TTL_SECONDS: ${EDIM_AUTH_INVITE_TTL_SECONDS:-172800}
+      EDIM_AUTH_DEV_TOKEN_DISPLAY: ${EDIM_AUTH_DEV_TOKEN_DISPLAY:-true}
+      EDIM_AUTH_ADMIN_EMAIL: ${EDIM_AUTH_ADMIN_EMAIL:-daniele.ciminieri@gmail.com}
+      EDIM_AUTH_SEED_PASSWORD: ${EDIM_AUTH_SEED_PASSWORD:-}
 
       # PYTHONPATH includes /app/model_runtime so 'edim_model' is importable
       # as a top-level package regardless of the mounted volume layout.

@@ -6743,10 +6743,15 @@ function ProductBrand({ onClick = null }) {
   );
 }
 
+function loginRedirectUrl(returnHash) {
+  const hash = String(returnHash || window.location.hash || "#/").replace(/^#?/, "#");
+  return `/auth/login?next=${encodeURIComponent(`/ui/${hash}`)}`;
+}
+
 function UnifiedHeader({
   currentUserId,
   availableUsers,
-  onUserChange,
+  signedIn,
   apiTarget,
   systemCompatibility,
   onApiTargetModeChange,
@@ -6755,13 +6760,9 @@ function UnifiedHeader({
   onOpenDatasets,
 }) {
   const activeUser = (availableUsers || []).find((user) => user.user_id === currentUserId) || null;
-  const activeUserLabel = (activeUser && (activeUser.display_name || activeUser.user_id)) || currentUserId || "User";
-  const handleUserSelect = (event) => {
-    const userId = event.target.value;
-    const menu = event.currentTarget.closest("details");
-    if (menu) menu.removeAttribute("open");
-    onUserChange(userId);
-  };
+  const activeUserLabel = signedIn
+    ? (activeUser && (activeUser.display_name || activeUser.user_id)) || currentUserId || "User"
+    : "Not signed in";
   return (
     <header className="edim-topbar">
       <ProductBrand onClick={onReturnToLanding} />
@@ -6789,16 +6790,13 @@ function UnifiedHeader({
               if (menu) menu.open = false;
               onOpenDatasets();
             }}><img src="./assets/icons/layers.svg" alt="" aria-hidden="true" />Dataset library</button> : null}
-            <label className="header-user-select">
-              <span>Switch user</span>
-              <select value={currentUserId || ""} onChange={handleUserSelect} disabled={apiTargetLoading}>
-                {(availableUsers || []).map((user) => (
-                  <option key={user.user_id} value={user.user_id}>
-                    {user.display_name || user.user_id}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <button
+              type="button"
+              className="user-dataset-link user-logout-button"
+              onClick={() => window.location.assign(signedIn ? "/auth/logout" : loginRedirectUrl())}
+            >
+              <img src="./assets/icons/logout.svg" alt="" aria-hidden="true" />{signedIn ? "Logout" : "Sign in"}
+            </button>
           </div>
         </details>
       </div>
@@ -10765,6 +10763,7 @@ function resetTopLevelScroll() {
 
 function App() {
   const [session, setSession] = useState(null);
+  const authStateRef = useRef("unknown");
   const [currentUserId, setCurrentUserId] = useState(api.getActiveUserId ? api.getActiveUserId() : "undp_analyst");
   const [apiTarget, setApiTarget] = useState(() => (
     api.getApiTarget
@@ -10855,6 +10854,9 @@ function App() {
       setLandingOpen(!parts.length);
       setErrorMessage(""); setStatusMessage("");
       if (!parts.length || parts[0] === "methodology") return;
+      if (parts[0] === "datasets" || parts[0] === "projects") {
+        if (!(await requireDashboardSession(hash))) return;
+      }
       if (parts[0] === "datasets") { setRunViewMode("datasets"); return; }
       if (parts[0] !== "projects") throw new Error("This workspace link is not recognized. Open Projects to continue.");
       if (!parts[1]) { setRunViewMode("projects"); return; }
@@ -11037,10 +11039,12 @@ function App() {
         setErrorMessage("");
         return bundledCatalog;
       } catch (bundleErr) {
-        setErrorMessage(
-          `${toErrorMessage(err, "Failed to load model architecture catalog from backend runtime catalog")} ` +
-          `${toErrorMessage(bundleErr, "Bundled model architecture catalog is also unavailable")}`
-        );
+        if (authStateRef.current !== "anonymous") {
+          setErrorMessage(
+            `${toErrorMessage(err, "Failed to load model architecture catalog from backend runtime catalog")} ` +
+            `${toErrorMessage(bundleErr, "Bundled model architecture catalog is also unavailable")}`
+          );
+        }
       }
       return architectureCatalog;
     }
@@ -11058,6 +11062,7 @@ function App() {
   async function refreshSession() {
     try {
       const payload = await api.fetchSession();
+      authStateRef.current = "authenticated";
       setSession(payload);
       if (payload && payload.user && payload.user.user_id) {
         setCurrentUserId(payload.user.user_id);
@@ -11065,6 +11070,11 @@ function App() {
       }
       return payload;
     } catch (err) {
+      if (err && (err.status === 401 || err.status === 403)) {
+        authStateRef.current = "anonymous";
+        setSession(null);
+        return null;
+      }
       setErrorMessage(toErrorMessage(err, "Failed to load user session"));
       return null;
     }
@@ -11270,6 +11280,10 @@ function App() {
     setErrorMessage("");
     setStatusMessage("");
     await refreshSession();
+    if (authStateRef.current === "anonymous") {
+      await refreshModelArchitectures();
+      return;
+    }
     const [initialProjects] = await Promise.all([
       refreshProjects(),
       refreshInputDatasets(),
@@ -12673,14 +12687,23 @@ function App() {
     setMethodologyOpen(false);
     setLandingOpen(true);
   }
-  function openDatasetLibrary() {
+  async function requireDashboardSession(returnHash) {
+    if (authStateRef.current === "authenticated") return true;
+    if (authStateRef.current !== "anonymous") await refreshSession();
+    if (authStateRef.current !== "anonymous") return true;
+    window.location.assign(loginRedirectUrl(returnHash));
+    return false;
+  }
+  async function openDatasetLibrary() {
+    if (!(await requireDashboardSession("#/datasets"))) return;
     setStatusMessage("");
     setErrorMessage("");
     setMethodologyOpen(false);
     setLandingOpen(false);
     setRunViewMode("datasets");
   }
-  function openProjectsPage() {
+  async function openProjectsPage() {
+    if (!(await requireDashboardSession("#/projects"))) return;
     setStatusMessage("");
     setErrorMessage("");
     setMethodologyOpen(false);
@@ -12792,7 +12815,7 @@ function App() {
       <UnifiedHeader
         currentUserId={currentUserId}
         availableUsers={availableUsers}
-        onUserChange={handleUserChange}
+        signedIn={Boolean(session && session.user && session.user.user_id)}
         apiTarget={apiTarget}
         systemCompatibility={systemCompatibility}
         onApiTargetModeChange={handleApiTargetModeChange}

@@ -28,13 +28,21 @@
 #   powershell -File scripts/deploy_azure_appservice.ps1
 #
 # Options:
-#   -AppName        (default: undphq220api001)
-#   -SkipDeploy     build the zip only (useful for inspection)
+#   -AppName           (default: undphq220api001)
+#   -SkipDeploy        build the zip only (useful for inspection)
+#   -AuthMode          (default: local_password; pass test_header to disable login)
+#   -AuthAdminEmail    (default: daniele.ciminieri@gmail.com; guaranteed admin account)
+#   -AuthSeedPassword  (optional; activates the admin with this password on first boot)
+#   -AuthSessionSecret (optional; auto-generated and preserved in app settings otherwise)
 
 [CmdletBinding()]
 param(
     [string]$AppName = "undphq220api001",
-    [switch]$SkipDeploy
+    [switch]$SkipDeploy,
+    [string]$AuthMode = "local_password",
+    [string]$AuthAdminEmail = "daniele.ciminieri@gmail.com",
+    [string]$AuthSeedPassword = "",
+    [string]$AuthSessionSecret = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -199,6 +207,44 @@ az webapp config appsettings set `
     --settings "SCM_DO_BUILD_DURING_DEPLOYMENT=true" "WEBSITES_PORT=8000" "EDIM_RUNS_DIR=/home/edim-data/runs" "PYTHONPATH=/home/site/wwwroot:/home/site/wwwroot/model_runtime" `
     --output none
 
+if ($AuthSessionSecret) {
+    $sessionSecret = $AuthSessionSecret
+} else {
+    # NOTE: casting an empty command result via ([string](az ...)).Trim() gives
+    # $null in Windows PowerShell 5.1 and crashes .Trim() - assign then test.
+    $existingSecret = az webapp config appsettings list `
+        --resource-group $ResourceGroup `
+        --name $AppName `
+        --query "[?name=='EDIM_AUTH_SESSION_SECRET'].value | [0]" `
+        --output tsv
+    $sessionSecret = if ($existingSecret) { [string]$existingSecret } else { "" }
+}
+if (-not $sessionSecret) {
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $secretBytes = New-Object byte[] 32
+        $rng.GetBytes($secretBytes)
+    } finally {
+        $rng.Dispose()
+    }
+    $sessionSecret = [Convert]::ToBase64String($secretBytes)
+    Write-Host "Generated EDIM_AUTH_SESSION_SECRET (stored in app settings; pass -AuthSessionSecret to pin it)."
+}
+
+az webapp config appsettings set `
+    --resource-group $ResourceGroup `
+    --name $AppName `
+    --settings "EDIM_AUTH_MODE=$AuthMode" "EDIM_AUTH_ADMIN_EMAIL=$AuthAdminEmail" "EDIM_AUTH_SESSION_SECRET=$sessionSecret" `
+    --output none
+
+if ($AuthSeedPassword) {
+    az webapp config appsettings set `
+        --resource-group $ResourceGroup `
+        --name $AppName `
+        --settings "EDIM_AUTH_SEED_PASSWORD=$AuthSeedPassword" `
+        --output none
+}
+
 az webapp config set `
     --resource-group $ResourceGroup `
     --name $AppName `
@@ -217,3 +263,11 @@ if ($LASTEXITCODE -ne 0) { throw "az webapp deploy failed (exit $LASTEXITCODE)" 
 
 Write-Host "`nDeployed. App URL: https://$AppName.azurewebsites.net"
 Write-Host "UI:  https://$AppName.azurewebsites.net/ui/"
+Write-Host "Auth mode : $AuthMode"
+Write-Host "Admin user: $AuthAdminEmail"
+if ($AuthSeedPassword) {
+    Write-Host "Admin password: EDIM_AUTH_SEED_PASSWORD is set; sign in with it and change it after first sign-in."
+} else {
+    Write-Host "Admin account starts inactive. Open the one-time invite link from the log stream:"
+    Write-Host "  az webapp log tail --resource-group $ResourceGroup --name $AppName"
+}

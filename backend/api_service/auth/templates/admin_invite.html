@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Invite a user · EDIM{% endblock %}
+{% block heading %}Invite a user{% endblock %}
+
+{% block content %}
+<form method="post" action="/auth/admin/invites">
+  <div class="mb-3">
+    <label class="form-label" for="user_id">User id</label>
+    <input
+      class="form-control"
+      id="user_id"
+      name="user_id"
+      placeholder="analyst_jane"
+      required
+      autofocus
+    />
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label" for="email">E-mail</label>
+    <input class="form-control" id="email" name="email" type="email" required />
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label" for="display_name">Display name</label>
+    <input class="form-control" id="display_name" name="display_name" />
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label" for="organization">Organization</label>
+    <input class="form-control" id="organization" name="organization" />
+  </div>
+
+  <button class="btn btn-edim w-100" type="submit">Create invitation</button>
+</form>
+
+{% if invite_link %}
+<code class="edim-token">{{ invite_link }}</code>
+{% endif %}
+{% endblock %}
+
+{% block footer %}
+<div class="edim-foot">
+  <a href="/auth/admin/users">Manage users</a>
+  <a href="/auth/logout">Sign out</a>
+</div>
+{% endblock %}

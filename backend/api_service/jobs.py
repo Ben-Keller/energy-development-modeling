@@ -233,6 +233,7 @@ class JobManager:
                 user_id=user_id,
                 request_payload=request_payload,
                 created_at=_fmt_ts(time.time()) or "",
+                dataset_manifest=dataset_manifest or {},
             ).to_dict(),
         )
         bundle_path = write_model_run_bundle(queued_dir / "inputs" / "request_bundle.json", bundle)
@@ -316,8 +317,8 @@ class JobManager:
                 execution_id = uuid.uuid4().hex
                 run_id = uuid.uuid4().hex
                 rec = _JobRecord(execution_id=execution_id, run_id=run_id, request=req, user_id=user_id, request_fingerprint=request_fingerprint)
-                rec.queue_message = self._queue_message_for_record(rec).to_dict()
                 rec.dataset_snapshot = self._stage_execution_dataset_snapshot(execution_id, user_id=user_id)
+                rec.queue_message = self._queue_message_for_record(rec).to_dict()
                 self._jobs[execution_id] = rec
                 self._pending.append(execution_id)
                 self._create_platform_run_record(rec)
@@ -349,8 +350,8 @@ class JobManager:
                 user_id=user_id,
                 request_fingerprint=self._request_fingerprint(req, user_id=user_id),
             )
-            rec.queue_message = self._queue_message_for_record(rec).to_dict()
             rec.dataset_snapshot = self._stage_execution_dataset_snapshot(execution_id, user_id=user_id)
+            rec.queue_message = self._queue_message_for_record(rec).to_dict()
             self._jobs[execution_id] = rec
             self._pending.append(execution_id)
             self._create_platform_run_record(rec)
@@ -483,6 +484,7 @@ class JobManager:
             user_id=rec.user_id,
             request_payload=rec.request.model_dump(mode="json"),
             created_at=_fmt_ts(rec.created_at) or "",
+            dataset_manifest=rec.dataset_snapshot or {},
         )
 
     def _queue_message_for_values(
@@ -495,7 +497,25 @@ class JobManager:
         request_payload: Dict[str, Any],
         created_at: str,
         attempt: int = 1,
+        dataset_manifest: Dict[str, Any] | None = None,
     ) -> ExecutionQueueMessage:
+        manifest = dataset_manifest if isinstance(dataset_manifest, dict) else {}
+        dataset_versions: List[Dict[str, Any]] = []
+        for row in manifest.get("datasets") or []:
+            if not isinstance(row, dict) or not row.get("versioned_override"):
+                continue
+            dataset_id = str(row.get("id") or "")
+            version_id = str(row.get("active_version_id") or "")
+            if not dataset_id or not version_id:
+                continue
+            dataset_versions.append(
+                {
+                    "dataset_id": dataset_id,
+                    "version_id": version_id,
+                    "storage_uri": str(row.get("storage_uri") or ""),
+                    "filename": str(row.get("path") or "").replace("\\", "/").rsplit("/", 1)[-1],
+                }
+            )
         return ExecutionQueueMessage(
             execution_id=execution_id,
             run_id=run_id,
@@ -505,6 +525,8 @@ class JobManager:
             attempt=attempt,
             created_at=created_at,
             retry_policy=self._retry_policy_payload(),
+            dataset_versions=dataset_versions,
+            dataset_manifest=manifest,
         )
 
     def _coerce_queue_message(self, raw: Any) -> ExecutionQueueMessage:

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in · EDIM{% endblock %}
+{% block heading %}Sign in{% endblock %}
+
+{% block content %}
+<form method="post" action="/auth/login">
+  <input type="hidden" name="next" value="{{ next_url }}" />
+
+  <div class="mb-3">
+    <label class="form-label" for="email">E-mail</label>
+    <input
+      class="form-control"
+      id="email"
+      name="email"
+      type="email"
+      value="{{ email }}"
+      autocomplete="username"
+      required
+      autofocus
+    />
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label" for="password">Password</label>
+    <input
+      class="form-control"
+      id="password"
+      name="password"
+      type="password"
+      autocomplete="current-password"
+      required
+    />
+  </div>
+
+  <button class="btn btn-edim w-100" type="submit">Sign in</button>
+</form>
+{% endblock %}
+
+{% block footer %}
+<div class="edim-foot">
+  <a href="/auth/forgot-password">Forgot your password?</a>
+  <a href="/ui/">Go to the workspace</a>
+</div>
+<p class="edim-meta">Access is by invitation only.</p>
+{% endblock %}
