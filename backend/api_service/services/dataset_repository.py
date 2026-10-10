@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Protocol
 from fastapi import HTTPException
 from fastapi.responses import FileResponse, Response
 
+from .dataset_blob import mirror_dataset_version
+
 from ..settings import Settings
 
 DATASET_STAGING_SCHEMA_VERSION = "dataset_staging_v1"
@@ -255,6 +257,7 @@ class LocalDatasetRepository(DatasetRepository):
             "user_upload_listable": bool(row.get("user_upload_listable", True)),
             "active_version_id": row.get("active_version_id", ""),
             "active_version_created_at": row.get("active_version_created_at", ""),
+            "storage_uri": str(row.get("storage_uri", "")),
             "versioned_override": bool(row.get("versioned_override", False)),
             "source_path": str(source_path),
         }
@@ -521,6 +524,7 @@ def build_input_dataset_catalog(settings: Settings, user_id: str = "local_user")
                     "source_path": base_path,
                     "active_version_id": str(active_row.get("version_id", "")),
                     "active_version_created_at": str(active_row.get("created_at", "")),
+                    "storage_uri": str(active_row.get("storage_uri", "")),
                     "versioned_override": True,
                     "project_ids": list(active_row.get("project_ids") or []),
                 }
@@ -548,6 +552,7 @@ def build_input_dataset_catalog(settings: Settings, user_id: str = "local_user")
                 "user_upload_listable": True,
                 "active_version_id": str((active_row or {}).get("version_id") or ""),
                 "active_version_created_at": str((active_row or {}).get("created_at") or ""),
+                "storage_uri": str((active_row or {}).get("storage_uri") or ""),
                 "versioned_override": bool(active_row),
                 "project_ids": list((active_row or {}).get("project_ids") or []),
             }
@@ -753,7 +758,18 @@ def register_dataset_upload(settings: Settings, dataset_id: str, filename: str, 
         "user_id": normalize_scope_id(user_id, "local_user"),
         "project_ids": [],
         "validation": validation,
+        "storage_uri": "",
     }
+    try:
+        metadata["storage_uri"] = mirror_dataset_version(
+            user_id=metadata["user_id"],
+            dataset_id=dataset_id,
+            version_id=version_id,
+            filename=metadata["filename"],
+            content=content,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to store dataset version in blob storage: {exc}") from exc
     _write_json(versions_dir / f"{version_id}.json", metadata)
     active = _load_active_versions(settings, user_id=user_id)
     active[dataset_id] = metadata

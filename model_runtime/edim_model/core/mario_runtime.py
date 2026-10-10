@@ -7,6 +7,8 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 import pandas as pd
 
+from ..dataset_paths import dataset_path
+
 
 REQUIRED_MARIO_INPUT_FILES = [
     "calliope_tech_to_mario_sector.csv",
@@ -132,7 +134,7 @@ def load_scenario_assumptions(
     scenario_key: str = "",
     run_year: int | None = None,
 ) -> Dict[str, Any]:
-    path = config_dir / "mario_inputs" / "scenario_assumptions.csv"
+    path = dataset_path("scenario_assumptions", config_dir / "mario_inputs" / "scenario_assumptions.csv")
     rows = _read_csv_rows(path)
     placeholder_row_count, placeholder_examples = _placeholder_examples_for_rows(rows)
     selected_candidates: Dict[str, List[Dict[str, Any]]] = {}
@@ -205,7 +207,7 @@ def load_scenario_assumptions(
 
 
 def load_development_indicator_mapping(config_dir: Path) -> Dict[str, Any]:
-    path = config_dir / "mario_inputs" / "development_indicator_mapping.csv"
+    path = dataset_path("development_indicator_mapping", config_dir / "mario_inputs" / "development_indicator_mapping.csv")
     rows = _read_csv_rows(path)
     normalized_rows = []
     for row in rows:
@@ -478,11 +480,11 @@ def run_mario_io_runtime(
     shocks["shock_value_musd"] = pd.to_numeric(shocks["shock_value_musd"], errors="coerce").fillna(0.0)
 
     emp = _normalize_str_columns(
-        _read_csv(mario_dir / "employment_intensity.csv"),
+        _read_csv(dataset_path("employment_intensity", mario_dir / "employment_intensity.csv")),
         ["mario_region", "mario_sector"],
     )
     va = _normalize_str_columns(
-        _read_csv(mario_dir / "value_added_intensity.csv"),
+        _read_csv(dataset_path("value_added_intensity", mario_dir / "value_added_intensity.csv")),
         ["mario_region", "mario_sector"],
     )
     for col in ("jobs_per_musd_direct", "jobs_per_musd_total"):

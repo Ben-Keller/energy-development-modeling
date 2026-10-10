@@ -162,6 +162,7 @@ class Settings:
     auth_reset_ttl_seconds: int = 3600
     auth_invite_ttl_seconds: int = 172800
     auth_dev_token_display: bool = True
+    auth_admin_email: str = "daniele.ciminieri@gmail.com"
 
 
 def _repo_root() -> Path:
@@ -299,6 +300,7 @@ def get_settings() -> Settings:
         auth_reset_ttl_seconds=_env_int("EDIM_AUTH_RESET_TTL_SECONDS", int(_cfg(runtime_config, ["auth", "reset_ttl_seconds"], 3600)), minimum=60),
         auth_invite_ttl_seconds=_env_int("EDIM_AUTH_INVITE_TTL_SECONDS", int(_cfg(runtime_config, ["auth", "invite_ttl_seconds"], 172800)), minimum=60),
         auth_dev_token_display=_env_bool("EDIM_AUTH_DEV_TOKEN_DISPLAY", bool(_cfg(runtime_config, ["auth", "dev_token_display"], True))),
+        auth_admin_email=(os.getenv("EDIM_AUTH_ADMIN_EMAIL") or str(_cfg(runtime_config, ["auth", "admin_email"], "daniele.ciminieri@gmail.com")) or "daniele.ciminieri@gmail.com").strip().lower(),
     )
 
 

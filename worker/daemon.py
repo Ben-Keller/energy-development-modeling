@@ -299,9 +299,10 @@ def _download_datasets(
     blob_client,
     dataset_versions: list[dict],
     workspace: Path,
-) -> None:
+) -> dict:
+    downloaded: dict = {}
     if not dataset_versions:
-        return
+        return downloaded
     datasets_dir = workspace / "inputs" / "datasets"
     datasets_dir.mkdir(parents=True, exist_ok=True)
     container_name = f"{config.blob_container_prefix}input-datasets"
@@ -314,13 +315,31 @@ def _download_datasets(
         storage_uri = item.get("storage_uri", "")
         blob_name = _blob_name_from_uri(storage_uri)
         if not blob_name:
-            raise RuntimeError(f"Cannot parse storage_uri for dataset version {version_id}: {storage_uri}")
+            raise RuntimeError(
+                f"Dataset {dataset_id} version {version_id} has no blob storage_uri. "
+                "Re-upload it via the dataset library so the worker can fetch it."
+            )
         local_path = datasets_dir / f"{dataset_id}_{version_id}"
         logger.info("Downloading dataset %s version %s -> %s", dataset_id, version_id, local_path)
         blob = container.get_blob_client(blob_name)
         with open(local_path, "wb") as fh:
             downloader = blob.download_blob()
             downloader.readinto(fh)
+        downloaded[dataset_id] = local_path
+    return downloaded
+
+
+def _apply_downloaded_dataset_paths(bundle: dict, downloaded: dict) -> None:
+    manifest = bundle.get("dataset_manifest")
+    datasets = manifest.get("datasets") if isinstance(manifest, dict) else None
+    if not isinstance(datasets, list):
+        return
+    for row in datasets:
+        if not isinstance(row, dict):
+            continue
+        local_path = downloaded.get(str(row.get("id") or ""))
+        if local_path is not None:
+            row["path"] = str(local_path)
 
 
 def _upload_artifacts(
@@ -737,7 +756,13 @@ def _execute_payload(
     cancel_thread.start()
 
     try:
-        _download_datasets(config, blob_client, dataset_versions, workspace)
+        downloaded_paths = _download_datasets(config, blob_client, dataset_versions, workspace)
+        if downloaded_paths:
+            _apply_downloaded_dataset_paths(bundle, downloaded_paths)
+            (workspace / "inputs" / "request_bundle.json").write_text(
+                json.dumps(bundle, indent=2, default=str),
+                encoding="utf-8",
+            )
 
         event_log.append(level="milestone", stage=_WORKER_STAGE, message="Running preflight checks")
  

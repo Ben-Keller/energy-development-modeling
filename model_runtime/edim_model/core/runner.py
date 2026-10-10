@@ -24,6 +24,7 @@ from .integrated import (
     build_run_report_markdown,
     create_exchange_bundle_zip,
 )
+from ..dataset_paths import dataset_path, set_dataset_manifest
 from .levers import load_lever_mappings
 from .mario_runtime import (
     load_development_indicator_mapping,
@@ -851,7 +852,7 @@ def build_environment_setup_report(
                 category="calliope",
             )
 
-    lever_map_path = settings.config_dir / "lever_mappings.csv"
+    lever_map_path = dataset_path("lever_mappings", settings.config_dir / "lever_mappings.csv")
     if lever_map_path.exists():
         try:
             mappings = load_lever_mappings(settings.config_dir)
@@ -884,7 +885,7 @@ def build_environment_setup_report(
             category="controls",
         )
 
-    metadata_path = settings.config_dir / "scenario_metadata.csv"
+    metadata_path = dataset_path("scenario_metadata", settings.config_dir / "scenario_metadata.csv")
     if metadata_path.exists():
         try:
             metadata = load_scenario_metadata(metadata_path)
@@ -928,7 +929,7 @@ def build_environment_setup_report(
             category="controls",
         )
 
-    development_model_path = settings.config_dir / "development_model.csv"
+    development_model_path = dataset_path("development_model", settings.config_dir / "development_model.csv")
     if development_model_path.exists():
         try:
             cfg_rows = _read_csv_rows(development_model_path)
@@ -1528,7 +1529,7 @@ def _set_nested_by_dotted_key(root: Dict[str, Any], dotted_key: str, value: floa
 
 def _load_development_model_config(config_dir: Path) -> Dict[str, Any]:
     config = deep_merge({}, DEVELOPMENT_MODEL_DEFAULTS)
-    path = config_dir / "development_model.csv"
+    path = dataset_path("development_model", config_dir / "development_model.csv")
     if not path.exists():
         raise FileNotFoundError(f"Required development model config not found: {path}")
     try:
@@ -1606,7 +1607,7 @@ def _evaluate_mario_mapping_quality(config_dir: Path, tech_library: Dict[str, An
     required_set = set(required_techs)
     out["mapping_required_tech_count"] = len(required_set)
 
-    tech_map_rows = _read_csv_rows(mario_dir / "calliope_tech_to_mario_sector.csv")
+    tech_map_rows = _read_csv_rows(dataset_path("calliope_tech_to_mario_sector", mario_dir / "calliope_tech_to_mario_sector.csv"))
     if not tech_map_rows:
         warnings.append("MARIO mapping file calliope_tech_to_mario_sector.csv is missing or empty.")
     tech_map_df = pd.DataFrame(tech_map_rows) if tech_map_rows else pd.DataFrame()
@@ -1635,8 +1636,8 @@ def _evaluate_mario_mapping_quality(config_dir: Path, tech_library: Dict[str, An
             + (f" Examples: {preview}" if preview else "")
         )
 
-    capex_rows = _read_csv_rows(mario_dir / "capex_sector_split.csv")
-    opex_rows = _read_csv_rows(mario_dir / "opex_sector_split.csv")
+    capex_rows = _read_csv_rows(dataset_path("capex_sector_split", mario_dir / "capex_sector_split.csv"))
+    opex_rows = _read_csv_rows(dataset_path("opex_sector_split", mario_dir / "opex_sector_split.csv"))
     if not capex_rows:
         warnings.append("MARIO mapping file capex_sector_split.csv is missing or empty.")
     if not opex_rows:
@@ -1705,7 +1706,7 @@ def _year_from_profile(settings: Settings, req: RunRequest) -> int:
 def _load_country_pool_mapping(
     config_dir: Path, calliope_root: Path | None = None
 ) -> Tuple[Dict[str, str], Dict[str, str], Dict[str, str]]:
-    path = config_dir / "mario_inputs" / "country_to_pool.csv"
+    path = dataset_path("country_to_pool", config_dir / "mario_inputs" / "country_to_pool.csv")
     loc_to_region: Dict[str, str] = {}
     loc_to_pool: Dict[str, str] = {}
     pool_to_region: Dict[str, str] = {}
@@ -1935,9 +1936,9 @@ def _build_component_base_rows(model: Any, warnings: List[str]) -> Tuple[pd.Data
 
 def _load_mario_mapping_tables(config_dir: Path) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     mario_dir = config_dir / "mario_inputs"
-    tech_map = pd.read_csv(mario_dir / "calliope_tech_to_mario_sector.csv")
-    capex_split = pd.read_csv(mario_dir / "capex_sector_split.csv")
-    opex_split = pd.read_csv(mario_dir / "opex_sector_split.csv")
+    tech_map = pd.read_csv(dataset_path("calliope_tech_to_mario_sector", mario_dir / "calliope_tech_to_mario_sector.csv"))
+    capex_split = pd.read_csv(dataset_path("capex_sector_split", mario_dir / "capex_sector_split.csv"))
+    opex_split = pd.read_csv(dataset_path("opex_sector_split", mario_dir / "opex_sector_split.csv"))
 
     for df in (tech_map, capex_split, opex_split):
         for col in df.columns:
@@ -2853,6 +2854,7 @@ def run_model_synchronously(
     """
     from .edim_pipeline import run_edim_pipeline
 
+    set_dataset_manifest(request_bundle.get("dataset_manifest") if isinstance(request_bundle, dict) else None)
     return run_edim_pipeline(
         settings=settings,
         req=req,

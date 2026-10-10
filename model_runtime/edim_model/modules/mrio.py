@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from ..dataset_paths import dataset_path
 from .base import DevelopmentModelModule, ModelModuleInfo
 
 
@@ -101,7 +102,7 @@ class MrioDevelopmentModule(DevelopmentModelModule):
                 "target_year": 2030,
             },
             "metadata": {
-                "geography_alignment_options": _read_csv_rows(settings.config_dir / "scenario_geography_mapping.csv"),
+                "geography_alignment_options": _read_csv_rows(dataset_path("scenario_geography_mapping", settings.config_dir / "scenario_geography_mapping.csv")),
                 "report": {
                     "source_file": report.get("source_file", ""),
                     "source_sha256": report.get("source_sha256", ""),

@@ -1315,6 +1315,12 @@ class MainAndArtifactTests(unittest.TestCase):
             record = client.get(f"/api/projects/{project_a}/runs/{draft['run_id']}/diagnostics", headers={"X-EDIM-User-Id": "admin"}).json()["run"]
             self.assertEqual(record["execution_queue_message"]["schema_version"], "execution_queue_message")
             self.assertEqual(record["execution_queue_message"]["execution_id"], submitted["execution_id"])
+            message_versions = record["execution_queue_message"]["dataset_versions"]
+            self.assertEqual(len(message_versions), 1)
+            self.assertEqual(message_versions[0]["dataset_id"], "lever_mappings")
+            self.assertEqual(message_versions[0]["version_id"], upload.json()["version_id"])
+            message_rows = record["execution_queue_message"]["dataset_manifest"]["datasets"]
+            self.assertTrue(next(row for row in message_rows if row["id"] == "lever_mappings")["versioned_override"])
             snapshot_rows = record["dataset_snapshot"]["datasets"]
             lever_snapshot = next(row for row in snapshot_rows if row["id"] == "lever_mappings")
             self.assertEqual(lever_snapshot["active_version_id"], upload.json()["version_id"])
@@ -1341,6 +1347,103 @@ class MainAndArtifactTests(unittest.TestCase):
             self.assertTrue(Path(lever_row["path"]).exists())
             self.assertTrue(str(lever_row["staged_relative_path"]).startswith("inputs/datasets/lever_mappings/"))
             self.assertEqual(len(lever_row["content_sha256"]), 64)
+
+    def test_dataset_path_resolver_prefers_active_override(self):
+        from model_runtime.edim_model.dataset_paths import dataset_path, set_dataset_manifest
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fallback = Path(tmp) / "fallback.csv"
+            fallback.write_text("default\n", encoding="utf-8")
+            override = Path(tmp) / "override.csv"
+            override.write_text("override\n", encoding="utf-8")
+            set_dataset_manifest(
+                {
+                    "datasets": [
+                        {"id": "development_model", "path": str(override)},
+                        {"id": "missing_file", "path": str(Path(tmp) / "absent.csv")},
+                    ]
+                }
+            )
+            try:
+                self.assertEqual(dataset_path("development_model", fallback), override)
+                self.assertEqual(dataset_path("missing_file", fallback), fallback)
+                self.assertEqual(dataset_path("unknown_dataset", fallback), fallback)
+            finally:
+                set_dataset_manifest(None)
+
+    def test_dataset_upload_mirrors_to_blob_only_when_configured(self):
+        from api_service.services import dataset_blob
+
+        with patch.dict("os.environ", {"EDIM_AZURITE_CONNECTION_STRING": "", "EDIM_BLOB_ACCOUNT_URL": ""}):
+            self.assertEqual(
+                dataset_blob.mirror_dataset_version(
+                    user_id="undp_analyst",
+                    dataset_id="lever_mappings",
+                    version_id="v1",
+                    filename="lever_mappings.csv",
+                    content=b"key,value\n",
+                ),
+                "",
+            )
+
+        class _FakeContainer:
+            def __init__(self):
+                self.uploaded = {}
+
+            def create_container(self):
+                return None
+
+            def upload_blob(self, name, data, overwrite=False):
+                self.uploaded[name] = bytes(data)
+
+            def get_blob_client(self, name):
+                return type("_FakeBlob", (), {"url": f"https://blob.example/stg-input-datasets/{name}"})()
+
+        fake_container = _FakeContainer()
+        fake_client = type("_FakeClient", (), {"get_container_client": lambda self, name: fake_container})()
+        with patch.dict("os.environ", {"EDIM_AZURITE_CONNECTION_STRING": "UseDevelopmentEmulator=true"}):
+            with patch("api_service.services.blob_artifact_storage._blob_service_client_from_env", return_value=fake_client):
+                url = dataset_blob.mirror_dataset_version(
+                    user_id="undp_analyst",
+                    dataset_id="lever_mappings",
+                    version_id="v1",
+                    filename="lever_mappings.csv",
+                    content=b"key,value\n",
+                )
+        self.assertEqual(url, "https://blob.example/stg-input-datasets/undp_analyst/lever_mappings/v1.csv")
+        self.assertEqual(fake_container.uploaded, {"undp_analyst/lever_mappings/v1.csv": b"key,value\n"})
+
+    def test_model_loaders_honor_dataset_overrides(self):
+        from model_runtime.edim_model.core.mario_runtime import load_development_indicator_mapping
+        from model_runtime.edim_model.dataset_paths import set_dataset_manifest
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_dir = Path(tmp) / "inputs"
+            mario_dir = config_dir / "mario_inputs"
+            mario_dir.mkdir(parents=True)
+            default_mapping = mario_dir / "development_indicator_mapping.csv"
+            default_mapping.write_text(
+                "indicator_id,indicator_name,driver_metric,aggregation_rule,unit,lag_years,notes\n"
+                "jobs_total,Total employment impact,jobs_total,sum,jobs,0,default row\n",
+                encoding="utf-8",
+            )
+            override_mapping = Path(tmp) / "override_mapping.csv"
+            override_mapping.write_text(
+                "indicator_id,indicator_name,driver_metric,aggregation_rule,unit,lag_years,notes\n"
+                "jobs_total,Total employment impact,e2e_override_marker,sum,jobs,0,override row\n",
+                encoding="utf-8",
+            )
+            set_dataset_manifest({"datasets": [{"id": "development_indicator_mapping", "path": str(override_mapping)}]})
+            try:
+                loaded = load_development_indicator_mapping(config_dir)
+                rows = loaded.get("rows") or loaded.get("records") or loaded.get("mappings") or []
+                self.assertTrue(rows)
+                self.assertEqual(rows[0].get("driver_metric"), "e2e_override_marker")
+            finally:
+                set_dataset_manifest(None)
+            fallback = load_development_indicator_mapping(config_dir)
+            rows = fallback.get("rows") or fallback.get("records") or fallback.get("mappings") or []
+            self.assertEqual(rows[0].get("driver_metric"), "jobs_total")
 
     def test_environment_setup_router_returns_checks(self):
         with tempfile.TemporaryDirectory() as tmp:

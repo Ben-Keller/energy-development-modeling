@@ -38,11 +38,7 @@ router = APIRouter()
 
 
 @router.get("/", include_in_schema=False)
-async def root(request: Request, user: UserContext = Depends(get_optional_user_context)):
-    settings = getattr(request.app.state, "settings", None)
-    mode = str(getattr(settings, "auth_mode", "") or "").strip().lower()
-    if mode == "local_password" and not user.user_id:
-        return RedirectResponse(url="/auth/login", status_code=307)
+async def root(request: Request):
     frontend_dir = getattr(request.app.state, "frontend_dir", None)
     if frontend_dir is not None:
         return RedirectResponse(url="/ui/", status_code=307)
@@ -366,7 +362,7 @@ def list_model_runtimes(
     job_manager: JobManager = Depends(get_job_manager),
     dataset_repository: DatasetRepository = Depends(get_dataset_repository),
     catalog_provider: ModelCatalogProvider = Depends(get_model_catalog_provider),
-    user: UserContext = Depends(get_current_user_context),
+    user: UserContext = Depends(get_optional_user_context),
 ):
     manifest = job_manager.runtime_manifest()
     dataset_manifest = dataset_repository.runtime_dataset_manifest(user_id=user.user_id)

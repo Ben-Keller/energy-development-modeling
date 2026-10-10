@@ -46,7 +46,10 @@ def _bind(settings):
 
 
 async def ensure_ready(request: Request) -> None:
-    state = request.app.state
+    await ensure_state_ready(request.app.state)
+
+
+async def ensure_state_ready(state) -> None:
     if getattr(state, "auth_ready", False):
         return
     loop_id = id(asyncio.get_running_loop())
@@ -58,9 +61,10 @@ async def ensure_ready(request: Request) -> None:
         async with engine.begin() as conn:
             await conn.run_sync(AuthBase.metadata.create_all)
         async with factory() as session:
-            from .bootstrap import seed_if_empty
+            from .bootstrap import ensure_admin, seed_if_empty
 
             await seed_if_empty(session, state.settings)
+            await ensure_admin(session, state.settings)
         state.auth_ready = True
 
 

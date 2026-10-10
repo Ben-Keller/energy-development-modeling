@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List
 
+from ..dataset_paths import dataset_path
 from .base import CancelCallback, EnergyModelModule, ModelModuleInfo, ProgressCallback
 
 
@@ -22,7 +23,7 @@ class CalliopeEnergyModule(EnergyModelModule):
         from ..core.scenarios import build_scenario_list
 
         overrides_path = settings.calliope_root / "overrides.yaml"
-        metadata_path = settings.config_dir / "scenario_metadata.csv"
+        metadata_path = dataset_path("scenario_metadata", settings.config_dir / "scenario_metadata.csv")
         scenarios = [row.model_dump() for row in build_scenario_list(overrides_path, metadata_path)]
         default_key = ""
         if scenarios:

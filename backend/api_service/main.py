@@ -9,7 +9,6 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api.routers import (
@@ -299,19 +298,12 @@ def create_app(
     for router in (system_router, platform_router, scenarios_router, datasets_router, runs_router):
         app.include_router(router)
 
-    @app.middleware("http")
-    async def guard_page_navigations(request: Request, call_next):
-        path = request.url.path
-        if (
-            str(getattr(settings, "auth_mode", "") or "").strip().lower() == "local_password"
-            and "text/html" in (request.headers.get("accept") or "")
-            and (path == "/" or path.startswith("/ui"))
-        ):
-            from .auth.backends import resolve_session_context
+    @app.on_event("startup")
+    async def _seed_auth_accounts() -> None:
+        if str(getattr(settings, "auth_mode", "") or "").strip().lower() == "local_password":
+            from .auth.db import ensure_state_ready
 
-            if await resolve_session_context(request) is None:
-                return RedirectResponse(url=f"/auth/login?next={path}", status_code=303)
-        return await call_next(request)
+            await ensure_state_ready(app.state)
 
     # Graceful shutdown: stop the completion bridge background thread.
     @app.on_event("shutdown")
