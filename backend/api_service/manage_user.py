@@ -5,7 +5,10 @@ Usage (from the directory where the ``api_service`` package lives):
     python -m api_service.manage_user <email> [options]
 
 Given an e-mail, it creates or completes a fully usable account (active,
-verified, admin by default) and returns the credentials. Examples:
+verified, admin by default) and returns the credentials. A fresh password is
+generated and printed only when the account is new or inactive, so repeated
+runs never rotate a working password; use --password to set your own or
+--keep-password to leave an existing one untouched. Examples:
 
     python -m api_service.manage_user daniele.ciminieri@gmail.com
     python -m api_service.manage_user someone@example.org --password "..."
@@ -50,15 +53,14 @@ async def _run(args: argparse.Namespace) -> int:
         async with engine.begin() as conn:
             await conn.run_sync(AuthBase.metadata.create_all)
 
-        password = args.password or ""
+        password = ""
         generated = False
         async with factory() as session:
             user = (await session.execute(select(AuthUser).where(func.lower(AuthUser.email) == email))).scalars().first()
             created = user is None
             if created:
-                if not password:
-                    password = helper.generate()
-                    generated = True
+                password = args.password or helper.generate()
+                generated = not args.password
                 user = AuthUser(
                     id=uuid.uuid4().hex,
                     user_id=user_id,
@@ -72,6 +74,7 @@ async def _run(args: argparse.Namespace) -> int:
                 )
                 session.add(user)
             else:
+                was_active = bool(user.is_active)
                 if not user.user_id:
                     user.user_id = user_id
                 user.is_active = True
@@ -82,10 +85,12 @@ async def _run(args: argparse.Namespace) -> int:
                     user.display_name = args.display_name
                 if args.organization:
                     user.organization = args.organization
-                if not args.keep_password:
-                    if not password:
-                        password = helper.generate()
-                        generated = True
+                if args.password:
+                    password = args.password
+                    user.hashed_password = helper.hash(password)
+                elif not args.keep_password and not was_active:
+                    password = helper.generate()
+                    generated = True
                     user.hashed_password = helper.hash(password)
             await session.commit()
             await session.refresh(user)
@@ -103,9 +108,10 @@ async def _run(args: argparse.Namespace) -> int:
     print(f"is_admin     : {bool(user.is_superuser)}")
     print(f"is_active    : {bool(user.is_active)}")
     print(f"created      : {created}")
-    print(f"login check  : {'OK' if login_ok else ('skipped (password kept)' if args.keep_password and not args.password else 'FAILED')}")
+    print(f"login check  : {'OK' if login_ok else ('n/a (password untouched)' if not password else 'FAILED')}")
     if password and generated:
         print(f"password     : {password}")
+        print(f"EDIM_MANAGE_USER_PASSWORD={password}")
         print("change it at /auth/change-password after the first sign-in")
     elif password:
         print("password     : (as provided)")
