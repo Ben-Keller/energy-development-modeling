@@ -88,7 +88,7 @@ async def _run(args: argparse.Namespace) -> int:
                 if args.password:
                     password = args.password
                     user.hashed_password = helper.hash(password)
-                elif not args.keep_password and not was_active:
+                elif not args.keep_password and (args.rotate_password or not was_active):
                     password = helper.generate()
                     generated = True
                     user.hashed_password = helper.hash(password)
@@ -125,6 +125,7 @@ def main() -> int:
     parser.add_argument("email", help="account e-mail")
     parser.add_argument("--password", default="", help="set this password (otherwise one is generated and printed)")
     parser.add_argument("--keep-password", action="store_true", help="do not touch the password of an existing account")
+    parser.add_argument("--rotate-password", action="store_true", help="force a fresh generated password even for an active account")
     parser.add_argument("--no-admin", action="store_true", help="create a regular (non-admin) account")
     parser.add_argument("--user-id", default="", help="ownership user_id (default: derived from the e-mail)")
     parser.add_argument("--display-name", default="", help="display name")
