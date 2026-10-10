@@ -210,11 +210,14 @@ az webapp config appsettings set `
 if ($AuthSessionSecret) {
     $sessionSecret = $AuthSessionSecret
 } else {
-    $sessionSecret = ([string](az webapp config appsettings list `
+    # NOTE: casting an empty command result via ([string](az ...)).Trim() gives
+    # $null in Windows PowerShell 5.1 and crashes .Trim() - assign then test.
+    $existingSecret = az webapp config appsettings list `
         --resource-group $ResourceGroup `
         --name $AppName `
         --query "[?name=='EDIM_AUTH_SESSION_SECRET'].value | [0]" `
-        --output tsv)).Trim()
+        --output tsv
+    $sessionSecret = if ($existingSecret) { [string]$existingSecret } else { "" }
 }
 if (-not $sessionSecret) {
     $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
